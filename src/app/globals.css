@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #2563eb;
+  --color-primary-light: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+  --sidebar-width: 240px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 侧边栏过渡动画 */
+.sidebar-transition {
+  transition: transform 0.3s ease, width 0.3s ease;
+}
+
+/* ===== 全局交互效果 ===== */
+
+/* 所有按钮/可点击元素统一过渡 */
+@layer base {
+  button, a, [role="button"], input, select, textarea {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: 200ms;
+    transition-timing-function: ease;
+  }
+}
+
+/* 卡片悬停效果 */
+@layer components {
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    @apply shadow-md border-gray-200;
+  }
+
+  /* 导航链接交互 */
+  .nav-link {
+    @apply transition-all duration-200;
+  }
+  .nav-link:hover {
+    @apply bg-gray-100;
+  }
+  .nav-link:active {
+    @apply scale-[0.98] bg-gray-200;
+  }
+  .nav-link.active {
+    @apply bg-primary-50 text-primary-700 font-medium;
+  }
+
+  /* 输入框统一样式 */
+  .input-base {
+    @apply px-3 py-2 border border-gray-200 rounded-lg text-sm
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           disabled:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50
+           transition-all duration-200;
+  }
+
+  /* 按钮基础交互（非组件场景） */
+  .btn-interactive {
+    @apply transition-all duration-200;
+  }
+  .btn-interactive:hover:not(:disabled) {
+    @apply shadow-sm;
+  }
+  .btn-interactive:active:not(:disabled) {
+    @apply scale-[0.97];
+  }
+  .btn-interactive:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+}
