@@ -94,7 +94,6 @@ export function CarbonTopRanking() {
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="w-4 text-gray-400">{i + 1}</span>
-                  <span className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
                   <span className="truncate text-gray-800">{it.name}</span>
                 </span>
                 <span className="flex-shrink-0 text-gray-500">

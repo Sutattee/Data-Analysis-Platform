@@ -53,11 +53,11 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
   {
     group: "运营中心",
     items: [
-      { label: "运营概览",   href: "/settings/ops-overview" },
-      { label: "Prompt管理", href: "/settings/prompt-mgmt" },
+      // { label: "运营概览",   href: "/settings/ops-overview" },
+      // { label: "Prompt管理", href: "/settings/prompt-mgmt" },
       { label: "对话管理",   href: "/settings/conversation" },
-      { label: "样本问题集", href: "/settings/sample-questions" },
-      { label: "效果评估",   href: "/settings/effect-eval" },
+      // { label: "样本问题集", href: "/settings/sample-questions" },
+      // { label: "效果评估",   href: "/settings/effect-eval" },
     ],
   },
 ];

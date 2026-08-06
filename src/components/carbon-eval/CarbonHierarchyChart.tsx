@@ -71,12 +71,11 @@ export function CarbonHierarchyChart() {
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="w-4 text-gray-400">{i + 1}</span>
-                <span className="inline-block h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
                 <span className="truncate text-gray-800">{item.name}</span>
+                {level !== "equipment" && <span className="flex-shrink-0 font-bold text-primary-600">＞</span>}
               </span>
               <span className="flex-shrink-0 text-gray-500">
                 {item.value.toLocaleString()} {unit}｜占比 {item.share}%｜环比 {sign(item.mom)}%
-                {level !== "equipment" && <span className="ml-1 text-primary-500">›</span>}
               </span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-gray-100">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
 import { Card } from "@/components/ui/Card";
 import { getComplianceTrend, complianceMeta, COMPLIANCE_TYPES } from "@/lib/mock-data/carbon-eval";
 import { GRADE_STYLE, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
@@ -61,8 +61,8 @@ export function ComplianceTrendCharts({ onAnomaly }: { onAnomaly: (d: AnomalyDet
                   <XAxis dataKey="date" tick={{ fontSize: 9 }} stroke="#9ca3af" interval={1} />
                   <YAxis tick={{ fontSize: 9 }} stroke="#9ca3af" width={40} />
                   <Tooltip contentStyle={{ borderRadius: 8, fontSize: 11 }} labelFormatter={(label) => `${label}`} formatter={(v: any, n: any) => [v, ({ actual: "实际值", limit: "目标值" } as Record<string, string>)[n as string] ?? n]} />
-                  <ReferenceLine y={meta.limit} stroke="#f97316" strokeDasharray="4 4" />
-                  <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 3 }} name="实际值" />
+                  <Line type="monotone" dataKey="limit" stroke="#f97316" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="目标值" />
                   {/* 当前异常点：一般/预警/危险 → 黄/橙/红 */}
                   {data
                     .filter((d) => d.anomalyGrade)
