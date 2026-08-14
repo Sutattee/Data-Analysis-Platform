@@ -20,7 +20,7 @@ export function ResultTable({ markdown }: ResultTableProps) {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-100">
-      <table className="w-full text-sm border-collapse">
+      <table className="text-sm border-collapse">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             {table.headers.map((h, i) => (

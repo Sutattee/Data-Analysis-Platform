@@ -118,7 +118,7 @@ export function MessageBubble({
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[78%] ${isUser ? "order-1" : ""}`}>
+      <div className={`max-w-[78%] min-w-0 ${isUser ? "order-1" : ""}`}>
         {/* 头像（无时间戳） */}
         <div className="flex items-center gap-2 mb-1">
           <span
@@ -397,7 +397,7 @@ function SmartAnswerView({
   const chartType = message.chartMeta?.currentType;
 
   return (
-    <div className="bg-gray-100 text-gray-800 px-4 py-3.5 rounded-lg rounded-bl-sm space-y-4">
+    <div className="bg-gray-100 text-gray-800 px-4 py-3.5 rounded-lg rounded-bl-sm space-y-4 min-w-0 overflow-hidden">
       {/* 1. 查询结果 */}
       <Section icon="🔢" title="查询结果">
         <ResultTable markdown={sa.queryResult} />

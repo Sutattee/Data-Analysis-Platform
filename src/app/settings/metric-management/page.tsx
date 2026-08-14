@@ -22,7 +22,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 
 export default function MetricManagementPage() {
   const toast = useToast();
-  const [metrics] = useState<MetricManage[]>(() => metricList.map((m) => ({ ...m })));
+  const [metrics, setMetrics] = useState<MetricManage[]>(() => metricList.map((m) => ({ ...m })));
 
   // 搜索
   const [keyword, setKeyword] = useState("");
@@ -38,6 +38,62 @@ export default function MetricManagementPage() {
 
   // 详情
   const [detailTarget, setDetailTarget] = useState<MetricManage | null>(null);
+
+  // 达标反推设置（详情抽屉内编辑）
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
+  const [showReverseAdd, setShowReverseAdd] = useState(false);
+  const [newReverseItem, setNewReverseItem] = useState("");
+
+  const reverseItems = detailTarget?.reverseItems ?? [];
+
+  // 反推内容变更：同步更新列表与详情抽屉
+  function updateReverseItems(next: string[]) {
+    if (!detailTarget) return;
+    setMetrics((prev) => prev.map((m) => (m.id === detailTarget.id ? { ...m, reverseItems: next } : m)));
+    setDetailTarget({ ...detailTarget, reverseItems: next });
+  }
+  // AI 生成：重置为指标配置的推荐内容
+  function regenReverseItems() {
+    const recommend = metricList.find((x) => x.id === detailTarget?.id)?.reverseItems ?? [];
+    updateReverseItems([...recommend]);
+    toast("已按 AI 推荐内容重新生成", "success");
+  }
+  function commitReverseEdit() {
+    if (editingIdx === null) return;
+    const v = editingText.trim();
+    if (v) {
+      updateReverseItems(reverseItems.map((it, i) => (i === editingIdx ? v : it)));
+      toast("已保存", "success");
+    }
+    setEditingIdx(null);
+  }
+  function confirmReverseDelete() {
+    if (deleteIdx === null) return;
+    updateReverseItems(reverseItems.filter((_, i) => i !== deleteIdx));
+    toast("已删除", "success");
+    setDeleteIdx(null);
+  }
+  function addReverseItem() {
+    const v = newReverseItem.trim();
+    if (!v) {
+      toast("请输入反推内容", "warning");
+      return;
+    }
+    updateReverseItems([...reverseItems, v]);
+    setNewReverseItem("");
+    setShowReverseAdd(false);
+    toast("已新增反推内容", "success");
+  }
+  function closeDetail() {
+    setDetailTarget(null);
+    setEditingIdx(null);
+    setEditingText("");
+    setDeleteIdx(null);
+    setShowReverseAdd(false);
+    setNewReverseItem("");
+  }
 
   const filtered = useMemo(() => {
     const kw = applied.trim().toLowerCase();
@@ -191,20 +247,22 @@ export default function MetricManagementPage() {
         </div>
       </Modal>
 
-      {/* 指标详情抽屉 */}
+      {/* 指标详情抽屉：基础信息 / 目标值管理 / 达标反推设置 */}
       <Drawer
         open={detailTarget !== null}
-        onClose={() => setDetailTarget(null)}
+        onClose={closeDetail}
         title="指标详情"
         width={560}
         footer={
           <div className="flex">
-            <Button onClick={() => setDetailTarget(null)}>取消</Button>
+            <Button onClick={closeDetail}>取消</Button>
           </div>
         }
       >
         {detailTarget && (
           <div className="space-y-3">
+            {/* 一、基础信息 */}
+            <div className="text-sm font-semibold text-gray-800">基础信息</div>
             <Field label="中文名称" value={detailTarget.nameCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.code}</code>} />
             <Field label="业务域" value={detailTarget.domain} />
@@ -218,9 +276,167 @@ export default function MetricManagementPage() {
             <Field label="负责人" value={detailTarget.owner} />
             <Field label="创建时间" value={detailTarget.createdAt} />
             <Field label="更新时间" value={detailTarget.updatedAt} />
+
+            {/* 二、目标值管理 */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="mb-2 text-sm font-semibold text-gray-800">目标值管理</div>
+              {detailTarget.target ? (
+                <Field
+                  label="考核目标"
+                  value={
+                    <span>
+                      {detailTarget.target.direction} {detailTarget.target.value} {detailTarget.unit}
+                      <span className="ml-2 text-xs text-gray-400">用于目标达成预测与达标条件反推</span>
+                    </span>
+                  }
+                />
+              ) : (
+                <p className="text-sm text-gray-400">暂未配置目标值</p>
+              )}
+            </div>
+
+            {/* 三、达标反推设置 */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-semibold text-gray-800">达标反推设置</div>
+                {detailTarget.target && (
+                  <div className="flex gap-2">
+                    <Button variant="secondary" size="sm" onClick={regenReverseItems}>
+                      AI 生成
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setShowReverseAdd(true)}>
+                      + 新增
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {detailTarget.target ? (
+                <div className="space-y-2">
+                  <div className="flex items-center text-xs text-gray-400">
+                    <span>内容由 AI 生成，仅供参考。</span>
+                    <span className="ml-auto">共 {reverseItems.length} 条</span>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-gray-100">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">反推内容</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-28">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {reverseItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="py-10 text-center text-sm text-gray-400">暂无反推内容</td>
+                          </tr>
+                        ) : (
+                          reverseItems.map((item, i) => (
+                            <tr key={`${item}_${i}`} className="hover:bg-gray-50">
+                              <td className="px-3 py-2.5">
+                                {editingIdx === i ? (
+                                  <input
+                                    autoFocus
+                                    maxLength={50}
+                                    value={editingText}
+                                    onChange={(e) => setEditingText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") commitReverseEdit();
+                                      else if (e.key === "Escape") setEditingIdx(null);
+                                    }}
+                                    onBlur={commitReverseEdit}
+                                    className="w-full px-2 py-1 border border-primary-400 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-700">{item}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                                {editingIdx === i ? (
+                                  <div className="inline-flex gap-1">
+                                    <button
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={commitReverseEdit}
+                                      className="px-2 py-0.5 text-xs text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                    >
+                                      保存
+                                    </button>
+                                    <button
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => setEditingIdx(null)}
+                                      className="px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                    >
+                                      取消
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex gap-1">
+                                    <button
+                                      onClick={() => {
+                                        setEditingIdx(i);
+                                        setEditingText(item);
+                                      }}
+                                      className="px-2 py-0.5 text-xs text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                    >
+                                      编辑
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteIdx(i)}
+                                      className="px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 rounded transition-colors"
+                                    >
+                                      删除
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {showReverseAdd && (
+                    <div className="flex gap-2">
+                      <input
+                        autoFocus
+                        maxLength={50}
+                        value={newReverseItem}
+                        onChange={(e) => setNewReverseItem(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") addReverseItem();
+                          else if (e.key === "Escape") {
+                            setShowReverseAdd(false);
+                            setNewReverseItem("");
+                          }
+                        }}
+                        placeholder="输入反推内容（不超过50字）"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <span className="self-center text-xs text-gray-400 whitespace-nowrap">{newReverseItem.length}/50</span>
+                      <Button size="sm" onClick={addReverseItem}>保存</Button>
+                      <Button size="sm" variant="secondary" onClick={() => { setShowReverseAdd(false); setNewReverseItem(""); }}>取消</Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">该指标未配置目标值，暂不支持达标反推设置</p>
+              )}
+            </div>
           </div>
         )}
       </Drawer>
+
+      {/* 反推内容删除确认 */}
+      <Modal open={deleteIdx !== null} onClose={() => setDeleteIdx(null)} title="确认删除" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">确定删除该反推内容吗？删除后不可恢复。</p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setDeleteIdx(null)}>取消</Button>
+            <Button variant="danger" onClick={confirmReverseDelete}>确定</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

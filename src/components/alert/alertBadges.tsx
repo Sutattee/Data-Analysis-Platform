@@ -1,4 +1,5 @@
 import type { AlertLevel, AlertType, AlertStatus } from "@/types";
+import type { MonitorStatus } from "@/lib/mock-data/grid-monitor";
 
 const TAG_BASE = "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap";
 
@@ -19,6 +20,14 @@ export function AlertLevelBadge({ level }: { level: AlertLevel }) {
       {level}
     </span>
   );
+}
+
+// 网格监测状态：正常 = 绿色普通标签，其余五级复用告警等级配色
+export function MonitorStatusBadge({ status }: { status: MonitorStatus }) {
+  if (status === "正常") {
+    return <span className={`${TAG_BASE} bg-green-100 text-green-700`}>正常</span>;
+  }
+  return <AlertLevelBadge level={status} />;
 }
 
 // 告警类型标签：常规黑色普通标签（不使用醒目颜色）

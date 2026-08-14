@@ -2,8 +2,13 @@ import { NavItem } from "@/types";
 
 // 能源消耗 - 二级导航（左侧纵向）
 const ENERGY_NAV: NavItem[] = [
-  { label: "能耗预测与运行分析", href: "/energy/grid-forecast", icon: "🔮" },
-  { label: "碳排放与环保合规评价", href: "/energy/carbon-eval",   icon: "🌱" },
+  { label: "能源总览",       href: "/energy/overview",     icon: "📊" },
+  { label: "网格监控",       href: "/energy/grid-monitor", icon: "🖥️" },
+  { label: "预测分析", href: "/energy/forecast", icon: "📈", children: [
+    { label: "预测总览", href: "/energy/forecast/overview", icon: "📊" },
+    { label: "情景预测", href: "/energy/forecast/scenario", icon: "🧪" },
+    { label: "预测记录", href: "/energy/forecast/records",  icon: "📑" },
+  ]},
   { label: "告警中心",     href: "/alert", icon: "⚠️", children: [
     { label: "告警记录", href: "/alert/records",    icon: "📋" },
     { label: "告警管理", href: "/alert/management", icon: "🛠️" },

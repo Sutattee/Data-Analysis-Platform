@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -37,6 +37,12 @@ export default function AlertDetailPage() {
   const original = ALERT_RECORDS.find((r) => r.id === params.id);
   const [record, setRecord] = useState<AlertRecord | undefined>(original ? { ...original } : undefined);
   const [modalMode, setModalMode] = useState<"mark" | null>(null);
+  // 是否从能源总览「异常详情抽屉」跳入（存在恢复快照时一键返回抽屉）
+  const [fromDrawer, setFromDrawer] = useState(false);
+
+  useEffect(() => {
+    setFromDrawer(!!sessionStorage.getItem("anomaly-drawer-return"));
+  }, []);
 
   if (!record) {
     return (
@@ -167,7 +173,7 @@ export default function AlertDetailPage() {
 
       {/* ===== 底部固定：操作按钮 ===== */}
       <div className="flex-shrink-0 flex justify-center gap-2 pt-3 border-t border-gray-100">
-        <Button onClick={() => router.back()}>返回</Button>
+        <Button onClick={() => router.back()}>{fromDrawer ? "返回异常详情" : "返回"}</Button>
       </div>
 
       <AlertStatusModal

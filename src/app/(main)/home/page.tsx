@@ -80,7 +80,7 @@ const DEMO_CASES = [
     desc: "预设行业数据分析模板，开箱即用的可视化仪表盘体验",
     icon: "📊",
     color: "bg-pink-50 text-pink-600",
-    route: "/energy/grid-forecast",
+    route: "/energy/overview",
   },
 ];
 

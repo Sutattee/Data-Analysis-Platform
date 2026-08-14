@@ -91,7 +91,15 @@ export function AnomalyDrawer({
       footer={
         rec ? (
           <div className="flex justify-end">
-            <Button onClick={() => router.push(`/alert/records/${rec.id}`)}>查看告警记录详情</Button>
+            <Button
+              onClick={() => {
+                // 记录抽屉快照，返回总览页时一键恢复异常详情
+                sessionStorage.setItem("anomaly-drawer-return", JSON.stringify(detail));
+                router.push(`/alert/records/${rec.id}`);
+              }}
+            >
+              查看告警记录详情
+            </Button>
           </div>
         ) : undefined
       }
@@ -104,6 +112,7 @@ export function AnomalyDrawer({
           {/* 核心异常数据 */}
           <Section title="核心异常数据">
             <Field label="告警等级" value={level ? <AlertLevelBadge level={level} /> : "-"} />
+            {detail?.dept && <Field label="部门" value={detail.dept} />}
             <Field label="指标名称" value={metricName} />
             <Field label="基准 / 阈值" value={baseline} />
             {isForecast ? (

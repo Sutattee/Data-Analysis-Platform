@@ -446,6 +446,8 @@ export interface MetricManage {
   createdAt: string;       // 创建时间
   updatedAt?: string;      // 更新时间
   calcFormula?: string;    // 计算公式
+  target?: { value: number; direction: "不高于" | "不低于" }; // 目标值（目标值管理）
+  reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }
 
 // ========== 导航 ==========

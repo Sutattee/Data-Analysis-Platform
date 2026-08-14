@@ -9,13 +9,14 @@ interface DrawerProps {
   children: ReactNode;
   footer?: ReactNode;
   width?: number; // px，默认 480
+  padding?: boolean; // 内容区内边距，默认 true；嵌入全高布局组件时传 false
 }
 
 /**
  * 右侧滑出抽屉：遮罩 + 从右滑入面板，ESC 关闭、锁定 body 滚动，
  * 支持进入/退出过渡动画。
  */
-export function Drawer({ open, onClose, title, children, footer, width = 480 }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, width = 480, padding = true }: DrawerProps) {
   const [render, setRender] = useState(open);
   const [slideIn, setSlideIn] = useState(false);
 
@@ -73,7 +74,7 @@ export function Drawer({ open, onClose, title, children, footer, width = 480 }: 
             </button>
           </div>
         )}
-        <div className="flex-1 overflow-auto p-6">{children}</div>
+        <div className={`flex-1 min-h-0 overflow-auto ${padding ? "p-6" : ""}`}>{children}</div>
         {footer && (
           <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">{footer}</div>
         )}

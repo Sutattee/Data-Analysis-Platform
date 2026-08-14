@@ -19,6 +19,8 @@ export const metricList: MetricManage[] = [
     owner: "王五",
     createdAt: "2026-06-15 09:30",
     updatedAt: "2026-07-20 14:22",
+    target: { value: 0.035, direction: "不高于" },
+    reverseItems: ["剩余周期平均单位产值碳排放量", "剩余周期允许碳排放量"],
   },
   {
     id: "m2",
@@ -121,6 +123,8 @@ export const metricList: MetricManage[] = [
     owner: "王五",
     createdAt: "2026-06-20 09:00",
     updatedAt: "2026-07-19 11:25",
+    target: { value: 31.0, direction: "不高于" },
+    reverseItems: ["剩余周期平均单箱综合能耗", "剩余周期允许综合能耗"],
   },
   {
     id: "m8",

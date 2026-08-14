@@ -29,6 +29,7 @@ export interface AnomalyDetail {
   duration?: string;
   cause?: string;
   suggestion?: string;
+  dept?: string; // 部门 / 车间（能源总览等页面构造的异常携带）
   recordId?: string; // 存在时抽屉显示「查看告警记录详情」
   level?: AlertLevel; // 告警等级（与告警记录页一致）
 }

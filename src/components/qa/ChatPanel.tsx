@@ -37,7 +37,8 @@ const MODELS = [
 ];
 
 // ========== 组件 ==========
-export function ChatPanel({ initialQuery }: { initialQuery?: string }) {
+// compact：嵌入侧滑窗等窄容器时使用（压缩欢迎模式排版，交互能力不变）
+export function ChatPanel({ initialQuery, compact = false }: { initialQuery?: string; compact?: boolean }) {
   const { toggleFavorite, addHistory, isFavorited } = useApp();
 
   // ----- 消息 & 输入 -----
@@ -481,79 +482,91 @@ export function ChatPanel({ initialQuery }: { initialQuery?: string }) {
         </div>
       </Modal>
 
-      {/* ===== 欢迎模式（初始状态）===== */}
-      {isFresh ? (
-        <div className="flex-1 flex flex-col px-4 pt-8 max-w-3xl mx-auto w-full">
-          {/* 欢迎语 */}
-          <div className="mb-6">
-            <h2 className="flex items-baseline gap-1.5 text-3xl font-bold text-gray-900 tracking-tight">
-              <span className="text-5xl font-extrabold leading-none bg-gradient-to-r from-primary-600 to-blue-500 bg-clip-text text-transparent">
-                AI
-              </span>
-              <span>，让数据会说话</span>
-            </h2>
-            <p className="text-sm text-gray-500 leading-relaxed mt-3">
-              连接企业数据，智能分析业务，辅助科学决策。
-            </p>
-          </div>
+      {/* ===== 内容区（唯一滚动区）：欢迎模式 / 消息列表 ===== */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+        <div className={`max-w-3xl mx-auto w-full px-4 ${compact ? "pt-6" : "pt-8"}`}>
+          {isFresh ? (
+            <>
+              {/* 欢迎语 */}
+              <div className="mb-6">
+                {compact ? (
+                  <>
+                    <h2 className="text-xl font-bold text-gray-900 tracking-tight">AI，让数据会说话</h2>
+                    <p className="text-sm text-gray-500 leading-relaxed mt-2">
+                      连接企业数据，智能分析业务，辅助科学决策。
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="flex items-baseline gap-1.5 text-3xl font-bold text-gray-900 tracking-tight">
+                      <span className="text-5xl font-extrabold leading-none bg-gradient-to-r from-primary-600 to-blue-500 bg-clip-text text-transparent">
+                        AI
+                      </span>
+                      <span>，让数据会说话</span>
+                    </h2>
+                    <p className="text-sm text-gray-500 leading-relaxed mt-3">
+                      连接企业数据，智能分析业务，辅助科学决策。
+                    </p>
+                  </>
+                )}
+              </div>
 
-          {/* 推荐问题 */}
-          <p className="text-sm font-medium text-gray-600 mb-3">推荐问题</p>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {RECOMMENDED_QUESTIONS.map((q) => (
-              <button
-                key={q}
-                onClick={() => sendMessage(q)}
-                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-primary-50 hover:text-primary-600 active:scale-95 transition-all duration-200"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-
-          <InputArea />
-        </div>
-      ) : (
-        /* ===== 对话模式 ===== */
-        <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full">
-          {/* 消息列表 */}
-          <div ref={scrollRef} className="flex-1 overflow-auto space-y-4 mb-4 pr-2">
-            {messages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                isFavorited={isFavorited(msg.id)}
-                onToggleFavorite={() => {
-                  const idx = messages.findIndex((m) => m.id === msg.id);
-                  let question = "";
-                  for (let i = idx - 1; i >= 0; i--) {
-                    if (messages[i].role === "user") { question = messages[i].content; break; }
-                  }
-                  toggleFavorite(msg, question);
-                }}
-                onFeedback={handleFeedback}
-                onFollowUpClick={(q) => sendMessage(q)}
-                onChartTypeChange={(t) => handleChartTypeChange(msg.id, t)}
-              />
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 px-4 py-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-500 text-sm">
-                    <Spinner size="sm" />
-                    思考中...
+              {/* 推荐问题 */}
+              <p className="text-sm font-medium text-gray-600 mb-3">推荐问题</p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {RECOMMENDED_QUESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => sendMessage(q)}
+                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-primary-50 hover:text-primary-600 active:scale-95 transition-all duration-200"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            /* 消息列表 */
+            <div className="space-y-4 pb-4">
+              {messages.map((msg) => (
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  isFavorited={isFavorited(msg.id)}
+                  onToggleFavorite={() => {
+                    const idx = messages.findIndex((m) => m.id === msg.id);
+                    let question = "";
+                    for (let i = idx - 1; i >= 0; i--) {
+                      if (messages[i].role === "user") { question = messages[i].content; break; }
+                    }
+                    toggleFavorite(msg, question);
+                  }}
+                  onFeedback={handleFeedback}
+                  onFollowUpClick={(q) => sendMessage(q)}
+                  onChartTypeChange={(t) => handleChartTypeChange(msg.id, t)}
+                />
+              ))}
+              {loading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 px-4 py-3 rounded-lg">
+                    <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <Spinner size="sm" />
+                      思考中...
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* 底部输入区 */}
-          <div className="pt-3 border-t border-gray-100">
-            <InputArea />
-          </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* ===== 底部固定输入区：不论是否发送，位置恒定 ===== */}
+      <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-4">
+        <div className="max-w-3xl mx-auto w-full">
+          <InputArea />
+        </div>
+      </div>
     </div>
   );
 }

@@ -346,6 +346,13 @@ export function AlertRecordsList() {
         )}
       </Card>
 
+      {/* 来源页跳入时展示一键返回（如网格监测「预警记录」） */}
+      {searchParams.get("from") && (
+        <div className="flex justify-center">
+          <Button onClick={() => router.back()}>返回</Button>
+        </div>
+      )}
+
       <AlertStatusModal
         open={modal !== null}
         mode={modal?.mode ?? "mark"}
