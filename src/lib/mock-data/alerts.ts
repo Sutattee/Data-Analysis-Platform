@@ -31,7 +31,7 @@ export function sortAlerts(records: AlertRecord[]): AlertRecord[] {
   });
 }
 
-// ========== 预警对象模板（钢铁制造场景，供策略页"指定对象"复用） ==========
+// ========== 告警对象模板（钢铁制造场景，供策略页"指定对象"复用） ==========
 export interface AlertObject {
   code: string;
   name: string;
@@ -113,7 +113,7 @@ function tsAt(offsetMin: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-// ========== 生成 40 条预警记录（确定性） ==========
+// ========== 生成 40 条告警记录（确定性） ==========
 export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) => {
   const obj = ALERT_OBJECTS[i % ALERT_OBJECTS.length];
   const level = ALERT_LEVELS[i % ALERT_LEVELS.length];
@@ -125,7 +125,7 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) =>
   const notifyMethods = NOTIFY_COMBOS[i % NOTIFY_COMBOS.length];
   const handled = i % 3 === 0; // 约 1/3 已处理
 
-  // 预警值：当前异常=已越界；预测风险=接近但未越界
+  // 告警值：当前异常=已越界；预测风险=接近但未越界
   const deviated = obj.target + (obj.low ? -gap : gap);
   const approaching = obj.target + (obj.low ? -gap * 0.6 : gap * 0.6);
   const valueLabel =
@@ -171,7 +171,7 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) =>
     metricName: obj.metric,
     triggerTime,
     status: handled ? "已处理" : "未处理",
-    // 核心预警数据
+    // 核心告警数据
     valueLabel,
     baselineLabel,
     deviation,
@@ -183,7 +183,7 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) =>
     forecastTime,
     riskProb: type === "预测风险" && i % 2 === 0 ? `${75 + (i % 20)}%` : undefined,
     // 判定依据
-    strategyName: type === "当前异常" ? `${obj.metric}异常预警策略` : `${obj.metric}风险预警策略`,
+    strategyName: type === "当前异常" ? `${obj.metric}异常告警策略` : `${obj.metric}风险告警策略`,
     triggerCondition: `${obj.metric}${obj.low ? "低于" : "高于"}基准值${gap.toFixed(1)}%`,
     // 原因与建议（约 1/3 记录无明确原因，演示"暂未识别到明确原因"）
     causeSummary: i % 3 === 0 ? undefined : CAUSES[i % CAUSES.length](obj),
@@ -199,7 +199,7 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) =>
 });
 
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========
-// 供「新建预警-指定对象」分层多选 与「预警记录/管理」级联筛选 共用
+// 供「新建告警-指定对象」分层多选 与「告警记录/管理」级联筛选 共用
 export interface OrgNode {
   name: string;
   children?: OrgNode[];

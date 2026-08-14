@@ -22,7 +22,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 
 export default function MetricManagementPage() {
   const toast = useToast();
-  const [metrics, setMetrics] = useState<MetricManage[]>(() => metricList.map((m) => ({ ...m })));
+  const [metrics] = useState<MetricManage[]>(() => metricList.map((m) => ({ ...m })));
 
   // 搜索
   const [keyword, setKeyword] = useState("");
@@ -36,16 +36,14 @@ export default function MetricManagementPage() {
   const [file, setFile] = useState<File | null>(null);
   const [importError, setImportError] = useState("");
 
-  // 详情 / 编辑 / 删除
+  // 详情
   const [detailTarget, setDetailTarget] = useState<MetricManage | null>(null);
-  const [editTarget, setEditTarget] = useState<MetricManage | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MetricManage | null>(null);
 
   const filtered = useMemo(() => {
     const kw = applied.trim().toLowerCase();
     if (!kw) return metrics;
     return metrics.filter(
-      (m) => m.nameCn.toLowerCase().includes(kw) || m.nameEn.toLowerCase().includes(kw)
+      (m) => m.nameCn.toLowerCase().includes(kw) || m.code.toLowerCase().includes(kw)
     );
   }, [metrics, applied]);
 
@@ -59,8 +57,8 @@ export default function MetricManagementPage() {
 
   // 下载模板（生成 csv 内容，模拟 xlsx 模板）
   function downloadTemplate() {
-    const header = "指标中文名称,指标英文名称,业务域,业务定义,计算口径,小数位数,度量单位,同义词(选填),负责人,描述(选填)\n";
-    const sample = "总利润,sum_total_profit,产品销售,,,2,元,,Frank,\n";
+    const header = "指标中文名称,指标编码,业务域,业务定义,计算口径,小数位数,度量单位,同义词(选填),负责人,描述(选填)\n";
+    const sample = "总利润,I_FIN_001,产品销售,,,2,元,,Frank,\n";
     const blob = new Blob(["﻿" + header + sample], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -87,21 +85,6 @@ export default function MetricManagementPage() {
     setImportError("");
   }
 
-  // 编辑保存
-  function handleEditSave(updated: MetricManage) {
-    setMetrics((prev) => prev.map((m) => (m.id === updated.id ? { ...updated, updatedAt: nowStr() } : m)));
-    setEditTarget(null);
-    toast("保存成功", "success");
-  }
-
-  // 删除
-  function handleDeleteConfirm() {
-    if (!deleteTarget) return;
-    setMetrics((prev) => prev.filter((m) => m.id !== deleteTarget.id));
-    toast("已删除", "success");
-    setDeleteTarget(null);
-  }
-
   const th = "text-left px-4 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
 
   return (
@@ -117,7 +100,7 @@ export default function MetricManagementPage() {
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="搜索指标中文名称/英文名称"
+            placeholder="搜索指标中文名称/指标编码"
             className="flex-1 min-w-[260px] max-w-[360px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
           <Button onClick={handleSearch}>查询</Button>
@@ -133,7 +116,7 @@ export default function MetricManagementPage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className={th}>指标中文名称</th>
-                <th className={th}>指标英文名称</th>
+                <th className={th}>指标编码</th>
                 <th className={th}>业务域</th>
                 <th className={th}>同义词</th>
                 <th className={th}>描述</th>
@@ -148,7 +131,7 @@ export default function MetricManagementPage() {
               ) : paged.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">{m.nameCn}</td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{m.nameEn}</td>
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{m.code}</td>
                   <td className="px-4 py-3 text-gray-600">{m.domain}</td>
                   <td className="px-4 py-3 text-gray-600 max-w-[160px]"><div className="truncate" title={m.synonyms}>{m.synonyms || "—"}</div></td>
                   <td className="px-4 py-3 text-gray-500 max-w-[200px]"><div className="truncate" title={m.description}>{m.description}</div></td>
@@ -156,8 +139,6 @@ export default function MetricManagementPage() {
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{m.createdAt}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditTarget(m)}>编辑</Button>
-                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(m)}>删除</Button>
                   </td>
                 </tr>
               ))}
@@ -225,11 +206,11 @@ export default function MetricManagementPage() {
         {detailTarget && (
           <div className="space-y-3">
             <Field label="中文名称" value={detailTarget.nameCn} />
-            <Field label="英文名称" value={<code className="text-xs">{detailTarget.nameEn}</code>} />
-            <Field label="指标编码" value={detailTarget.code} />
+            <Field label="指标编码" value={<code className="text-xs">{detailTarget.code}</code>} />
             <Field label="业务域" value={detailTarget.domain} />
             <Field label="业务定义" value={detailTarget.definition} />
-            <Field label="计算口径" value={detailTarget.formula} />
+            <Field label="统计口径" value={detailTarget.formula} />
+            <Field label="计算公式" value={detailTarget.calcFormula} />
             <Field label="小数位数" value={String(detailTarget.decimals)} />
             <Field label="度量单位" value={detailTarget.unit} />
             <Field label="同义词" value={detailTarget.synonyms} />
@@ -240,103 +221,6 @@ export default function MetricManagementPage() {
           </div>
         )}
       </Drawer>
-
-      {/* 指标编辑抽屉 */}
-      {editTarget && (
-        <MetricEditDrawer
-          target={editTarget}
-          onClose={() => setEditTarget(null)}
-          onSave={handleEditSave}
-        />
-      )}
-
-      {/* 删除确认 */}
-      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="删除指标" size="sm">
-        <p className="text-sm text-gray-600">是否确认删除指标「{deleteTarget?.nameCn}」？</p>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button variant="secondary" onClick={() => setDeleteTarget(null)}>取消</Button>
-          <Button variant="danger" onClick={handleDeleteConfirm}>确定</Button>
-        </div>
-      </Modal>
     </div>
-  );
-}
-
-function nowStr() {
-  const d = new Date();
-  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-// 指标编辑抽屉
-function MetricEditDrawer({
-  target, onClose, onSave,
-}: { target: MetricManage; onClose: () => void; onSave: (m: MetricManage) => void }) {
-  const [form, setForm] = useState<MetricManage>({ ...target });
-  function set<K extends keyof MetricManage>(k: K, v: MetricManage[K]) {
-    setForm((prev) => ({ ...prev, [k]: v }));
-  }
-  const labelCls = "block text-xs text-gray-500 mb-1";
-  const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
-
-  return (
-    <Drawer open onClose={onClose} title="编辑指标" width={560}>
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>指标中文名称</label>
-            <input className={inputCls} value={form.nameCn} onChange={(e) => set("nameCn", e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>指标英文名称</label>
-            <input className={inputCls} value={form.nameEn} onChange={(e) => set("nameEn", e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>指标编码</label>
-            <input className={inputCls} value={form.code} onChange={(e) => set("code", e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>业务域</label>
-            <select className={inputCls} value={form.domain} onChange={(e) => set("domain", e.target.value)}>
-              {["生产管理", "质量管理", "能源管理", "物耗管理", "设备管理", "工艺质量", "成本管理"].map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>小数位数</label>
-            <input type="number" min={0} max={6} className={inputCls} value={form.decimals} onChange={(e) => set("decimals", Number(e.target.value))} />
-          </div>
-          <div>
-            <label className={labelCls}>度量单位</label>
-            <input className={inputCls} value={form.unit} onChange={(e) => set("unit", e.target.value)} />
-          </div>
-        </div>
-        <div>
-          <label className={labelCls}>业务定义</label>
-          <textarea rows={2} className={`${inputCls} resize-none`} value={form.definition} onChange={(e) => set("definition", e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>计算口径</label>
-          <textarea rows={2} className={`${inputCls} resize-none`} value={form.formula} onChange={(e) => set("formula", e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>负责人</label>
-          <input className={inputCls} value={form.owner} onChange={(e) => set("owner", e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>同义词（选填）</label>
-          <input className={inputCls} value={form.synonyms ?? ""} onChange={(e) => set("synonyms", e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>描述（选填）</label>
-          <textarea rows={3} className={`${inputCls} resize-none`} value={form.description ?? ""} onChange={(e) => set("description", e.target.value)} />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100">
-        <Button variant="secondary" onClick={onClose}>取消</Button>
-        <Button onClick={() => onSave(form)}>保存</Button>
-      </div>
-    </Drawer>
   );
 }

@@ -55,7 +55,7 @@ export function TraceSidebar({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索问题"
+          placeholder={tab === "metrics" ? "搜索指标" : "搜索问题"}
           className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
       </div>

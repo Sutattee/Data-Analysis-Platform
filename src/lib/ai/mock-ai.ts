@@ -191,7 +191,7 @@ function matchAnswer(input: string): { answer: string; isKnowledge: boolean } {
 
 1. **立即行动**：校准卷接机2号切丝宽度，预计恢复后单箱耗烟叶量回落至 38 公斤/箱左右
 2. **预防措施**：建立切丝宽度定期抽检机制，每班次检测一次
-3. **监控加强**：对A牌号烟支重量增设在线检测，提前预警异常`,
+3. **监控加强**：对A牌号烟支重量增设在线检测，提前告警异常`,
       isKnowledge: false,
     };
   }

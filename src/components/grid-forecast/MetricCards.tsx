@@ -118,7 +118,7 @@ export function CoreMetricCards() {
           <span className="text-sm text-gray-400">个</span>
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-400">
-          较昨日 +{anomaly.delta}个｜最高预警
+          较昨日 +{anomaly.delta}个｜最高告警
           <AlertLevelBadge level={anomaly.maxLevel} />
         </div>
       </CardShell>

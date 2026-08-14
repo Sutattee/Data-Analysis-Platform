@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { dataSourceTypes } from "@/lib/mock-data/data-source";
+import { selectableDataSourceTypes } from "@/lib/mock-data/data-source";
 import { Button } from "@/components/ui/Button";
 
 interface FilterBarProps {
@@ -38,7 +38,7 @@ export function FilterBar({
         <label className="text-sm text-gray-500 whitespace-nowrap">数据源类型</label>
         <select value={type} onChange={(e) => onTypeChange(e.target.value)} className={selectCls}>
           <option value="all">全部</option>
-          {dataSourceTypes.map((t) => (
+          {selectableDataSourceTypes.map((t) => (
             <option key={t.key} value={t.key}>
               {t.label}
             </option>

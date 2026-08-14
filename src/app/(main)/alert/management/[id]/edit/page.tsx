@@ -13,11 +13,11 @@ export default function EditStrategyPage() {
     <div className="flex flex-col h-[calc(100vh-96px)] gap-4">
       <div className="flex-shrink-0">
         <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-2">
-          <Link href="/alert/management" className="hover:text-primary-600">预警中心</Link>
+          <Link href="/alert/management" className="hover:text-primary-600">告警中心</Link>
           <span>/</span>
-          <span className="text-gray-600">数据预警详情</span>
+          <span className="text-gray-600">数据告警详情</span>
         </div>
-        <h1 className="text-xl font-bold text-gray-900">编辑数据预警</h1>
+        <h1 className="text-xl font-bold text-gray-900">编辑数据告警</h1>
       </div>
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
         {initial ? (
@@ -27,7 +27,7 @@ export default function EditStrategyPage() {
             <span className="text-4xl mb-3">🔍</span>
             <p className="text-sm text-gray-500">策略不存在或已被删除</p>
             <Link href="/alert/management" className="mt-3 text-sm text-primary-600 hover:text-primary-700">
-              返回预警管理
+              返回告警管理
             </Link>
           </div>
         )}

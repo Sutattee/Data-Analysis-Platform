@@ -117,10 +117,7 @@ export default function DataSourceListPage() {
           onKeywordChange={resetPage(setKeyword)}
           onSearch={() => setPage(1)}
           actions={
-            <>
-              <Button onClick={() => router.push("/settings/data-source/integrate")}>集成 Sparta 数据</Button>
-              <Button onClick={() => router.push("/settings/data-source/create")}>+ 新增数据源</Button>
-            </>
+            <Button onClick={() => router.push("/settings/data-source/create")}>+ 新增数据源</Button>
           }
         />
       </div>

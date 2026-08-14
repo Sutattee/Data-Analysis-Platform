@@ -57,7 +57,7 @@ export function AnomalyRanking() {
             <span className="col-span-3">对象名称</span>
             <span className="col-span-2">异常状态</span>
             <span className="col-span-2 pr-4 text-right">异常数量</span>
-            <span className="col-span-2">最高预警等级</span>
+            <span className="col-span-2">最高告警等级</span>
             <span className="col-span-2 text-right">操作</span>
           </div>
           {data.map((it, i) => (
@@ -92,7 +92,7 @@ export function AnomalyRanking() {
                   className="text-primary-600 hover:underline"
                   onClick={() => router.push(`/alert/records?object=${encodeURIComponent(it.name)}`)}
                 >
-                  查看预警记录
+                  查看告警记录
                 </button>
               </span>
             </div>
@@ -100,7 +100,7 @@ export function AnomalyRanking() {
         </div>
       )}
       <p className="mt-3 text-xs text-gray-400">
-        仅展示已发生的异常；点击对象名进入下级，「查看预警记录」跳转预警记录页。
+        仅展示已发生的异常；点击对象名进入下级，「查看告警记录」跳转告警记录页。
       </p>
     </Card>
   );

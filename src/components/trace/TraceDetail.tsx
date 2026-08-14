@@ -138,7 +138,7 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
             {showValues === false ? (
               <Grid
                 items={[
-                  { label: "指标英文名称", value: metric.nameEn },
+                  { label: "指标编码", value: metric.code },
                   { label: "评价周期", value: d.overview?.evalCycle ?? d.period },
                   { label: "支持组织维度", value: "企业、工厂、车间" },
                   { label: "统计范围", value: "当前用户有权访问的企业组织范围" },
@@ -148,7 +148,7 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
               <Grid
                 items={[
                   { label: "当次结果", value: d.value ? `${d.value}${d.unit ?? ""}` : undefined },
-                  { label: "指标英文名称", value: metric.nameEn },
+                  { label: "指标编码", value: metric.code },
                   { label: "时间范围", value: d.context?.timeRange },
                   { label: "统计范围", value: d.context?.orgScope },
                   { label: "数据截至时间", value: d.context?.dataAsOf },

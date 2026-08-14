@@ -55,9 +55,8 @@ const FORM_TYPES: Partial<Record<DataSourceTypeKey, string>> = {
 };
 
 // 新增页 Tab 顺序（PostgreSQL 在首位）→ 默认选中 PostgreSQL
-const CREATE_TAB_ORDER: DataSourceTypeKey[] = [
-  "postgresql", "mysql", "oracle", "sqlserver", "clickhouse", "api",
-];
+// 当前仅开放 PostgreSQL、MySQL，其余类型暂隐藏（保留代码）
+const CREATE_TAB_ORDER: DataSourceTypeKey[] = ["postgresql", "mysql"];
 const createTabs = CREATE_TAB_ORDER.map(
   (k) => dataSourceTypes.find((t) => t.key === k)!
 ).filter(Boolean);

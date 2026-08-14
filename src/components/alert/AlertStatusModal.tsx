@@ -26,7 +26,7 @@ export function AlertStatusModal({ open, mode, onClose, onConfirm }: AlertStatus
     <Modal open={open} onClose={onClose} title={isMark ? "标记为已处理" : "标记为误处理"} size="md">
       <div className="space-y-4">
         <p className="text-sm text-gray-600">
-          {isMark ? "是否确认已处理此预警？" : "是否确认误处理此预警？"}
+          {isMark ? "是否确认已处理此告警？" : "是否确认误处理此告警？"}
         </p>
 
         {isMark && (

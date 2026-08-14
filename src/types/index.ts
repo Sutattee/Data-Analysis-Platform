@@ -341,11 +341,11 @@ export interface ConversationRecord {
   messageCount: number;
 }
 
-// ========== 预警中心 ==========
-// 预警等级（优先级：危险 > 告警 > 预警 > 关注 > 提示）
+// ========== 告警中心 ==========
+// 告警等级（优先级：危险 > 告警 > 预警 > 关注 > 提示）
 export type AlertLevel = "提示" | "关注" | "预警" | "告警" | "危险";
 
-// 预警类型：当前异常（已发生）/ 预测风险（未来可能越界）
+// 告警类型：当前异常（已发生）/ 预测风险（未来可能越界）
 export type AlertType = "当前异常" | "预测风险";
 
 // 处理状态
@@ -354,20 +354,20 @@ export type AlertStatus = "未处理" | "已处理";
 // 业务领域
 export type AlertDomain = "生产管理" | "质量管理" | "能耗管理" | "设备管理";
 
-// 一条预警记录
+// 一条告警记录
 export interface AlertRecord {
-  id: string;                 // 预警编号 YJ202607270035（兼作路由参数）
+  id: string;                 // 告警编号 YJ202607270035（兼作路由参数）
   level: AlertLevel;          // 等级
-  title: string;              // 预警标题
-  type: AlertType;            // 预警类型（当前异常 / 预测风险）
+  title: string;              // 告警标题
+  type: AlertType;            // 告警类型（当前异常 / 预测风险）
   domain: AlertDomain;        // 业务领域
-  objectCode: string;         // 预警对象编号
-  objectName: string;         // 预警对象名称
+  objectCode: string;         // 告警对象编号
+  objectName: string;         // 告警对象名称
   metricName: string;         // 指标中文名称
-  triggerTime: string;        // 预警触发时间 YYYY-MM-DD HH:mm
+  triggerTime: string;        // 告警触发时间 YYYY-MM-DD HH:mm
   status: AlertStatus;        // 处理状态
-  // —— 核心预警数据 ——
-  valueLabel: string;         // 预警值（当前异常=当前值 / 预测风险=预测值）
+  // —— 核心告警数据 ——
+  valueLabel: string;         // 告警值（当前异常=当前值 / 预测风险=预测值）
   baselineLabel: string;      // 基准 / 阈值
   deviation: string;          // 偏离程度
   confidenceRange?: string;   // 置信区间（仅预测风险）
@@ -375,7 +375,7 @@ export interface AlertRecord {
   forecastTime?: string;      // 预计越界时间（仅预测风险）
   riskProb?: string;          // 风险概率（仅预测模型可提供时）
   // —— 判定依据 ——
-  strategyName: string;       // 预警策略名称
+  strategyName: string;       // 告警策略名称
   triggerCondition: string;   // 触发条件
   // —— 原因与处置建议 ——
   causeSummary?: string;      // 原因摘要（空表示暂未识别到明确原因）
@@ -389,9 +389,9 @@ export interface AlertRecord {
   handledBy?: string;         // 处理人
 }
 
-// ========== 预警管理（数据预警策略）==========
+// ========== 告警管理（数据告警策略）==========
 export type AlertOperator = "高于" | "低于" | "超出正常区间";
-export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "正常区间";
+export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "历史均值" | "正常区间";
 export type AlertDetectCycle = "每5分钟" | "每15分钟" | "每30分钟" | "每小时" | "每日" | "每月";
 export type AlertScope = "全部适用对象" | "指定对象";
 
@@ -405,10 +405,10 @@ export interface AlertCondition {
   deviation?: string;             // 偏离比例 %（选填）
 }
 
-// 数据预警策略
+// 数据告警策略
 export interface AlertStrategy {
   id: string;
-  name: string;                   // 预警名称
+  name: string;                   // 告警名称
   description?: string;           // 策略说明
   type: AlertType;                // 当前异常 / 预测风险
   domain: AlertDomain;            // 业务域
@@ -416,7 +416,7 @@ export interface AlertStrategy {
   objects: string[];              // 指定对象名称（scope=指定对象时）
   conditions: AlertCondition[];   // 触发条件
   relation: "且" | "或";          // 多条件关系
-  level: AlertLevel;              // 预警等级
+  level: AlertLevel;              // 告警等级
   detectCycle: AlertDetectCycle;  // 检测周期
   notifyTemplate: string;         // 通知预览模板
   notifyMethods: string[];        // 通知方式
@@ -432,7 +432,7 @@ export interface AlertStrategy {
 export interface MetricManage {
   id: string;
   nameCn: string;          // 指标中文名称
-  nameEn: string;          // 指标英文名称（唯一标识）
+  nameEn: string;          // 指标英文名称（保留：溯源拓扑等仍在用，列表/详情改用 code）
   code: string;            // 指标编码
   domain: string;          // 业务域
   definition: string;      // 业务定义
@@ -445,6 +445,7 @@ export interface MetricManage {
   owner: string;           // 负责人
   createdAt: string;       // 创建时间
   updatedAt?: string;      // 更新时间
+  calcFormula?: string;    // 计算公式
 }
 
 // ========== 导航 ==========

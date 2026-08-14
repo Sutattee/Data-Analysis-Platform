@@ -56,7 +56,7 @@ export function CarbonAnomalyRanking() {
             <span className="col-span-3">对象名称</span>
             <span className="col-span-2">异常状态</span>
             <span className="col-span-2 pr-4 text-right">异常数量</span>
-            <span className="col-span-2">最高预警等级</span>
+            <span className="col-span-2">最高告警等级</span>
             <span className="col-span-2 text-right">操作</span>
           </div>
           {data.map((it, i) => (
@@ -93,7 +93,7 @@ export function CarbonAnomalyRanking() {
                     router.push(`/alert/records?object=${encodeURIComponent(it.name)}&domain=${encodeURIComponent("碳排放与环保合规")}`)
                   }
                 >
-                  查看预警记录
+                  查看告警记录
                 </button>
               </span>
             </div>
@@ -101,7 +101,7 @@ export function CarbonAnomalyRanking() {
         </div>
       )}
       <p className="mt-3 text-xs text-gray-400">
-        仅展示碳排放及环保合规业务域异常；点击对象名进入下级，「查看预警记录」跳转预警记录页并带入对象与业务域筛选。
+        仅展示碳排放及环保合规业务域异常；点击对象名进入下级，「查看告警记录」跳转告警记录页并带入对象与业务域筛选。
       </p>
     </Card>
   );

@@ -64,7 +64,8 @@ export interface TraceDetail {
 export interface TraceMetric {
   id: string;
   name: string;
-  nameEn?: string;       // 指标英文名称
+  nameEn?: string;       // 指标英文名称（技术拓扑树节点展示用）
+  code?: string;         // 指标编码
   domain?: string;       // 业务域
   theme: string;
   metricType: "原子指标" | "衍生指标" | "派生指标";
@@ -219,7 +220,7 @@ const TEMPLATES: Record<MetricCategory, {
     steps: () => ["采集实际完成产量；", "采集计划产量；", "实际产量 ÷ 计划产量，得到生产效率。"],
     path: () => ["按生产计划组织生产", "统计实际产出", "与计划目标对比"],
     factors: () => ["设备产能", "原料供应", "排程合理性", "突发事件"],
-    app: () => "用于评估生产执行情况、预警交付风险。",
+    app: () => "用于评估生产执行情况、告警交付风险。",
     rules: () => ["实际与计划同口径；", "计划产量取已下达订单；", "结果按小数位展示。"],
   },
   operationCost: {
@@ -238,7 +239,7 @@ function generateMetric(m: MetricMeta): TraceMetric {
   // 指标组成（定义溯源用，无数值）：将口径中的 ÷ 替换为 ＋，得到组成项
   const composition = m.formulaBiz.includes("÷") ? m.formulaBiz.replace(/\s*÷\s*/g, " ＋ ") : m.formulaBiz;
   // 中英文补充
-  const ex = METRIC_EXTRA[m.id] || { nameEn: m.id, domain: m.theme, fieldCn: m.field, tableCn: m.table, modelEn: m.model, dbEn: m.db, sourcesEn: m.sources };
+  const ex = METRIC_EXTRA[m.id] || { nameEn: m.id, code: m.id, domain: m.theme, fieldCn: m.field, tableCn: m.table, modelEn: m.model, dbEn: m.db, sourcesEn: m.sources };
   // 生成多行执行结果（字段值 + 计算结果）
   const numFields = m.field.split(" / ").map((f) => f.trim());
   const numValues = [m.numerator, m.denominator].map((s) => extractNum(s || ""));
@@ -319,7 +320,7 @@ function generateMetric(m: MetricMeta): TraceMetric {
   };
 
   return {
-    id: m.id, name: m.name, nameEn: ex.nameEn, domain: ex.domain, theme: m.theme, metricType: m.metricType,
+    id: m.id, name: m.name, nameEn: ex.nameEn, code: ex.code, domain: ex.domain, theme: m.theme, metricType: m.metricType,
     businessTree, technicalTree,
     businessTreeDefine, technicalTreeDefine, businessDetailDefine, technicalDetailDefine,
     businessDetail: {
@@ -505,24 +506,24 @@ const METRIC_METAS: MetricMeta[] = [
 ];
 
 // 指标中英文补充（技术拓扑节点与数据来源展示中英文名称）
-const METRIC_EXTRA: Record<string, { nameEn: string; domain: string; fieldCn: string; tableCn: string; modelEn: string; dbEn: string; sourcesEn: string }> = {
-  packagingEff: { nameEn: "packaging_equipment_efficiency", domain: "设备管理", fieldCn: "运行时间 / 计划时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
-  controllableCost: { nameEn: "controllable_cost_per_carton", domain: "成本管理", fieldCn: "可控费用金额 / 产量", tableCn: "可控费用事实表", modelEn: "cost_model", dbEn: "finance_db", sourcesEn: "Finance System" },
-  rollingEff: { nameEn: "rolling_equipment_efficiency", domain: "设备管理", fieldCn: "运行时间 / 计划时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
-  inventoryTurnover: { nameEn: "inventory_turnover_rate", domain: "成本管理", fieldCn: "消耗金额 / 平均库存", tableCn: "库存事实表", modelEn: "inventory_model", dbEn: "wms_db", sourcesEn: "WMS, MES" },
-  laborProductivity: { nameEn: "labor_productivity", domain: "生产管理", fieldCn: "产值 / 在岗人数", tableCn: "劳动生产率事实表", modelEn: "hr_model", dbEn: "production_command_db", sourcesEn: "Production Command System" },
-  netEquipmentEff: { nameEn: "net_equipment_efficiency", domain: "设备管理", fieldCn: "运行时间 / 可用时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
-  productionEff: { nameEn: "production_efficiency", domain: "生产管理", fieldCn: "实际产量 / 计划产量", tableCn: "产量事实表", modelEn: "production_model", dbEn: "mes_db", sourcesEn: "MES, ERP" },
-  operationCost: { nameEn: "operation_cost", domain: "成本管理", fieldCn: "总成本", tableCn: "运营成本事实表", modelEn: "operation_cost_model", dbEn: "nc_db", sourcesEn: "NC System" },
-  paperConsumption: { nameEn: "paper_consumption_per_carton", domain: "物耗管理", fieldCn: "盘纸消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
-  labelPaperConsumption: { nameEn: "label_paper_consumption_per_carton", domain: "物耗管理", fieldCn: "商标纸消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
-  tobaccoConsumption: { nameEn: "tobacco_consumption_per_carton", domain: "物耗管理", fieldCn: "烟叶消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES" },
-  filterRodConsumption: { nameEn: "filter_rod_consumption_per_carton", domain: "物耗管理", fieldCn: "嘴棒消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
+const METRIC_EXTRA: Record<string, { nameEn: string; code: string; domain: string; fieldCn: string; tableCn: string; modelEn: string; dbEn: string; sourcesEn: string }> = {
+  packagingEff: { nameEn: "packaging_equipment_efficiency", code: "I_DEV_001", domain: "设备管理", fieldCn: "运行时间 / 计划时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
+  controllableCost: { nameEn: "controllable_cost_per_carton", code: "I_COST_001", domain: "成本管理", fieldCn: "可控费用金额 / 产量", tableCn: "可控费用事实表", modelEn: "cost_model", dbEn: "finance_db", sourcesEn: "Finance System" },
+  rollingEff: { nameEn: "rolling_equipment_efficiency", code: "I_DEV_002", domain: "设备管理", fieldCn: "运行时间 / 计划时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
+  inventoryTurnover: { nameEn: "inventory_turnover_rate", code: "I_COST_002", domain: "成本管理", fieldCn: "消耗金额 / 平均库存", tableCn: "库存事实表", modelEn: "inventory_model", dbEn: "wms_db", sourcesEn: "WMS, MES" },
+  laborProductivity: { nameEn: "labor_productivity", code: "I_PRD_001", domain: "生产管理", fieldCn: "产值 / 在岗人数", tableCn: "劳动生产率事实表", modelEn: "hr_model", dbEn: "production_command_db", sourcesEn: "Production Command System" },
+  netEquipmentEff: { nameEn: "net_equipment_efficiency", code: "I_DEV_003", domain: "设备管理", fieldCn: "运行时间 / 可用时间", tableCn: "设备运行事实表", modelEn: "device_runtime_model", dbEn: "mes_db", sourcesEn: "MES, Data Acquisition System" },
+  productionEff: { nameEn: "production_efficiency", code: "I_PRD_002", domain: "生产管理", fieldCn: "实际产量 / 计划产量", tableCn: "产量事实表", modelEn: "production_model", dbEn: "mes_db", sourcesEn: "MES, ERP" },
+  operationCost: { nameEn: "operation_cost", code: "I_COST_003", domain: "成本管理", fieldCn: "总成本", tableCn: "运营成本事实表", modelEn: "operation_cost_model", dbEn: "nc_db", sourcesEn: "NC System" },
+  paperConsumption: { nameEn: "paper_consumption_per_carton", code: "I_MAT_001", domain: "物耗管理", fieldCn: "盘纸消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
+  labelPaperConsumption: { nameEn: "label_paper_consumption_per_carton", code: "I_MAT_002", domain: "物耗管理", fieldCn: "商标纸消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
+  tobaccoConsumption: { nameEn: "tobacco_consumption_per_carton", code: "I_MAT_003", domain: "物耗管理", fieldCn: "烟叶消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES" },
+  filterRodConsumption: { nameEn: "filter_rod_consumption_per_carton", code: "I_MAT_004", domain: "物耗管理", fieldCn: "嘴棒消耗量 / 产量", tableCn: "物料消耗事实表", modelEn: "material_consumption_model", dbEn: "mes_db", sourcesEn: "MES, WMS" },
 };
 
 // ========== 单位产值碳排放量（完整示例，手工） ==========
 const carbonMetric: TraceMetric = {
-  id: "carbon", name: "单位产值碳排放量", nameEn: "carbon_per_output_value", domain: "能源管理", theme: "能耗指标", metricType: "派生指标",
+  id: "carbon", name: "单位产值碳排放量", nameEn: "carbon_per_output_value", code: "I_ENG_001", domain: "能源管理", theme: "能耗指标", metricType: "派生指标",
   businessTree: {
     id: "c_b1", label: "单位产值碳排放量（0.1444 吨/万元）", type: "metric", detail: {},
     children: [{

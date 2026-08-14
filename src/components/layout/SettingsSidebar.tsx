@@ -7,8 +7,16 @@ import { SETTINGS_NAV } from "@/lib/constants";
 
 export function SettingsSidebar() {
   const pathname = usePathname();
-  // 默认展开第一个组（系统配置）
-  const [expanded, setExpanded] = useState<Set<string>>(new Set([SETTINGS_NAV[0].group]));
+  // 默认展开第一个组（系统配置），并自动展开包含当前路由 item 的分组（避免进入子页时菜单折叠看不到高亮）
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const initial = new Set([SETTINGS_NAV[0].group]);
+    for (const g of SETTINGS_NAV) {
+      if (g.items.some((it) => pathname === it.href || pathname.startsWith(it.href + "/"))) {
+        initial.add(g.group);
+      }
+    }
+    return initial;
+  });
 
   function toggle(group: string) {
     setExpanded((prev) => {

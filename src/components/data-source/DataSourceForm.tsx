@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DataSourceRecord, DataSourceTypeKey } from "@/types";
-import { dataSourceTypes, mockTestConnectionCreate } from "@/lib/mock-data/data-source";
+import { selectableDataSourceTypes, mockTestConnectionCreate } from "@/lib/mock-data/data-source";
 import { useToast } from "@/components/ui/Toast";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -128,7 +128,7 @@ export function DataSourceForm({ mode, initial, onSubmit, onCancel }: Props) {
               setValues((prev) => ({ ...prev, type: t, port: mode === "edit" ? prev.port : PORT_BY_TYPE[t] }));
             }}
           >
-            {dataSourceTypes.map((t) => (
+            {selectableDataSourceTypes.map((t) => (
               <option key={t.key} value={t.key}>
                 {t.label}
               </option>

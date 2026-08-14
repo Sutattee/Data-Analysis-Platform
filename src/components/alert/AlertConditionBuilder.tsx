@@ -3,7 +3,7 @@
 import type { AlertType, AlertCondition } from "@/types";
 import {
   ALERT_OPERATORS,
-  ALERT_BASELINE_TYPES,
+  OPERATOR_BASELINE_MAP,
   FORECAST_RANGES,
   METRIC_OPTIONS,
   FORECAST_METRIC_OPTIONS,
@@ -101,7 +101,29 @@ export function AlertConditionBuilder({
       <div className="space-y-2.5">
         {conditions.map((c, i) => {
           const isRange = c.baselineType === "正常区间";
+          const isHistoryMean = c.baselineType === "历史均值";
+          const allowedBaselines = OPERATOR_BASELINE_MAP[c.operator];
           const [lo, hi] = rangeParts(c.baselineValue);
+
+          // 判断方式 ↔ 基准类型 联动
+          function handleOperatorChange(newOp: AlertCondition["operator"]) {
+            const allowed = OPERATOR_BASELINE_MAP[newOp];
+            const patch: Partial<AlertCondition> = { operator: newOp };
+            // 当前基准类型不在新判断方式的候选内 → 重置为首项
+            if (!allowed.includes(c.baselineType)) patch.baselineType = allowed[0];
+            // 单值 ↔ 正常区间 切换时清空，避免格式错配（单值 vs 下限～上限）
+            const willBeRange = (patch.baselineType ?? c.baselineType) === "正常区间";
+            if (isRange !== willBeRange) patch.baselineValue = "";
+            update(i, patch);
+          }
+          function handleBaselineTypeChange(newBt: AlertCondition["baselineType"]) {
+            const patch: Partial<AlertCondition> = { baselineType: newBt };
+            const willBeRange = newBt === "正常区间";
+            // 正常区间语义上唯一搭配「超出正常区间」
+            if (willBeRange) patch.operator = "超出正常区间";
+            if (isRange !== willBeRange) patch.baselineValue = "";
+            update(i, patch);
+          }
           return (
             <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50/50">
               <div className="flex flex-wrap items-end gap-3">
@@ -144,7 +166,7 @@ export function AlertConditionBuilder({
                   <select
                     className={selectCls}
                     value={c.operator}
-                    onChange={(e) => update(i, { operator: e.target.value as AlertCondition["operator"] })}
+                    onChange={(e) => handleOperatorChange(e.target.value as AlertCondition["operator"])}
                   >
                     {ALERT_OPERATORS.map((o) => (
                       <option key={o} value={o}>{o}</option>
@@ -158,9 +180,9 @@ export function AlertConditionBuilder({
                   <select
                     className={selectCls}
                     value={c.baselineType}
-                    onChange={(e) => update(i, { baselineType: e.target.value as AlertCondition["baselineType"] })}
+                    onChange={(e) => handleBaselineTypeChange(e.target.value as AlertCondition["baselineType"])}
                   >
-                    {ALERT_BASELINE_TYPES.map((b) => (
+                    {allowedBaselines.map((b) => (
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
@@ -188,9 +210,17 @@ export function AlertConditionBuilder({
                       />
                     </div>
                   </>
+                ) : isHistoryMean ? (
+                  // 历史均值由系统计算，无需用户输入
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500">历史均值</span>
+                    <div className="flex h-[38px] items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 text-sm text-gray-400">
+                      由系统自动计算
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500">基准值</span>
+                    <span className="text-xs text-gray-500">{c.baselineType}</span>
                     <input
                       className={inputCls}
                       value={c.baselineValue}

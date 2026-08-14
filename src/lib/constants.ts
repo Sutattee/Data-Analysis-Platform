@@ -4,9 +4,9 @@ import { NavItem } from "@/types";
 const ENERGY_NAV: NavItem[] = [
   { label: "能耗预测与运行分析", href: "/energy/grid-forecast", icon: "🔮" },
   { label: "碳排放与环保合规评价", href: "/energy/carbon-eval",   icon: "🌱" },
-  { label: "预警中心",     href: "/alert", icon: "⚠️", children: [
-    { label: "预警记录", href: "/alert/records",    icon: "📋" },
-    { label: "预警管理", href: "/alert/management", icon: "🛠️" },
+  { label: "告警中心",     href: "/alert", icon: "⚠️", children: [
+    { label: "告警记录", href: "/alert/records",    icon: "📋" },
+    { label: "告警管理", href: "/alert/management", icon: "🛠️" },
   ]},
   { label: "智能问数", href: "/qa",          icon: "💬" },
   { label: "指标溯源", href: "/metric-trace", icon: "🔗" },
@@ -30,7 +30,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "大模型平台", href: "/llm-platform", icon: "🧠" },
 ];
 
-// 管理后台二级导航（配置中心 / 运营中心）
+// 管理后台二级导航（配置中心）
 export interface SettingsNavGroup {
   group: string;
   items: { label: string; href: string }[];
@@ -44,20 +44,16 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "元数据管理", href: "/settings/metadata" },
       { label: "指标管理",   href: "/settings/metric-management" },
       { label: "业务术语",   href: "/settings/biz-term" },
-      { label: "业务逻辑",     href: "/settings/biz-logic" },
-      { label: "领域根因模板", href: "/settings/root-cause-template" },
-      { label: "主题分析",     href: "/settings/theme-analysis" },
-      { label: "报告模板",     href: "/settings/report-templates" },
+      { label: "业务逻辑",   href: "/settings/biz-logic" },
+      { label: "对话管理",   href: "/settings/conversation" },
     ],
   },
   {
-    group: "运营中心",
+    group: "归因配置",
     items: [
-      // { label: "运营概览",   href: "/settings/ops-overview" },
-      // { label: "Prompt管理", href: "/settings/prompt-mgmt" },
-      { label: "对话管理",   href: "/settings/conversation" },
-      // { label: "样本问题集", href: "/settings/sample-questions" },
-      // { label: "效果评估",   href: "/settings/effect-eval" },
+      { label: "能源管理", href: "/settings/attribution/energy" },
+      { label: "生产管理", href: "/settings/attribution/production" },
+      { label: "工艺质量", href: "/settings/attribution/quality" },
     ],
   },
 ];

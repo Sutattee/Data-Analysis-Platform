@@ -101,7 +101,7 @@ const seeds: Seed[] = [
   { id: "c11", user: "trader01", title: "期权持仓希腊字母风险分析", durationSec: 45.6, status: "运行中", feedback: "未反馈", inSampleSet: false, startTime: "2025-07-16 16:40:33", dataModel: "证券经纪业务主题", questionType: "智能问数" },
   { id: "c12", user: "admin", title: "季度报告模板生成", durationSec: 118, status: "中断", feedback: "未反馈", inSampleSet: false, startTime: "2025-07-16 17:01:12", dataModel: "经营分析模型-精简版", questionType: "报告生成" },
   { id: "c13", user: "analyst_li", title: "成本结构多维下钻分析", durationSec: 32.1, status: "正常", feedback: "点赞", inSampleSet: false, startTime: "2025-07-15 09:12:00", dataModel: "经营分析模型-精简版", questionType: "智能问数" },
-  { id: "c14", user: "ops_wang", title: "能耗异常预警记录查询", durationSec: 5.432, status: "正常", feedback: "点踩", inSampleSet: false, startTime: "2025-07-15 10:33:45", dataModel: "生产运营主题", questionType: "智能问数" },
+  { id: "c14", user: "ops_wang", title: "能耗异常告警记录查询", durationSec: 5.432, status: "正常", feedback: "点踩", inSampleSet: false, startTime: "2025-07-15 10:33:45", dataModel: "生产运营主题", questionType: "智能问数" },
   { id: "c15", user: "dev_chen", title: "产能利用率的计算口径是什么", durationSec: 7.89, status: "正常", feedback: "未反馈", inSampleSet: true, startTime: "2025-07-15 11:20:18", dataModel: "生产运营主题", questionType: "知识问答" },
   { id: "c16", user: "trader01", title: "北向资金实时净流入查询", durationSec: 2.1, status: "正常", feedback: "点赞", inSampleSet: false, startTime: "2025-07-15 14:05:50", dataModel: "证券经纪业务主题", questionType: "智能问数" },
 ];

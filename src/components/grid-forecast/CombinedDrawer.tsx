@@ -21,7 +21,7 @@ interface CombinedDrawerProps {
   anomaly: AnomalyDetail | null;
 }
 
-// 组合标记详情：Tab 切换「预测修正 / 异常预警」
+// 组合标记详情：Tab 切换「预测修正 / 异常告警」
 export function CombinedDrawer({ open, onClose, event, anomaly }: CombinedDrawerProps) {
   const [tab, setTab] = useState<"correction" | "anomaly">("correction");
   if (!event && !anomaly) return <Drawer open={open} onClose={onClose} title="组合标记详情">{null}</Drawer>;
@@ -44,7 +44,7 @@ export function CombinedDrawer({ open, onClose, event, anomaly }: CombinedDrawer
             tab === "anomaly" ? "border-primary-600 font-medium text-primary-700" : "border-transparent text-gray-500"
           }`}
         >
-          异常预警
+          异常告警
         </button>
       </div>
 

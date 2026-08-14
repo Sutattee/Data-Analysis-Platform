@@ -22,6 +22,14 @@ const OBJECTS = ["全厂", "动力车间", "制丝车间", "卷包车间"];
 const selectCls =
   "px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500";
 
+// AI 异常原因：按指标生成碳排放综合分析，按影响程度由高到低，融入关联对象/影响程度/证据/可信度
+function buildCarbonCause(object: string, metricName: string, unit: string, p: any): string {
+  if (metricName === "单位产值碳排放量") {
+    return `经分析，本次${object}单位产值碳排放量升至 ${p.actual} ${unit}，主要受产值下降与高碳能源占比上升共同影响。\n首要原因是卷包车间排产减少、工业产值下降，单位产值分摊排放上升，影响程度高、可信度高；\n其次，自备电厂燃煤机组负荷提升，高碳能源占比上升，产生中等影响，可信度高；\n此外，外购电力碳排放因子季节性偏高，间接排放略有增加，影响程度低、可信度中。`;
+  }
+  return `经分析，本次${object}碳排放总量升至 ${p.actual} ${unit}，主要受高碳能源消耗增加与外购电力上升共同影响。\n首要原因是锅炉燃煤负荷提升，直接排放（燃料燃烧）显著增加，影响程度高、可信度高；\n其次，外购电力因线损与尖峰用电增加，间接排放同步上升，产生中等影响，可信度高；\n此外，部分工序石灰石等辅料消耗上升，工艺排放略有增加，影响程度低、可信度中。`;
+}
+
 function buildCarbonAnomaly(object: string, metricName: string, unit: string, p: any): AnomalyDetail {
   return {
     title: `${object} · ${metricName}异常`,
@@ -31,7 +39,8 @@ function buildCarbonAnomaly(object: string, metricName: string, unit: string, p:
     deviation: `超出目标 ${(((p.actual - p.target) / p.target) * 100).toFixed(1)}%`,
     triggerTime: p.time ?? `${p.date}`,
     duration: "2小时15分钟",
-    cause: "碳排放当量短期上升，可能由高碳能源消耗增加或产值波动引起。",
+    // 动力车间：该对象当前数据不足，演示"暂无依据 → 补充异常原因"流程；其余对象展示 AI 综合分析
+    cause: object === "动力车间" ? "" : buildCarbonCause(object, metricName, unit, p),
     suggestion: "排查高排放源（锅炉/工艺直燃），优化能源结构与负荷调度。",
     level: p.anomalyGrade ? GRADE_TO_LEVEL[p.anomalyGrade as EvalGrade] : "预警",
   };
@@ -46,7 +55,7 @@ function buildCarbonForecastAnomaly(object: string, metricName: string, unit: st
     deviation: `预计超出目标 ${(((p.predict - p.target) / p.target) * 100).toFixed(1)}%`,
     confidenceRange: p.upper && p.lower ? `${p.lower} ~ ${p.upper} ${unit}` : undefined,
     forecastTime: `预计${p.date}越界`,
-    cause: "根据历史碳排放趋势预测，未来该指标可能超出目标/标准。",
+    cause: "",
     suggestion: "建议提前推进减排措施，优化高排放源运行，降低超标风险。",
     level: "预警" as AlertLevel,
   };

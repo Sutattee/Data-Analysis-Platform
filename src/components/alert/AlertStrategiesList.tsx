@@ -8,11 +8,11 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Spinner } from "@/components/ui/Spinner";
 import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
-import { AlertTypeBadge, AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
+import { AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { useApp } from "@/lib/store/AppContext";
 import { useToast } from "@/components/ui/Toast";
-import { ALERT_TYPES, ALERT_RECORDS, orgPathOf, EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
+import { ALERT_RECORDS, orgPathOf, EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
 import {
   getAlertStrategies,
@@ -35,7 +35,7 @@ const selectCls =
 
 // 启用前校验配置完整性
 function validateStrategy(s: AlertStrategy): { ok: boolean; msg: string } {
-  if (!s.name.trim()) return { ok: false, msg: "预警名称缺失" };
+  if (!s.name.trim()) return { ok: false, msg: "告警名称缺失" };
   if (s.conditions.length === 0) return { ok: false, msg: "触发条件缺失" };
   for (const c of s.conditions) {
     if (!c.metric.trim() || !c.baselineValue.trim()) return { ok: false, msg: "触发条件不完整" };
@@ -55,9 +55,9 @@ export function AlertStrategiesList() {
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
 
-  // 仅展示能耗管理方向的预警策略
+  // 仅展示能耗管理方向的告警策略
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
-    getAlertStrategies().filter((s) => s.domain === "能耗管理")
+    getAlertStrategies().filter((s) => s.domain === "能耗管理" && s.type === "当前异常")
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<StratFilter>(EMPTY_FILTER);
@@ -103,7 +103,6 @@ export function AlertStrategiesList() {
     const filtered = strategies.filter(
       (s) =>
         (!applied.keyword.trim() || s.name.toLowerCase().includes(applied.keyword.trim().toLowerCase())) &&
-        (!applied.type || s.type === applied.type) &&
         (!applied.domain || s.domain === applied.domain) &&
         (!applied.enabled || (applied.enabled === "启用" ? s.enabled : !s.enabled)) &&
         matchStrategyOrg(s)
@@ -132,7 +131,7 @@ export function AlertStrategiesList() {
     runLoad();
   }
   // 表头筛选：即时应用
-  function applyColumnFilter(key: "type" | "enabled", v: string) {
+  function applyColumnFilter(key: "enabled", v: string) {
     setApplied((prev) => ({ ...prev, [key]: v }));
     setPage(1);
   }
@@ -157,7 +156,7 @@ export function AlertStrategiesList() {
       toast("已删除", "success");
     } else {
       updateAlertStrategyById(confirm.id, { enabled: false });
-      toast("已停用，历史预警不受影响", "success");
+      toast("已停用，历史告警不受影响", "success");
     }
     setConfirm(null);
   }
@@ -168,7 +167,7 @@ export function AlertStrategiesList() {
 
   // 指标去重展示
   const metricsOf = (s: AlertStrategy) => Array.from(new Set(s.conditions.map((c) => c.metric))).join("、");
-  // 该策略关联的预警记录（按领域+类型模拟关联）
+  // 该策略关联的告警记录（按领域+类型模拟关联）
   const recordsOf = (s: AlertStrategy) =>
     ALERT_RECORDS.filter((r) => r.domain === s.domain && r.type === s.type).slice(0, 6);
 
@@ -181,13 +180,13 @@ export function AlertStrategiesList() {
             value={filter.keyword}
             onChange={(e) => setFilter({ ...filter, keyword: e.target.value })}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="搜索预警名称"
+            placeholder="搜索告警名称"
             className="w-[280px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
           <Button onClick={handleSearch}>查询</Button>
           <Button variant="secondary" onClick={handleReset}>重置</Button>
           {isAdmin && (
-            <Button className="ml-auto" onClick={() => router.push("/alert/management/new")}>+ 新建数据预警</Button>
+            <Button className="ml-auto" onClick={() => router.push("/alert/management/new")}>+ 新建数据告警</Button>
           )}
         </div>
         <div className="mt-3">
@@ -213,7 +212,7 @@ export function AlertStrategiesList() {
         {phase === "success" && total === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <span className="text-4xl mb-3">{hasFilter ? "🔍" : "📭"}</span>
-            <p className="text-sm text-gray-500">{hasFilter ? "无筛选结果" : "暂无预警策略"}</p>
+            <p className="text-sm text-gray-500">{hasFilter ? "无筛选结果" : "暂无告警策略"}</p>
             {hasFilter && <Button variant="secondary" className="mt-3" onClick={handleReset}>重置筛选</Button>}
           </div>
         )}
@@ -222,14 +221,8 @@ export function AlertStrategiesList() {
             <table className="w-full text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
-                  <th className="text-left px-4 py-3">预警名称</th>
+                  <th className="text-left px-4 py-3">告警名称</th>
                   <th className="text-left px-4 py-3">数据指标</th>
-                  <th className="text-left px-4 py-3">
-                    <span className="inline-flex items-center gap-0.5">
-                      预警类型
-                      <ColumnFilter options={ALERT_TYPES} value={applied.type} onChange={(v) => applyColumnFilter("type", v)} />
-                    </span>
-                  </th>
                   <th className="text-left px-4 py-3">触发条件</th>
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
@@ -246,7 +239,6 @@ export function AlertStrategiesList() {
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-800">{s.name}</td>
                     <td className="px-4 py-3 text-gray-600">{metricsOf(s)}</td>
-                    <td className="px-4 py-3"><AlertTypeBadge type={s.type} /></td>
                     <td className="px-4 py-3 text-gray-600 max-w-[220px]">
                       <div className="truncate" title={formatConditions(s)}>{formatConditions(s)}</div>
                     </td>
@@ -259,7 +251,7 @@ export function AlertStrategiesList() {
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
                       <div className="flex items-center justify-end gap-1 flex-wrap">
                         <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setViewTarget(s)}>查看</Button>
-                        <Button variant="ghost" size="sm" onClick={() => setRecordsTarget(s)}>预警记录</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setRecordsTarget(s)}>告警记录</Button>
                         {isAdmin && (
                           <>
                             <Button variant="ghost" size="sm" onClick={() => router.push(`/alert/management/${s.id}/edit`)}>编辑</Button>
@@ -296,13 +288,13 @@ export function AlertStrategiesList() {
       <Modal
         open={confirm !== null}
         onClose={() => setConfirm(null)}
-        title={confirm?.kind === "delete" ? "删除数据预警" : "停用数据预警"}
+        title={confirm?.kind === "delete" ? "删除数据告警" : "停用数据告警"}
         size="sm"
       >
         <p className="text-sm text-gray-600">
           {confirm?.kind === "delete"
-            ? "是否确认删除此预警？"
-            : "停用后不再生成新预警，历史预警不受影响。"}
+            ? "是否确认删除此告警？"
+            : "停用后不再生成新告警，历史告警不受影响。"}
         </p>
         <div className="flex justify-end gap-2 mt-5">
           <Button variant="secondary" onClick={() => setConfirm(null)}>取消</Button>
@@ -313,11 +305,10 @@ export function AlertStrategiesList() {
       </Modal>
 
       {/* 查看（只读详情） */}
-      <Drawer open={viewTarget !== null} onClose={() => setViewTarget(null)} title="预警策略详情" width={560}>
+      <Drawer open={viewTarget !== null} onClose={() => setViewTarget(null)} title="告警策略详情" width={560}>
         {viewTarget && (
           <div className="space-y-4 text-sm">
             <div className="flex items-center gap-2 flex-wrap">
-              <AlertTypeBadge type={viewTarget.type} />
               <AlertLevelBadge level={viewTarget.level} />
               <span className={viewTarget.enabled ? "text-green-600 font-medium" : "text-gray-400"}>
                 {viewTarget.enabled ? "启用" : "停用"}
@@ -353,15 +344,15 @@ export function AlertStrategiesList() {
         )}
       </Drawer>
 
-      {/* 预警记录（该策略关联的历史记录） */}
-      <Drawer open={recordsTarget !== null} onClose={() => setRecordsTarget(null)} title="预警记录" width={620}>
+      {/* 告警记录（该策略关联的历史记录） */}
+      <Drawer open={recordsTarget !== null} onClose={() => setRecordsTarget(null)} title="告警记录" width={620}>
         {recordsTarget && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-500">策略「{recordsTarget.name}」关联的预警记录（按领域与类型匹配）：</p>
+            <p className="text-sm text-gray-500">策略「{recordsTarget.name}」关联的告警记录（按领域与类型匹配）：</p>
             {recordsOf(recordsTarget).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <span className="text-3xl mb-2">📭</span>
-                <p className="text-sm">该策略暂无预警记录</p>
+                <p className="text-sm">该策略暂无告警记录</p>
               </div>
             ) : (
               <div className="space-y-2">

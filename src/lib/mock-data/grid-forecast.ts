@@ -15,7 +15,7 @@ import type { AlertLevel } from "@/types";
 export type EvalGrade = "优秀" | "良好" | "一般" | "预警" | "危险";
 export type ForecastStatus = "预计达标" | "存在超标风险" | "预计超标";
 
-// 异常详情（抽屉展示，可由预警记录或趋势异常点构造）
+// 异常详情（抽屉展示，可由告警记录或趋势异常点构造）
 export interface AnomalyDetail {
   title: string;
   metricName?: string;
@@ -29,8 +29,8 @@ export interface AnomalyDetail {
   duration?: string;
   cause?: string;
   suggestion?: string;
-  recordId?: string; // 存在时抽屉显示「查看预警记录详情」
-  level?: AlertLevel; // 预警等级（与预警记录页一致）
+  recordId?: string; // 存在时抽屉显示「查看告警记录详情」
+  level?: AlertLevel; // 告警等级（与告警记录页一致）
 }
 
 export const GRADE_STYLE: Record<EvalGrade, { color: string; soft: string; text: string }> = {
@@ -70,7 +70,7 @@ export function gradeByShare(ratio: number): EvalGrade {
   return "优秀";
 }
 
-// 评价等级 → 预警等级映射（用于异常抽屉的预警等级标签）
+// 评价等级 → 告警等级映射（用于异常抽屉的告警等级标签）
 export const GRADE_TO_LEVEL: Record<EvalGrade, AlertLevel> = {
   "优秀": "提示",
   "良好": "提示",
@@ -436,7 +436,7 @@ export function getEnergyThreeState(range: "本月累计" | "今年累计" = "�
   ];
 }
 
-// ===== 7. 当前异常分布与定位（基于预警记录聚合） =====
+// ===== 7. 当前异常分布与定位（基于告警记录聚合） =====
 export interface AnomalyItem {
   name: string;
   maxLevel: AlertLevel;
@@ -448,7 +448,7 @@ export interface AnomalyItem {
   recordId?: string;
 }
 
-// 取节点关联的能耗预警记录（车间=其网格记录；网格=其记录；设备=所属网格记录）
+// 取节点关联的能耗告警记录（车间=其网格记录；网格=其记录；设备=所属网格记录）
 function recordsForNode(name: string, level: "workshop" | "grid" | "equipment", parent: string | null) {
   return ALERT_RECORDS.filter((r) => {
     if (r.domain !== "能耗管理") return false;
@@ -478,7 +478,7 @@ function rankToLevel(rank: number): AlertLevel | null {
   return (["提示", "关注", "预警", "告警", "危险"] as AlertLevel[])[rank - 1];
 }
 
-// 取某对象（全厂/车间）关联的一条能耗预警记录 id（趋势异常点抽屉跳转用）
+// 取某对象（全厂/车间）关联的一条能耗告警记录 id（趋势异常点抽屉跳转用）
 export function pickAlertRecordId(object: string): string | undefined {
   const p = orgPathOf(object);
   const inObj = ALERT_RECORDS.find(
@@ -510,7 +510,7 @@ export function getAnomalyDistribution(
     return (i + name.length) % r === 0 ? "发生中" : "已恢复";
   };
 
-  // 设备层：预警数量/最高等级取其所属网格的记录聚合（设备无独立记录）
+  // 设备层：告警数量/最高等级取其所属网格的记录聚合（设备无独立记录）
   if (level === "equipment") {
     const equips = equipmentsOfGrid(parent ?? undefined);
     const agg = aggregate(recordsForNode("", level, parent));
@@ -528,7 +528,7 @@ export function getAnomalyDistribution(
     });
   }
 
-  // 车间/网格层：预警数量为该节点下所有子对象（网格/设备）记录数之和
+  // 车间/网格层：告警数量为该节点下所有子对象（网格/设备）记录数之和
   const nodes = level === "workshop" ? ENERGY_WORKSHOPS : gridsOfWorkshop(parent ?? undefined);
   return nodes
     .map((n, i) => {

@@ -21,7 +21,7 @@ export function AlertLevelBadge({ level }: { level: AlertLevel }) {
   );
 }
 
-// 预警类型标签：常规黑色普通标签（不使用醒目颜色）
+// 告警类型标签：常规黑色普通标签（不使用醒目颜色）
 export function AlertTypeBadge({ type }: { type: AlertType }) {
   return <span className={`${TAG_BASE} bg-gray-100 text-gray-700`}>{type}</span>;
 }

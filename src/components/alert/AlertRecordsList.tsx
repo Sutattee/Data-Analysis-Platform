@@ -6,16 +6,14 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { Spinner } from "@/components/ui/Spinner";
-import { AlertLevelBadge, AlertTypeBadge, AlertStatusText } from "@/components/alert/alertBadges";
+import { AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
 import { AlertStatusModal } from "@/components/alert/AlertStatusModal";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { useApp } from "@/lib/store/AppContext";
 import {
   ALERT_RECORDS,
   ALERT_LEVELS,
-  ALERT_TYPES,
   ALERT_STATUSES,
-  sortAlerts,
   orgPathOf,
   EMPTY_ORG_FILTER,
   type OrgFilter,
@@ -67,12 +65,12 @@ export function AlertRecordsList() {
   const { state } = useApp();
   const currentUser = state.user?.nickname || state.user?.username || "当前用户";
 
-  // 仅展示能源消耗管理（能耗管理）方向的预警记录
+  // 仅展示能源消耗管理（能耗管理）方向的告警记录
   const [records, setRecords] = useState<AlertRecord[]>(() =>
-    ALERT_RECORDS.map((r) => ({ ...r }))
+    ALERT_RECORDS.filter((r) => r.type === "当前异常").map((r) => ({ ...r }))
   );
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/domain/date）
-  // 支持 URL ?domain= 预筛选业务域（carbon-eval 异常「查看预警记录」跳转用）
+  // 支持 URL ?domain= 预筛选业务域（carbon-eval 异常「查看告警记录」跳转用）
   const [applied, setApplied] = useState<AlertFilter>(() => {
     const d = searchParams.get("domain");
     return d ? { ...EMPTY_FILTER, domain: d } : EMPTY_FILTER;
@@ -140,7 +138,6 @@ export function AlertRecordsList() {
     const filtered = records.filter(
       (r) =>
         matchKeyword(r, applied.keyword) &&
-        (!applied.type || r.type === applied.type) &&
         (!applied.level || r.level === applied.level) &&
         (!applied.domain || r.domain === applied.domain) &&
         (!applied.status || r.status === applied.status) &&
@@ -149,7 +146,7 @@ export function AlertRecordsList() {
     );
     if (sortMode === "time_desc") return [...filtered].sort((a, b) => b.triggerTime.localeCompare(a.triggerTime));
     if (sortMode === "time_asc") return [...filtered].sort((a, b) => a.triggerTime.localeCompare(b.triggerTime));
-    return sortAlerts(filtered);
+    return filtered;
   }, [records, applied, sortMode, orgFilter]);
 
   const total = sorted.length;
@@ -182,7 +179,7 @@ export function AlertRecordsList() {
   }
 
   // 表头筛选：即时应用
-  function applyColumnFilter(key: "type" | "level" | "status", v: string) {
+  function applyColumnFilter(key: "level" | "status", v: string) {
     setApplied((prev) => ({ ...prev, [key]: v }));
     setPage(1);
   }
@@ -215,7 +212,7 @@ export function AlertRecordsList() {
             value={filter.keyword}
             onChange={(e) => setFilter({ ...filter, keyword: e.target.value })}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="搜索预警标题/预警对象编号/预警对象名称/接收人姓名/指标名称"
+            placeholder="搜索告警标题/告警对象编号/告警对象名称/接收人姓名/指标名称"
             className="w-[480px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
           <Button onClick={handleSearch}>查询</Button>
@@ -284,19 +281,13 @@ export function AlertRecordsList() {
                       <ColumnFilter options={ALERT_LEVELS} value={applied.level} onChange={(v) => applyColumnFilter("level", v)} />
                     </span>
                   </th>
-                  <th className="text-left px-4 py-3 sticky left-0 bg-gray-50 z-10">预警标题</th>
-                  <th className="text-left px-4 py-3">
-                    <span className="inline-flex items-center gap-0.5">
-                      预警类型
-                      <ColumnFilter options={ALERT_TYPES} value={applied.type} onChange={(v) => applyColumnFilter("type", v)} />
-                    </span>
-                  </th>
-                  <th className="text-left px-4 py-3">预警对象编号</th>
-                  <th className="text-left px-4 py-3">预警对象名称</th>
+                  <th className="text-left px-4 py-3 sticky left-0 bg-gray-50 z-10">告警标题</th>
+                  <th className="text-left px-4 py-3">告警对象编号</th>
+                  <th className="text-left px-4 py-3">告警对象名称</th>
                   <th className="text-left px-4 py-3">指标名称</th>
                   <th className="text-left px-4 py-3 cursor-pointer select-none" onClick={toggleTimeSort}>
                     <span className="inline-flex items-center gap-1">
-                      预警触发时间
+                      告警触发时间
                       <span className="text-gray-400">{sortMode === "time_desc" ? "↓" : sortMode === "time_asc" ? "↑" : "↕"}</span>
                     </span>
                   </th>
@@ -314,7 +305,6 @@ export function AlertRecordsList() {
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3"><AlertLevelBadge level={r.level} /></td>
                     <td className="px-4 py-3 sticky left-0 bg-white z-10 text-gray-900">{r.title}</td>
-                    <td className="px-4 py-3"><AlertTypeBadge type={r.type} /></td>
                     <td className="px-4 py-3 text-gray-600 font-mono text-xs">{r.objectCode}</td>
                     <td className="px-4 py-3 text-gray-600">{r.objectName}</td>
                     <td className="px-4 py-3 text-gray-600">{r.metricName}</td>

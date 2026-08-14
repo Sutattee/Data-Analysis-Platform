@@ -60,7 +60,7 @@ const EMPTY: FormData = {
   relation: "且",
   level: "预警",
   detectCycle: "每5分钟",
-  notifyTemplate: defaultNotifyTemplate("当前异常"),
+  notifyTemplate: defaultNotifyTemplate(),
   notifyMethods: [],
   receivers: [],
   repeatAlert: false,
@@ -131,19 +131,6 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
     setData((prev) => ({ ...prev, [key]: v }));
   }
 
-  // 切换预警类型：同步条件的 forecastRange
-  function setType(t: AlertType) {
-    setData((prev) => ({
-      ...prev,
-      type: t,
-      notifyTemplate: defaultNotifyTemplate(t),
-      conditions: prev.conditions.map((c) =>
-        t === "预测风险" ? { ...c, forecastRange: c.forecastRange ?? "未来7天" } : { ...c, forecastRange: undefined }
-      ),
-    }));
-  }
-
-
   function toggleNotify(m: string) {
     set("notifyMethods", data.notifyMethods.includes(m) ? data.notifyMethods.filter((x) => x !== m) : [...data.notifyMethods, m]);
   }
@@ -151,12 +138,16 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
   function validate(): boolean {
     const e: Record<string, string> = {};
     const ce: string[] = [];
-    if (!data.name.trim()) e.name = "请输入预警名称";
+    if (!data.name.trim()) e.name = "请输入告警名称";
     if (data.scope === "指定对象" && data.objects.length === 0) e.objects = "请选择指定对象";
     data.conditions.forEach((c, i) => {
       const miss: string[] = [];
       if (!c.metric.trim()) miss.push("指标");
-      if (!c.baselineValue.trim() || c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim()))
+      // 历史均值由系统计算，无需用户填写基准值，跳过该项校验
+      if (
+        c.baselineType !== "历史均值" &&
+        (!c.baselineValue.trim() || (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim())))
+      )
         miss.push("基准值");
       ce[i] = miss.length ? `请完善${miss.join("、")}` : "";
     });
@@ -222,7 +213,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-400">
         <span className="text-4xl mb-3">🔒</span>
-        <p className="text-sm text-gray-500">暂无权限，仅管理员可{mode === "new" ? "新建" : "编辑"}数据预警</p>
+        <p className="text-sm text-gray-500">暂无权限，仅管理员可{mode === "new" ? "新建" : "编辑"}数据告警</p>
       </div>
     );
   }
@@ -232,21 +223,12 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
       {/* 中部滚动表单 */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-2">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-5">
-          {/* 预警名称 */}
-          <Input label="预警名称" required placeholder="请输入" value={data.name} error={errors.name} onChange={(e) => set("name", e.target.value)} />
+          {/* 告警名称 */}
+          <Input label="告警名称" required placeholder="请输入" value={data.name} error={errors.name} onChange={(e) => set("name", e.target.value)} />
 
-          {/* 预警类型 */}
+          {/* 告警等级 */}
           <div>
-            <label className={labelCls}>预警类型 <span className="text-red-500">*</span></label>
-            <select className={selectCls} value={data.type} onChange={(e) => setType(e.target.value as AlertType)}>
-              <option value="当前异常">当前异常</option>
-              <option value="预测风险">预测风险</option>
-            </select>
-          </div>
-
-          {/* 预警等级 */}
-          <div>
-            <label className={labelCls}>预警等级 <span className="text-red-500">*</span></label>
+            <label className={labelCls}>告警等级 <span className="text-red-500">*</span></label>
             <select className={selectCls} value={data.level} onChange={(e) => set("level", e.target.value as AlertLevel)}>
               {ALERT_LEVELS.map((l) => (
                 <option key={l} value={l}>{l}</option>
@@ -295,7 +277,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
           <div className="md:col-span-2">
             <label className={labelCls}>触发条件 <span className="text-red-500">*</span></label>
             <AlertConditionBuilder
-              type={data.type}
+              type="当前异常"
               conditions={data.conditions}
               relation={data.relation}
               errors={condErrors}
@@ -315,7 +297,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
           <div>
             <label className={labelCls}>
               检测周期 <span className="text-red-500">*</span>
-              <Tip text="配置预警策略的执行频率；策略启用后持续监测，已有预警的处理状态不影响后续执行。" />
+              <Tip text="配置告警策略的执行频率；策略启用后持续监测，已有告警的处理状态不影响后续执行。" />
             </label>
             <select className={selectCls} value={data.detectCycle} onChange={(e) => set("detectCycle", e.target.value as AlertDetectCycle)}>
               {ALERT_DETECT_CYCLES.map((c) => (

@@ -25,7 +25,7 @@ export const builtinSkills: Skill[] = [
 // 我的技能：用户自建，可创建/编辑/删除/开关
 export const mySkills: Skill[] = [
   { id: "m1", name: "销售复盘助手", desc: "按月自动汇总销售数据并生成复盘要点。", icon: "📊", color: "bg-amber-50 text-amber-600", category: "mine", enabled: true },
-  { id: "m2", name: "能耗预警技能", desc: "监控能耗指标异常并主动推送预警通知。", icon: "⚡", color: "bg-rose-50 text-rose-600", category: "mine", enabled: false },
+  { id: "m2", name: "能耗告警技能", desc: "监控能耗指标异常并主动推送告警通知。", icon: "⚡", color: "bg-rose-50 text-rose-600", category: "mine", enabled: false },
   { id: "m3", name: "质量巡检技能", desc: "定时拉取质检数据并生成巡检报告。", icon: "✅", color: "bg-emerald-50 text-emerald-600", category: "mine", enabled: true },
 ];
 

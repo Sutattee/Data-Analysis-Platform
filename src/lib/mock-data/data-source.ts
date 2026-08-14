@@ -22,6 +22,11 @@ export const dataSourceTypes: DataSourceTypeOption[] = [
   { key: "api", label: "RestAPI" },
 ];
 
+// 当前可选数据源类型（仅 PostgreSQL、MySQL；其余类型保留代码、UI 暂隐藏）
+export const selectableDataSourceTypes: DataSourceTypeOption[] = dataSourceTypes.filter((t) =>
+  t.key === "postgresql" || t.key === "mysql"
+);
+
 // 类型 → 展示名
 export const typeLabelMap: Record<DataSourceTypeKey, string> = dataSourceTypes.reduce(
   (acc, t) => ({ ...acc, [t.key]: t.label }),

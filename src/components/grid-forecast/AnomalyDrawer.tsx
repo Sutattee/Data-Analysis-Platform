@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
@@ -35,6 +37,7 @@ export function AnomalyDrawer({
   detail: AnomalyDetail | null;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const rec = detail?.recordId ? ALERT_RECORDS.find((r) => r.id === detail.recordId) : undefined;
 
   const metricName = detail?.metricName ?? rec?.metricName ?? "-";
@@ -43,10 +46,41 @@ export function AnomalyDrawer({
   const deviation = detail?.deviation ?? rec?.deviation;
   const triggerTime = detail?.triggerTime ?? rec?.triggerTime;
   const duration = detail?.duration ?? rec?.duration;
-  const cause = detail?.cause ?? rec?.causeSummary;
   const suggestion = detail?.suggestion ?? rec?.suggestion;
   const level = detail?.level ?? rec?.level;
   const isForecast = !!detail?.forecastValue;
+
+  // —— 异常原因编辑态 ——
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [savedCause, setSavedCause] = useState<string | undefined>(undefined);
+
+  // detail 引用变化（点击新异常 / 关闭重开）时重置编辑态；保存只改 savedCause，不触发重置
+  useEffect(() => {
+    setEditing(false);
+    setDraft("");
+    setSavedCause(undefined);
+  }, [detail]);
+
+  const baseCause = detail?.cause ?? rec?.causeSummary;
+  const effectiveCause = savedCause ?? baseCause;
+  const hasCause = !!effectiveCause?.trim();
+
+  function startEdit() {
+    setDraft(effectiveCause ?? "");
+    setEditing(true);
+  }
+  function cancelEdit() {
+    setEditing(false);
+    setDraft("");
+  }
+  function handleSave() {
+    if (!draft.trim()) return;
+    setSavedCause(draft.trim());
+    setEditing(false);
+    setDraft("");
+    toast("异常原因已保存，并关联至本次预警记录", "success");
+  }
 
   return (
     <Drawer
@@ -57,19 +91,19 @@ export function AnomalyDrawer({
       footer={
         rec ? (
           <div className="flex justify-end">
-            <Button onClick={() => router.push(`/alert/records/${rec.id}`)}>查看预警记录详情</Button>
+            <Button onClick={() => router.push(`/alert/records/${rec.id}`)}>查看告警记录详情</Button>
           </div>
         ) : undefined
       }
     >
       {detail && (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold text-gray-900">{detail.title}</h2>
-          </div>
+          {/* 副标题：对象 · 指标异常 */}
+          <p className="text-sm text-gray-500">{detail.title}</p>
 
+          {/* 核心异常数据 */}
           <Section title="核心异常数据">
-            <Field label="预警等级" value={level ? <AlertLevelBadge level={level} /> : "-"} />
+            <Field label="告警等级" value={level ? <AlertLevelBadge level={level} /> : "-"} />
             <Field label="指标名称" value={metricName} />
             <Field label="基准 / 阈值" value={baseline} />
             {isForecast ? (
@@ -89,11 +123,46 @@ export function AnomalyDrawer({
             )}
           </Section>
 
-          <Section title="原因与处置建议">
-            <Field label="原因摘要" value={cause ?? "暂未识别到明确原因"} />
-            <Field label="处置建议" value={suggestion} />
-          </Section>
+          {/* 异常原因（AI 综合分析，可补充 / 修正） */}
+          <div>
+            <h4 className="mb-2 text-xs font-semibold text-gray-500">异常原因</h4>
+            {hasCause && !editing ? (
+              <div className="space-y-2">
+                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{effectiveCause}</p>
+                <div>
+                  <Button size="sm" variant="secondary" onClick={startEdit}>修正异常原因</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {!hasCause && (
+                  <p className="text-sm text-gray-400">当前数据不足，暂无法确定异常原因</p>
+                )}
+                <textarea
+                  rows={5}
+                  maxLength={500}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="请输入异常原因"
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm transition-all duration-200 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{draft.length}/500</span>
+                  <div className="flex gap-2">
+                    {hasCause && (
+                      <Button size="sm" variant="secondary" onClick={cancelEdit}>取消</Button>
+                    )}
+                    <Button size="sm" onClick={handleSave} disabled={!draft.trim()}>保存</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
+          {/* 处置建议 */}
+          <Field label="处置建议" value={suggestion} />
+
+          {/* 判定依据 */}
           <Field
             label="判定依据"
             value={rec ? `${rec.strategyName}｜${rec.triggerCondition}` : "指标值超出评价阈值（基于历史趋势与目标值判定）"}

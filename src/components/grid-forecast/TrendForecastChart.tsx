@@ -17,6 +17,14 @@ const OBJECTS = ["全厂", "动力车间", "制丝车间", "卷包车间"];
 const selectCls =
   "px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500";
 
+// AI 异常原因：按指标生成综合分析，按影响程度由高到低，融入关联对象/影响程度/证据/可信度
+function buildCause(object: string, metricName: string, unit: string, p: any): string {
+  if (metricName === "单箱卷烟综合能耗") {
+    return `经分析，本次${object}单箱卷烟综合能耗升至 ${p.actual} ${unit}，主要受产量下降和制冷效率降低共同影响。\n首要原因是卷包车间排产减少2个班次，日产量下降12%，但固定能耗未同步下降，导致单位产量分摊能耗增加，影响程度高、可信度高；\n其次，AH13制冷主机COP由4.2降至3.1，设备电耗同步上升，对单箱能耗产生中等程度影响，可信度高；\n此外，外界温度由28℃升至35℃，可能进一步增加空调及制冷负荷，影响程度低、可信度中。`;
+  }
+  return `经分析，本次${object}综合能耗升至 ${p.actual} ${unit}，主要受生产负荷提升与蒸汽管网损耗增大共同影响。\n首要原因是卷包车间新增排产班次，主要用能设备运行时长增加，能耗随之上升，影响程度高、可信度高；\n其次，蒸汽管网2号分段疏水阀存在内漏，管网损耗增大约8%，对整体能耗产生中等影响，可信度中；\n此外，近期外界气温下降，供暖与伴热负荷上升，可能进一步推高能耗，影响程度低、可信度中。`;
+}
+
 // 当前异常详情（actual 段异常点）
 function buildAnomaly(object: string, metricName: string, unit: string, p: any): AnomalyDetail {
   return {
@@ -27,7 +35,8 @@ function buildAnomaly(object: string, metricName: string, unit: string, p: any):
     deviation: `超出目标 ${(((p.actual - p.target) / p.target) * 100).toFixed(1)}%`,
     triggerTime: p.time ?? `${p.date}`,
     duration: "2小时15分钟",
-    cause: "近期用能负荷上升，结合气温与生产排产变化，需排查高耗能设备运行状态。",
+    // 动力车间：该对象当前数据不足，演示"暂无依据 → 补充异常原因"流程；其余对象展示 AI 综合分析
+    cause: object === "动力车间" ? "" : buildCause(object, metricName, unit, p),
     suggestion: "核查主要用能设备启停与负载，优化错峰用电与蒸汽供给策略。",
     recordId: pickAlertRecordId(object),
     level: p.anomalyGrade ? GRADE_TO_LEVEL[p.anomalyGrade as EvalGrade] : "预警",
@@ -47,7 +56,7 @@ function buildForecastAnomaly(object: string, metricName: string, unit: string, 
     deviation: `预计超出目标 ${(((p.predict - p.target) / p.target) * 100).toFixed(1)}%`,
     confidenceRange: p.upper && p.lower ? `${p.lower} ~ ${p.upper} ${unit}` : undefined,
     forecastTime: isDay ? `预计${y}年${m}月${d}日越界` : `预计${y}年${m}月越界`,
-    cause: "根据历史能耗趋势预测，未来该指标可能超出目标阈值。",
+    cause: "",
     suggestion: "建议提前调整用能计划，优化高耗能设备运行，降低预测超标风险。",
     recordId: pickAlertRecordId(object),
     level: "预警" as AlertLevel,
