@@ -1,6 +1,8 @@
 // 情景预测 — 模拟数据与预测引擎（确定性生成：固定锚点 + sin 扰动，无 Date.now / Math.random）
 // 四种预测类型：未来值预测 / 目标达成预测 / 工况情景测算 / 达标条件反推
 import { metricList } from "./metric-management";
+import { activeTargetOf } from "./metric-targets";
+import type { MetricTargetVersion } from "@/types";
 
 // ===== 时间锚点（与能源总览 / 网格监控对齐）=====
 export const DATA_END = "2026-08-09"; // 最新完整统计日
@@ -99,7 +101,8 @@ export interface ForecastMetric {
   objects: string[]; // 可预测对象（长度 1 = 固定对象自动带入）
   types: ForecastType[];
   ranges: string[]; // 未来值可选范围
-  target?: { value: number; direction: "不高于" | "不低于" };
+  target?: { value: number; direction: "不高于" | "不低于" }; // 兜底目标（旧配置）
+  metricId?: string; // 关联指标管理 id（目标值以目标值管理的有效版本为准）
   targetCtx?: { currentAcc: string; doneOutput: string; remainingPlan: number; currentLevel: number }; // 目标达成 / 反推上下文
   conditions: MetricCondition[]; // 工况条件映射
   influencers: [string, string]; // 主要影响因素（结论文案）
@@ -200,6 +203,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
     base: 29.8, seed: 3, objects: ["全厂"], types: ["未来值预测", "目标达成预测", "达标条件反推"],
     ranges: ["明日", "未来7日", "未来15日"],
     target: { value: 31.0, direction: "不高于" },
+    metricId: "m7", // 目标值以目标值管理有效版本为准（单箱综合能耗）
     targetCtx: { currentAcc: "30.9 kgce/箱（截至 2026-08-09）", doneOutput: "386,000 箱", remainingPlan: 214000, currentLevel: 30.9 },
     conditions: [
       { code: "planned_output", required: true, default: 4200, sensitivity: -0.00003 },
@@ -213,6 +217,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
     base: 0.0338, seed: 11, objects: ["全厂"], types: ["未来值预测", "目标达成预测", "达标条件反推"],
     ranges: ["明日", "未来7日", "未来15日"],
     target: { value: 0.035, direction: "不高于" },
+    metricId: "m1", // 目标值以目标值管理有效版本为准（单位产值碳排放量）
     targetCtx: { currentAcc: "0.0342 tCO₂e/万元（截至 2026-08-09）", doneOutput: "386,000 箱（对应产值 38,200 万元）", remainingPlan: 214000, currentLevel: 0.0342 },
     conditions: [
       { code: "planned_output", required: true, default: 4200, sensitivity: -0.00003 },
@@ -228,6 +233,43 @@ export function reverseItemsOf(metricName: string): string[] {
   return metricList.find((m) => m.nameCn === metricName)?.reverseItems ?? [];
 }
 
+// ===== 有效目标值（来自目标值管理，仅支持已配置目标值的指标） =====
+// 目标达成预测 / 达标条件反推 以目标值管理的「生效中」版本为准；
+// 无 metricId（未在指标管理中配置目标值）的指标不支持目标达成预测。
+export function effectiveTargetOf(m: ForecastMetric): MetricTargetVersion | null {
+  const active = m.metricId ? activeTargetOf(m.metricId) : undefined;
+  if (active) return active;
+  // 兜底：旧配置（无 metricId 但有 target）转换为单值目标
+  if (m.target) {
+    return {
+      id: `legacy-${m.key}`,
+      version: "V1",
+      metricId: m.metricId ?? "",
+      metricName: m.name,
+      period: "年度",
+      direction: m.target.direction === "不高于" ? "≤" : "≥",
+      value: m.target.value,
+      unit: m.unit,
+      effectiveStart: "2026-01-01",
+      effectiveEnd: "2026-12-31",
+      enabled: true,
+      status: "生效中",
+      effectiveTime: "2026-01-01",
+      createdAt: "",
+      createdBy: "",
+    };
+  }
+  return null;
+}
+
+// 判断方向展示（"不高于/不低于" → 符号；"=" → "=目标值"）
+export function formatTargetDir(direction: string): string {
+  if (direction === "不高于") return "≤";
+  if (direction === "不低于") return "≥";
+  if (direction === "=") return "=目标值";
+  return direction;
+}
+
 // ===== 预测输入 / 输出 =====
 export interface ForecastInput {
   type: ForecastType;
@@ -236,7 +278,9 @@ export interface ForecastInput {
   modelId: string;
   range?: string; // 未来值：明日 / 未来7日 / 未来15日
   period?: string; // 目标达成 / 反推：本月 / 本季度 / 本年度
-  targetValue?: number; // 临时测算目标值
+  targetValue?: number; // 临时测算目标值（单值方向）
+  targetLower?: number; // 临时测算目标区间下限（区间方向）
+  targetUpper?: number; // 临时测算目标区间上限（区间方向）
   calcMode?: "tomorrow" | "date" | "period"; // 工况情景测算时段
   calcDate?: string;
   conditions?: Record<string, number | string>; // 工况输入
@@ -367,7 +411,16 @@ function futureForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
 function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const period = input.period ?? "本年度";
   const d = m.decimals;
-  const target = input.targetValue ?? m.target!.value;
+  const eff = effectiveTargetOf(m)!; // 调用前已保证存在（无目标值指标不支持本类型）
+  const isRange = eff.direction === "处于目标区间";
+  // 正式目标（有效版本）；临时测算值优先（仅用于本次预测，不修改正式目标配置）
+  const formalValue = isRange ? eff.upper! : eff.value!;
+  const formalLower = isRange ? eff.lower! : undefined;
+  const target = isRange ? input.targetUpper ?? formalValue : input.targetValue ?? formalValue;
+  const targetLower = input.targetLower ?? formalLower;
+  const isTemp = isRange
+    ? input.targetLower !== undefined || input.targetUpper !== undefined
+    : input.targetValue !== undefined;
   // 周期末预测系数（确定性）：不同周期给出不同达成态势
   const FACTORS: Record<string, Record<string, number>> = {
     comprehensive: { 本月: 1.02, 本季度: 1.037, 本年度: 1.0604 }, // 29.8 → 30.4 / 30.9 / 31.6
@@ -377,11 +430,31 @@ function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
   const forecastEnd = round(m.base * factor, d);
   const gap = round(forecastEnd - target, d);
   const threshold = target * 0.015;
-  const verdict = gap > threshold ? "预计超标" : gap >= -threshold ? "存在超标风险" : "预计达标";
-  const verdictTone = verdict === "预计达标" ? "good" : verdict === "存在超标风险" ? "warn" : "danger";
+  const verdict = isRange
+    ? forecastEnd > target
+      ? "预计超出区间上限"
+      : targetLower !== undefined && forecastEnd < targetLower
+        ? "预计低于区间下限"
+        : "预计达标"
+    : gap > threshold
+      ? "预计超标"
+      : gap >= -threshold
+        ? "存在超标风险"
+        : "预计达标";
+  const verdictTone = verdict === "预计达标" ? "good" : verdict.includes("风险") ? "warn" : "danger";
   const deadline = period === "本月" ? "2026-08-31" : period === "本季度" ? "2026-09-30" : "2026-12-31";
-  const dir = m.target!.direction;
-  const headline = `${period === "本年度" ? "年末" : period === "本季度" ? "季度末" : "月末"}${m.name}预计 ${fmt(forecastEnd, d)} ${m.unit}，目标${dir === "不高于" ? "≤" : "≥"}${fmt(target, d)}，预计${gap >= 0 ? "高出" : "低于"} ${fmt(Math.abs(gap), d)}，${verdict}`;
+  const dir = formatTargetDir(eff.direction);
+  const targetLabel = isRange
+    ? `${fmt(targetLower ?? 0, d)}～${fmt(target, d)}`
+    : `${dir}${fmt(target, d)}`;
+  const gapLabel = isRange
+    ? forecastEnd > target
+      ? `高于上限 ${fmt(gap, d)}`
+      : targetLower !== undefined && forecastEnd < targetLower
+        ? `低于下限 ${fmt(targetLower - forecastEnd, d)}`
+        : `位于目标区间内（${fmt(forecastEnd - (targetLower ?? 0), d)}）`
+    : `${gap >= 0 ? "高出" : "低于"} ${fmt(Math.abs(gap), d)}`;
+  const headline = `${period === "本年度" ? "年末" : period === "本季度" ? "季度末" : "月末"}${m.name}预计 ${fmt(forecastEnd, d)} ${m.unit}，目标${targetLabel} ${m.unit}，预计${gapLabel}，${verdict}`;
 
   // 周期曲线：本月=日度（9 实际 + 22 预测），本季度=月度（2+1），本年度=月度（8+4）
   const points: ChartPoint[] = [];
@@ -409,12 +482,11 @@ function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
     });
   }
 
-  const isTemp = input.targetValue !== undefined && input.targetValue !== m.target!.value;
   return {
     headline,
     fields: [
       { label: "周期末预测值", value: `${fmt(forecastEnd, d)} ${m.unit}`, tone: verdictTone },
-      { label: `目标值${isTemp ? "（临时测算值）" : ""}`, value: `${dir === "不高于" ? "≤" : "≥"} ${fmt(target, d)} ${m.unit}`, tone: "muted" },
+      { label: `目标值${isTemp ? "（临时测算值）" : ""}`, value: `${targetLabel} ${m.unit}`, tone: "muted" },
       { label: "预计差距", value: `${gap >= 0 ? "+" : ""}${fmt(gap, d)} ${m.unit}`, tone: verdictTone },
       { label: "达成判断", value: verdict, tone: verdictTone },
     ],
@@ -422,12 +494,20 @@ function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
     conclusions: buildConclusions(m, model2(m, input), [
       `当前累计实际值：${m.targetCtx!.currentAcc}；剩余生产计划：${m.targetCtx!.remainingPlan.toLocaleString()} 箱（系统自动加载）。`,
       `预测截止时间：${deadline}；预测区间：${fmt(forecastEnd * 0.98, d)}～${fmt(forecastEnd * 1.02, d)} ${m.unit}。`,
-    ], verdict === "预计超标"
+      isTemp
+        ? `本次按临时测算目标 ${targetLabel} ${m.unit} 判断，不修改正式目标配置。`
+        : `正式目标（${eff.version}，${eff.status}）：${targetLabel} ${m.unit}。`,
+    ], verdict === "预计超标" || verdict === "预计超出区间上限"
       ? [
           `建议立即启动节能管控：优先压降辅助系统空转与待机能耗，复核高耗能工序运行参数。`,
           `如需明确剩余周期的量化控制值，请使用「达标条件反推」测算具体控制要求。`,
         ]
-      : [
+      : verdict === "预计低于区间下限"
+        ? [
+            `预测值低于目标区间下限，建议核实数据口径与计量准确性后持续跟踪。`,
+            `如需明确剩余周期的量化控制值，请使用「达标条件反推」测算。`,
+          ]
+        : [
           `当前态势可控，建议维持既有运行策略并按周跟踪累计值与预测差距。`,
           `关注季节性负荷变化对趋势的影响，如需量化控制值可配合「达标条件反推」使用。`,
     ]),
@@ -511,7 +591,11 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
 // ----- 4. 达标条件反推 -----
 function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const d = m.decimals;
-  const target = input.targetValue ?? m.target!.value;
+  const eff = effectiveTargetOf(m)!; // 调用前已保证存在（无目标值指标不支持本类型）
+  const isRange = eff.direction === "处于目标区间";
+  const formalValue = isRange ? eff.upper! : eff.value!;
+  const target = isRange ? input.targetUpper ?? formalValue : input.targetValue ?? formalValue;
+  const dir = formatTargetDir(eff.direction);
   const item = input.reverseItem ?? reverseItemsOf(m.name)[0] ?? "剩余周期平均指标控制值";
   const remainingPlan = input.remainingPlan ?? m.targetCtx!.remainingPlan;
   const isTotal = item.includes("允许"); // 允许总量类 vs 平均控制类
@@ -522,7 +606,7 @@ function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: Forecast
   const controlTotal = Math.round(remainingPlan * controlAvg);
 
   const headline = isTotal
-    ? `按目标${m.target!.direction === "不高于" ? "≤" : "≥"}${fmt(target, d)} ${m.unit}测算，剩余周期允许${m.name.replace("单箱", "").replace("单位产值", "")}总量 ${controlTotal.toLocaleString()}（按剩余计划 ${remainingPlan.toLocaleString()} 箱）`
+    ? `按目标${dir}${fmt(target, d)} ${m.unit}测算，剩余周期允许${m.name.replace("单箱", "").replace("单位产值", "")}总量 ${controlTotal.toLocaleString()}（按剩余计划 ${remainingPlan.toLocaleString()} 箱）`
     : `剩余周期平均${m.name}需控制在 ${fmt(controlAvg, d)} ${m.unit} 以内，需较当前值 ${fmt(current, d)} ${delta >= 0 ? "降低" : "提高"} ${fmt(Math.abs(delta), d)} ${m.unit}`;
 
   const currentTotal = Math.round(remainingPlan * current);
@@ -532,7 +616,7 @@ function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: Forecast
       { label: `反推结果（${item}）`, value: isTotal ? `${controlTotal.toLocaleString()}（${fmt(controlAvg, d)} ${m.unit}×${remainingPlan.toLocaleString()} 箱）` : `≤ ${fmt(controlAvg, d)} ${m.unit}`, tone: "danger" },
       { label: "当前值（计划水平）", value: `${fmt(current, d)} ${m.unit}`, tone: "muted" },
       { label: "所需调整量", value: `${delta >= 0 ? "-" : "+"}${fmt(Math.abs(delta), d)} ${m.unit}`, tone: delta > 0 ? "warn" : "good" },
-      { label: "目标值", value: `${m.target!.direction} ${fmt(target, d)} ${m.unit}`, tone: "muted" },
+      { label: "目标值", value: `${dir} ${fmt(target, d)} ${m.unit}`, tone: "muted" },
     ],
     chart: {
       kind: "reverse",
@@ -548,7 +632,7 @@ function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: Forecast
       unit: m.unit,
     },
     conclusions: buildConclusions(m, model2(m, input), [
-      `目标值 ${m.target!.direction} ${fmt(target, d)} ${m.unit}；当前累计 ${m.targetCtx!.currentAcc}；已完成产量 ${m.targetCtx!.doneOutput}。`,
+      `目标值 ${dir} ${fmt(target, d)} ${m.unit}；当前累计 ${m.targetCtx!.currentAcc}；已完成产量 ${m.targetCtx!.doneOutput}。`,
       `反推假设：剩余周期生产计划 ${remainingPlan.toLocaleString()} 箱，能耗与产量近似线性，忽略极端工况影响。`,
     ], [
       `建议将控制值分解到班组与日班执行，并按周复盘实际累计与控制曲线的偏差。`,

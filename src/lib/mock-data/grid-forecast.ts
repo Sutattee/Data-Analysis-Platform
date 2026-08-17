@@ -28,6 +28,7 @@ export interface AnomalyDetail {
   forecastTime?: string; // 预计越界时间（预测异常）
   duration?: string;
   cause?: string;
+  causeType?: "AI生成" | "人工补录"; // 原因类型（cause 存在时有值）
   suggestion?: string;
   dept?: string; // 部门 / 车间（能源总览等页面构造的异常携带）
   recordId?: string; // 存在时抽屉显示「查看告警记录详情」

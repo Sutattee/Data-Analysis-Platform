@@ -185,8 +185,9 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) =>
     // 判定依据
     strategyName: type === "当前异常" ? `${obj.metric}异常告警策略` : `${obj.metric}风险告警策略`,
     triggerCondition: `${obj.metric}${obj.low ? "低于" : "高于"}基准值${gap.toFixed(1)}%`,
-    // 原因与建议（约 1/3 记录无明确原因，演示"暂未识别到明确原因"）
+    // 原因与建议（约 1/3 记录无明确原因，演示"暂未识别到明确原因"；有原因时 AI生成/人工补录 交替）
     causeSummary: i % 3 === 0 ? undefined : CAUSES[i % CAUSES.length](obj),
+    causeType: i % 3 === 0 ? undefined : i % 2 === 0 ? "AI生成" : "人工补录",
     suggestion: SUGGESTIONS[i % SUGGESTIONS.length](obj),
     // 责任与处理情况
     receiver,

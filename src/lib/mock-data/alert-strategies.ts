@@ -8,28 +8,52 @@ import type {
   AlertType,
   AlertDomain,
 } from "@/types";
-import { dataMetrics } from "./data-assets";
+import { metricList } from "./metric-management";
+import { activeTargetOf } from "./metric-targets";
+import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
-export const ALERT_OPERATORS: AlertOperator[] = ["高于", "低于", "超出正常区间"];
-export const ALERT_BASELINE_TYPES: AlertBaselineType[] = ["目标值", "基准值", "上限", "下限", "历史均值", "正常区间"];
+export const ALERT_OPERATORS: AlertOperator[] = ["<", "≤", ">", "≥", "≠", "=", "超出正常区间"];
+export const ALERT_BASELINE_TYPES: AlertBaselineType[] = ["目标值", "基准值", "上限", "下限", "正常区间"];
 
 // 判断方式 → 合适的基准类型候选（触发条件联动筛选）
-// 「高于下限 / 低于上限」属常态不告警，故分别排除；「超出正常区间」仅搭配正常区间。
+// 单值比较可搭配 目标值/基准值/上限/下限；「超出正常区间」仅搭配正常区间。
 export const OPERATOR_BASELINE_MAP: Record<AlertOperator, AlertBaselineType[]> = {
-  "高于": ["目标值", "上限", "基准值", "历史均值"],
-  "低于": ["目标值", "下限", "基准值", "历史均值"],
+  "<": ["目标值", "基准值", "上限", "下限"],
+  "≤": ["目标值", "基准值", "上限", "下限"],
+  ">": ["目标值", "基准值", "上限", "下限"],
+  "≥": ["目标值", "基准值", "上限", "下限"],
+  "≠": ["目标值", "基准值", "上限", "下限"],
+  "=": ["目标值", "基准值", "上限", "下限"],
   "超出正常区间": ["正常区间"],
 };
 export const ALERT_DETECT_CYCLES: AlertDetectCycle[] = ["每5分钟", "每15分钟", "每30分钟", "每小时", "每日", "每月"];
-export const ALERT_SCOPE_OPTIONS: AlertScope[] = ["全部适用对象", "指定对象"];
+export const ALERT_SCOPE_OPTIONS: AlertScope[] = ["全部适用对象", "指定对象"]; // 保留常量供历史数据展示
 export const NOTIFY_METHOD_OPTIONS = ["短信", "邮件"];
 export const FORECAST_RANGES = ["未来3天", "未来7天", "未来15天", "未来1个月", "未来2个月", "未来3个月"];
 
-// 指标候选（复用数据资产的指标）
-export const METRIC_OPTIONS: string[] = dataMetrics.map((m) => m.name);
+// 指标候选（指标管理同源，支持关键字搜索）
+export const METRIC_OPTIONS: string[] = metricList.map((m) => m.nameCn);
 // 支持预测模型的指标（预测风险类型仅可选这些）
-export const FORECAST_METRIC_OPTIONS: string[] = ["综合能耗", "吨钢成本", "OEE", "日产量"];
+export const FORECAST_METRIC_OPTIONS: string[] = [
+  "单箱综合能耗",
+  "单位产值碳排放量",
+  "包装设备运行效率",
+  "卷接设备运行效率",
+];
+
+// 指标定义（id + 单位），供触发条件按指标带出单位 / 带入目标值
+export function metricDefOf(name: string): { id: string; unit: string } | undefined {
+  const m = metricList.find((x) => x.nameCn === name);
+  return m ? { id: m.id, unit: m.unit } : undefined;
+}
+
+// 有效目标值（目标值管理「生效中」版本；无配置返回 null）
+export function activeTargetForMetric(name: string): MetricTargetVersion | null {
+  const def = metricDefOf(name);
+  if (!def) return null;
+  return activeTargetOf(def.id) ?? null;
+}
 
 // 通知预览模板：按告警类型区分
 // 当前异常
@@ -69,26 +93,41 @@ export function defaultNotifyTemplate(): string {
 }
 
 // ========== 触发条件格式化 ==========
+// 示例：设备OEE ≤ 基准值 85%，且偏离比例达到10% / 单箱综合能耗 > 上限 31.0 kgce/箱 / 烘丝机出口水分偏差 超出正常区间 12.5%～13.5%
+// 单位拼接：% 类单位紧跟数值（85%），其余单位空一格（31.0 公斤标煤/箱）
+function joinUnit(unit: string): string {
+  if (!unit) return "";
+  return unit.startsWith("%") ? unit : ` ${unit}`;
+}
+
 export function formatCondition(c: AlertCondition): string {
-  // 历史均值由系统计算，无需展示基准值
-  const valPart = c.baselineType === "历史均值" ? "" : ` ${c.baselineValue}`;
-  const base = c.forecastRange
-    ? `${c.metric} 未来${c.forecastRange}预测值 ${c.operator} ${c.baselineType}${valPart}`
-    : `${c.metric} ${c.operator} ${c.baselineType}${valPart}`;
-  return c.deviation ? `${base}，偏离${c.deviation}%` : base;
+  const unit = metricDefOf(c.metric)?.unit ?? "";
+  let base: string;
+  if (c.baselineType === "正常区间") {
+    base = `${c.metric} ${c.operator} ${c.baselineValue}`;
+  } else if (c.baselineType === "目标值") {
+    // 目标值由系统带入（含单位），不支持编辑
+    base = `${c.metric} ${c.operator} 目标值 ${c.baselineValue}${joinUnit(unit)}`;
+  } else {
+    base = `${c.metric} ${c.operator} ${c.baselineType} ${c.baselineValue}${joinUnit(unit)}`;
+  }
+  const dev = c.deviation ? `，且偏离比例达到${c.deviation}%` : "";
+  return c.forecastRange
+    ? `${c.metric} 未来${c.forecastRange}预测值 ${c.operator} ${c.baselineType} ${c.baselineValue}${joinUnit(unit)}${dev}`
+    : `${base}${dev}`;
 }
 
 export function formatConditions(s: { conditions: AlertCondition[]; relation: "且" | "或" }): string {
   return s.conditions.map(formatCondition).join(` ${s.relation} `);
 }
 
-// 根据数据指标推断业务域（无需用户填写）
+// 根据数据指标推断业务域（无需用户填写，映射自指标管理的业务域）
 export function domainOfMetric(metric: string): AlertDomain {
   if (!metric) return "生产管理";
-  if (/能耗|电耗|煤气|水耗|能源/.test(metric)) return "能耗管理";
-  const cat = dataMetrics.find((m) => m.name === metric)?.category;
-  if (cat === "质量") return "质量管理";
-  if (cat === "设备") return "设备管理";
+  const domain = metricList.find((m) => m.nameCn === metric)?.domain;
+  if (domain === "能源管理") return "能耗管理";
+  if (domain === "质量管理" || domain === "工艺质量") return "质量管理";
+  if (domain === "设备管理") return "设备管理";
   return "生产管理";
 }
 
@@ -96,14 +135,14 @@ export function domainOfMetric(metric: string): AlertDomain {
 export const ALERT_STRATEGIES: AlertStrategy[] = ([
   {
     id: "AS-001",
-    name: "综合能耗超限告警策略",
-    description: "监测全厂综合能耗超出上限",
+    name: "单箱综合能耗超上限策略",
+    description: "监测单箱综合能耗超出上限",
     type: "当前异常",
     domain: "能耗管理",
     scope: "指定对象",
-    objects: ["厂区电力能源网格", "循环水能源网格"],
+    objects: ["什邡卷烟厂", "制丝车间", "卷包车间"],
     conditions: [
-      { metric: "综合能耗", operator: "高于", baselineType: "上限", baselineValue: "600.0 kgce/t", deviation: "8" },
+      { metric: "单箱综合能耗", operator: ">", baselineType: "上限", baselineValue: "31.0", deviation: "8" },
     ],
     relation: "且",
     level: "告警",
@@ -119,14 +158,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-002",
-    name: "单箱卷烟综合能耗超标策略",
-    description: "单箱综合能耗超出目标值",
+    name: "单箱综合能耗超目标值策略",
+    description: "单箱综合能耗超出目标值（目标值自动带入，不可编辑）",
     type: "当前异常",
     domain: "能耗管理",
-    scope: "全部适用对象",
-    objects: [],
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
     conditions: [
-      { metric: "单箱卷烟综合能耗", operator: "高于", baselineType: "目标值", baselineValue: "12.0 公斤标煤/箱", deviation: "5" },
+      { metric: "单箱综合能耗", operator: ">", baselineType: "目标值", baselineValue: "31.0", deviation: "5" },
     ],
     relation: "且",
     level: "预警",
@@ -140,14 +179,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-003",
-    name: "厂区电力消耗异常策略",
-    description: "厂区电力能源网格用电量超限",
+    name: "包装设备运行效率低于下限策略",
+    description: "包装设备运行效率低于下限且偏离达到 3%",
     type: "当前异常",
-    domain: "能耗管理",
+    domain: "生产管理",
     scope: "指定对象",
-    objects: ["厂区电力能源网格"],
+    objects: ["卷包车间", "包装机"],
     conditions: [
-      { metric: "总用电量", operator: "高于", baselineType: "上限", baselineValue: "1,300,000 kWh", deviation: "3" },
+      { metric: "包装设备运行效率", operator: "<", baselineType: "下限", baselineValue: "85", deviation: "3" },
     ],
     relation: "且",
     level: "预警",
@@ -163,14 +202,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-004",
-    name: "高炉煤气放散率告警策略",
-    description: "煤气放散率超标监测",
+    name: "卷接设备运行效率基准告警策略",
+    description: "设备OEE类指标：≤ 基准值且偏离达到 10%",
     type: "当前异常",
-    domain: "能耗管理",
+    domain: "生产管理",
     scope: "指定对象",
-    objects: ["高炉煤气能源网格"],
+    objects: ["卷包车间", "1#卷烟机"],
     conditions: [
-      { metric: "煤气放散率", operator: "高于", baselineType: "上限", baselineValue: "1.5%", deviation: "0.3" },
+      { metric: "卷接设备运行效率", operator: "≤", baselineType: "基准值", baselineValue: "90", deviation: "10" },
     ],
     relation: "且",
     level: "告警",
@@ -184,14 +223,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-005",
-    name: "蒸汽消耗超标策略",
-    description: "蒸汽能源网格用量超限",
+    name: "烘丝机出口水分偏差区间策略",
+    description: "烘丝机出口水分超出正常区间",
     type: "当前异常",
-    domain: "能耗管理",
+    domain: "质量管理",
     scope: "指定对象",
-    objects: ["蒸汽能源网格"],
+    objects: ["制丝车间", "1#烘丝机", "2#烘丝机"],
     conditions: [
-      { metric: "总蒸汽用量", operator: "高于", baselineType: "上限", baselineValue: "3,000 t", deviation: "4" },
+      { metric: "烘丝机出口水分偏差", operator: "超出正常区间", baselineType: "正常区间", baselineValue: "-0.5%～0.5%" },
     ],
     relation: "且",
     level: "预警",
@@ -207,14 +246,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-006",
-    name: "循环水能耗异常策略",
-    description: "循环水吨钢电耗超目标",
+    name: "优质品率低于下限策略",
+    description: "优质品率低于下限监测",
     type: "当前异常",
-    domain: "能耗管理",
+    domain: "质量管理",
     scope: "指定对象",
-    objects: ["循环水能源网格"],
+    objects: ["卷包车间", "包装机"],
     conditions: [
-      { metric: "循环水吨钢电耗", operator: "高于", baselineType: "目标值", baselineValue: "32 kWh/t", deviation: "6" },
+      { metric: "优质品率", operator: "<", baselineType: "下限", baselineValue: "96", deviation: "2" },
     ],
     relation: "且",
     level: "关注",
@@ -229,13 +268,13 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   {
     id: "AS-007",
     name: "单位产值碳排放量告警策略",
-    description: "单位产值碳排放量超标",
+    description: "单位产值碳排放量超出目标值（目标值自动带入）",
     type: "当前异常",
     domain: "能耗管理",
-    scope: "全部适用对象",
-    objects: [],
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
     conditions: [
-      { metric: "单位产值碳排放量", operator: "高于", baselineType: "目标值", baselineValue: "0.035 tCO₂e/万元", deviation: "5" },
+      { metric: "单位产值碳排放量", operator: ">", baselineType: "目标值", baselineValue: "0.035", deviation: "5" },
     ],
     relation: "且",
     level: "危险",
@@ -251,14 +290,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "AS-008",
-    name: "污水排放COD超标策略",
-    description: "污水排放COD浓度超上限",
+    name: "百小时停机断料率超上限策略",
+    description: "百小时停机断料率超出上限监测",
     type: "当前异常",
-    domain: "能耗管理",
-    scope: "全部适用对象",
-    objects: [],
+    domain: "设备管理",
+    scope: "指定对象",
+    objects: ["物资管理科", "高架立体库"],
     conditions: [
-      { metric: "污水排放COD", operator: "高于", baselineType: "上限", baselineValue: "50 mg/L", deviation: "8" },
+      { metric: "百小时停机断料率", operator: ">", baselineType: "上限", baselineValue: "5", deviation: "8" },
     ],
     relation: "且",
     level: "告警",

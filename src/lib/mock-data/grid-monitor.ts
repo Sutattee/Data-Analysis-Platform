@@ -150,6 +150,40 @@ export const GRID_DEPTS: DeptDef[] = [
           { code: "ET1C01_2", name: "松散回潮机", weight: 0.5 },
         ],
       },
+      {
+        id: "silk-stem", name: "梗丝处理线", system: "梗丝线", baseAvg: 7400, seed: 17,
+        anomaly: { start: 18, end: 12, grade: "预警" },
+        devices: [
+          { code: "ET1D01_1", name: "梗丝干燥机", weight: 0.5 },
+          { code: "ET1D01_2", name: "压梗机", weight: 0.3 },
+          { code: "ET1D01_3", name: "梗丝膨化塔", weight: 0.2 },
+        ],
+      },
+      {
+        id: "silk-recon", name: "薄片生产线", system: "薄片线", baseAvg: 6900, seed: 18,
+        anomaly: { start: 0, end: 0, grade: "关注" }, // 当日新增
+        devices: [
+          { code: "ET1E01_1", name: "薄片成型机", weight: 0.55 },
+          { code: "ET1E01_2", name: "薄片烘干机", weight: 0.45 },
+        ],
+      },
+      {
+        id: "silk-flavor", name: "糖香料调配中心", system: "糖香料调配", baseAvg: 4300, seed: 19,
+        anomaly: { start: 260, end: 252, grade: "关注" }, // 远景历史窗口（2025 年下半年）
+        devices: [
+          { code: "ET1F01_1", name: "糖香料罐", weight: 0.4 },
+          { code: "ET1F01_2", name: "调配搅拌罐", weight: 0.3 },
+          { code: "ET1F01_3", name: "输送泵", weight: 0.3 },
+        ],
+      },
+      {
+        id: "silk-store", name: "储丝房", system: "储丝房", baseAvg: 3800, seed: 20,
+        anomaly: { start: 95, end: 90, grade: "提示" },
+        devices: [
+          { code: "ET1G01_1", name: "储丝柜", weight: 0.6 },
+          { code: "ET1G01_2", name: "储丝房空调机组", weight: 0.4 },
+        ],
+      },
     ],
   },
   {
@@ -213,6 +247,30 @@ export const GRID_DEPTS: DeptDef[] = [
         devices: [
           { code: "ET3A07_1", name: "7#卷烟机", weight: 0.5 },
           { code: "ET3A07_2", name: "包装机", weight: 0.5 },
+        ],
+      },
+      {
+        id: "spec-1", name: "1#异型卷接包机组", system: "异型卷接包机组", baseAvg: 3800, seed: 61,
+        anomaly: { start: 100, end: 95, grade: "关注" },
+        devices: [
+          { code: "ET4A01_1", name: "异型卷烟机", weight: 0.5 },
+          { code: "ET4A01_2", name: "异型包装机", weight: 0.5 },
+        ],
+      },
+      {
+        id: "spec-2", name: "2#异型卷接包机组", system: "异型卷接包机组", baseAvg: 3600, seed: 62,
+        anomaly: { start: 880, end: 870, grade: "告警" }, // 远景历史窗口（2024 年上半年）
+        devices: [
+          { code: "ET4A02_1", name: "异型卷烟机", weight: 0.5 },
+          { code: "ET4A02_2", name: "异型包装机", weight: 0.5 },
+        ],
+      },
+      {
+        id: "spec-pack", name: "异型烟包装线", system: "异型包装线", baseAvg: 2800, seed: 63,
+        anomaly: { start: 650, end: 640, grade: "提示" }, // 远景历史窗口（2025 年上半年）
+        devices: [
+          { code: "ET4B01_1", name: "装封箱机", weight: 0.6 },
+          { code: "ET4B01_2", name: "贴标机", weight: 0.4 },
         ],
       },
     ],
@@ -295,7 +353,7 @@ export const GRID_DEPTS: DeptDef[] = [
     ],
   },
   {
-    name: "后勤/信息/办公",
+    name: "生产及管理用房",
     grids: [
       {
         id: "office-bld", name: "办公楼网格", system: "后勤保障", baseAvg: 4800, seed: 51,
@@ -306,6 +364,24 @@ export const GRID_DEPTS: DeptDef[] = [
           { code: "ET6A01_3", name: "VRV空调机组", weight: 0.3 },
         ],
       },
+    ],
+  },
+  {
+    name: "工艺质量科",
+    grids: [
+      {
+        id: "qc-lab", name: "质检实验室网格", system: "质量检验", baseAvg: 2600, seed: 71,
+        anomaly: { start: 150, end: 140, grade: "提示" }, // 远景历史窗口
+        devices: [
+          { code: "ET7A01_1", name: "实验室空调机组", weight: 0.55 },
+          { code: "ET7A01_2", name: "检测仪器配电箱", weight: 0.45 },
+        ],
+      },
+    ],
+  },
+  {
+    name: "后勤",
+    grids: [
       {
         id: "office-canteen", name: "食堂网格", system: "后勤保障", baseAvg: 3100, seed: 52,
         anomaly: { start: 80, end: 75, grade: "提示" },
@@ -314,41 +390,17 @@ export const GRID_DEPTS: DeptDef[] = [
           { code: "ET6B01_2", name: "排油烟机", weight: 0.4 },
         ],
       },
+    ],
+  },
+  {
+    name: "信息科",
+    grids: [
       {
         id: "office-idc", name: "信息机房", system: "信息化", baseAvg: 12400, seed: 53,
         anomaly: { start: 520, end: 510, grade: "关注" }, // 远景历史窗口（2025 年上半年）
         devices: [
           { code: "ET6C01_1", name: "机房精密空调", weight: 0.5 },
           { code: "ET6C01_2", name: "服务器机柜配电", weight: 0.5 },
-        ],
-      },
-    ],
-  },
-  {
-    name: "异型烟车间",
-    grids: [
-      {
-        id: "spec-1", name: "1#异型卷接包机组", system: "异型卷接包机组", baseAvg: 3800, seed: 61,
-        anomaly: { start: 100, end: 95, grade: "关注" },
-        devices: [
-          { code: "ET4A01_1", name: "异型卷烟机", weight: 0.5 },
-          { code: "ET4A01_2", name: "异型包装机", weight: 0.5 },
-        ],
-      },
-      {
-        id: "spec-2", name: "2#异型卷接包机组", system: "异型卷接包机组", baseAvg: 3600, seed: 62,
-        anomaly: { start: 880, end: 870, grade: "告警" }, // 远景历史窗口（2024 年上半年）
-        devices: [
-          { code: "ET4A02_1", name: "异型卷烟机", weight: 0.5 },
-          { code: "ET4A02_2", name: "异型包装机", weight: 0.5 },
-        ],
-      },
-      {
-        id: "spec-pack", name: "异型烟包装线", system: "异型包装线", baseAvg: 2800, seed: 63,
-        anomaly: { start: 650, end: 640, grade: "提示" }, // 远景历史窗口（2025 年上半年）
-        devices: [
-          { code: "ET4B01_1", name: "装封箱机", weight: 0.6 },
-          { code: "ET4B01_2", name: "贴标机", weight: 0.4 },
         ],
       },
     ],

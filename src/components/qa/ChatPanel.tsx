@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { QaMessage } from "@/types";
+import { QaMessage, VisitBoard } from "@/types";
 import { mockAiResponse, getWelcomeMessage } from "@/lib/ai/mock-ai";
 import { generateId } from "@/lib/utils";
 import { useApp } from "@/lib/store/AppContext";
 import { dataModels } from "@/lib/mock-data/data-assets";
 import { mockKnowledgeDocs, mockAiSkills } from "@/lib/mock-data/settings";
 import { MessageBubble } from "./MessageBubble";
+import { AnalystAvatar } from "./AnalystAvatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 
@@ -36,10 +37,35 @@ const MODELS = [
   { id: "qwen", name: "通义千问", desc: "国产大模型" },
 ];
 
+// 板块推断：用于首页最近访问「智能问数对话」的所属板块标注
+const BOARD_KEYWORDS: [VisitBoard, string[]][] = [
+  ["能源消耗", ["能耗", "电耗", "能源", "碳排", "天然气", "蒸汽", "用水"]],
+  ["生产管理", ["产量", "生产", "计划", "效率", "达成", "牌号", "库存", "机台"]],
+  ["工艺质量", ["质量", "水分", "优质品", "废品", "工艺", "偏差", "合格"]],
+];
+function detectVisitBoard(text: string): VisitBoard {
+  for (const [board, keywords] of BOARD_KEYWORDS) {
+    if (keywords.some((k) => text.includes(k))) return board;
+  }
+  return "生产管理";
+}
+
 // ========== 组件 ==========
 // compact：嵌入侧滑窗等窄容器时使用（压缩欢迎模式排版，交互能力不变）
-export function ChatPanel({ initialQuery, compact = false }: { initialQuery?: string; compact?: boolean }) {
-  const { toggleFavorite, addHistory, isFavorited } = useApp();
+// welcomeText：自定义欢迎语（如能耗三页 AI 助手传入业务化开场白，仅欢迎模式展示）
+// suppressHistory：案例演示模式（不计入业务问数历史、热门问题统计）
+export function ChatPanel({
+  initialQuery,
+  compact = false,
+  welcomeText,
+  suppressHistory = false,
+}: {
+  initialQuery?: string;
+  compact?: boolean;
+  welcomeText?: string;
+  suppressHistory?: boolean;
+}) {
+  const { toggleFavorite, addHistory, isFavorited, addRecentVisit, state } = useApp();
 
   // ----- 消息 & 输入 -----
   const [messages, setMessages] = useState<QaMessage[]>([getWelcomeMessage()]);
@@ -154,11 +180,24 @@ export function ChatPanel({ initialQuery, compact = false }: { initialQuery?: st
       setMessages((prev) => [...prev.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
       setLoading(true);
-      addHistory(userMsg);
+      // 案例演示模式不计入业务问数历史与热门问题统计
+      if (!suppressHistory) {
+        addHistory(userMsg);
+        // 记录最近访问（首页「智能问数对话」条目；同一问题重复提问仅更新时间）
+        addRecentVisit({
+          id: `rv-qa-${text.slice(0, 40)}`,
+          title: text,
+          board: detectVisitBoard(text),
+          contentType: "智能问数对话",
+          creator: state.user?.nickname || state.user?.username || "当前用户",
+          editable: false,
+          route: `/qa?query=${encodeURIComponent(text)}`,
+        });
+      }
       try {
         const reply = await mockAiResponse(text);
         setMessages((prev) => [...prev, reply]);
-        addHistory(reply);
+        if (!suppressHistory) addHistory(reply);
       } catch {
         setMessages((prev) => [
           ...prev,
@@ -173,7 +212,7 @@ export function ChatPanel({ initialQuery, compact = false }: { initialQuery?: st
         setLoading(false);
       }
     },
-    [loading, addHistory]
+    [loading, addHistory, suppressHistory, addRecentVisit, state.user]
   );
 
   sendMessageRef.current = sendMessage;
@@ -489,7 +528,15 @@ export function ChatPanel({ initialQuery, compact = false }: { initialQuery?: st
             <>
               {/* 欢迎语 */}
               <div className="mb-6">
-                {compact ? (
+                {compact && welcomeText ? (
+                  /* 自定义欢迎语：数字人头像 + 开场白 */
+                  <div className="flex items-start gap-3">
+                    <span className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full ring-2 ring-primary-100">
+                      <AnalystAvatar />
+                    </span>
+                    <p className="pt-1 text-sm leading-relaxed text-gray-700">{welcomeText}</p>
+                  </div>
+                ) : compact ? (
                   <>
                     <h2 className="text-xl font-bold text-gray-900 tracking-tight">AI，让数据会说话</h2>
                     <p className="text-sm text-gray-500 leading-relaxed mt-2">

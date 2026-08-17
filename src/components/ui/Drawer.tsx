@@ -10,13 +10,23 @@ interface DrawerProps {
   footer?: ReactNode;
   width?: number; // px，默认 480
   padding?: boolean; // 内容区内边距，默认 true；嵌入全高布局组件时传 false
+  headerExtra?: ReactNode; // 标题栏右侧自定义内容（渲染在关闭按钮左侧）
 }
 
 /**
  * 右侧滑出抽屉：遮罩 + 从右滑入面板，ESC 关闭、锁定 body 滚动，
  * 支持进入/退出过渡动画。
  */
-export function Drawer({ open, onClose, title, children, footer, width = 480, padding = true }: DrawerProps) {
+export function Drawer({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  width = 480,
+  padding = true,
+  headerExtra,
+}: DrawerProps) {
   const [render, setRender] = useState(open);
   const [slideIn, setSlideIn] = useState(false);
 
@@ -65,13 +75,16 @@ export function Drawer({ open, onClose, title, children, footer, width = 480, pa
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
             <h3 className="font-semibold text-gray-800">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="关闭"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-1">
+              {headerExtra}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="关闭"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
         <div className={`flex-1 min-h-0 overflow-auto ${padding ? "p-6" : ""}`}>{children}</div>

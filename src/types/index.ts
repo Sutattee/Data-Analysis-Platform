@@ -378,7 +378,8 @@ export interface AlertRecord {
   strategyName: string;       // 告警策略名称
   triggerCondition: string;   // 触发条件
   // —— 原因与处置建议 ——
-  causeSummary?: string;      // 原因摘要（空表示暂未识别到明确原因）
+  causeSummary?: string;      // 异常原因（空表示暂未识别到明确原因）
+  causeType?: "AI生成" | "人工补录"; // 原因类型（causeSummary 存在时有值）
   suggestion?: string;        // 处置建议
   // —— 责任与处理情况 ——
   receiver: string;           // 接收人
@@ -390,19 +391,19 @@ export interface AlertRecord {
 }
 
 // ========== 告警管理（数据告警策略）==========
-export type AlertOperator = "高于" | "低于" | "超出正常区间";
-export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "历史均值" | "正常区间";
+export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间";
+export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "正常区间";
 export type AlertDetectCycle = "每5分钟" | "每15分钟" | "每30分钟" | "每小时" | "每日" | "每月";
-export type AlertScope = "全部适用对象" | "指定对象";
+export type AlertScope = "全部适用对象" | "指定对象"; // 保留类型兼容；新表单固定为指定对象
 
 // 单条触发条件
 export interface AlertCondition {
   metric: string;                 // 数据指标
   forecastRange?: string;         // 预测范围（仅预测风险）
   operator: AlertOperator;        // 判断方式
-  baselineType: AlertBaselineType;
-  baselineValue: string;          // 基准值；正常区间为 "下限~上限"
-  deviation?: string;             // 偏离比例 %（选填）
+  baselineType: AlertBaselineType; // 基准类型
+  baselineValue: string;          // 基准值；正常区间为 "下限~上限"；目标值为系统带入的目标值
+  deviation?: string;             // 偏离比例 %（选填，不填=越界即触发）
 }
 
 // 数据告警策略
@@ -450,6 +451,157 @@ export interface MetricManage {
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }
 
+// ========== 目标值管理（指标详情内，版本化） ==========
+export type TargetPeriod = "月度" | "季度" | "年度";
+
+// 判断方向（单值方向用 value；"处于目标区间"用 lower/upper）
+export type TargetDirection = "<" | "≤" | ">" | "≥" | "=" | "处于目标区间";
+
+export type TargetVersionStatus = "待生效" | "生效中" | "已失效";
+
+// 指标目标值版本：编辑不修改原记录而是生成新版本，历史版本永久保留
+export interface MetricTargetVersion {
+  id: string;
+  version: string;               // 版本号 V1、V2…（同指标同考核周期下系统递增）
+  metricId: string;              // 所属指标
+  metricName: string;            // 指标名称（只读带入）
+  period: TargetPeriod;          // 考核周期
+  direction: TargetDirection;    // 判断方向
+  value?: number;                // 目标值（单值方向必填）
+  lower?: number;                // 目标区间下限（区间方向必填，下限 < 上限）
+  upper?: number;                // 目标区间上限
+  unit: string;                  // 指标单位（只读带入）
+  effectiveStart: string;        // 生效周期开始 YYYY-MM-DD
+  effectiveEnd: string;          // 生效周期结束 YYYY-MM-DD
+  enabled: boolean;              // 是否启用
+  status: TargetVersionStatus;   // 状态（按生效周期 + 启用 + 替代/停用记录推导）
+  effectiveTime: string;         // 实际开始生效时间
+  createdAt: string;             // 创建时间 YYYY-MM-DD HH:mm
+  createdBy: string;             // 创建人
+  basis?: string;                // 目标依据（≤200 字）
+  remark?: string;               // 备注（≤200 字）
+  changeNote?: string;           // 变更说明（编辑生成新版本时必填，≤200 字）
+  replacedAt?: string;           // 被新版本替代时间
+  disabledAt?: string;           // 停用时间
+  disabledBy?: string;           // 停用操作人
+  disableReason?: string;        // 停用原因
+}
+
+// ========== 折标系数管理（能源折标准煤系数 / 能源碳排放因子，版本化） ==========
+export type CoeffEnergyType = "电" | "蒸汽" | "水" | "天然气";
+
+export type CoeffType = "折标准煤系数" | "能源碳排放因子";
+
+export type CoeffStatus = "待生效" | "生效中" | "已失效";
+
+// 折标系数版本：统一维护能源折标准煤系数与碳排放因子，版本化永久保留不可删除
+export interface CoefficientVersion {
+  id: string;
+  version: string;               // 版本号 V1、V2…（同能源+系数类型+能源来源下系统递增）
+  energyType: CoeffEnergyType;   // 能源类型
+  coeffType: CoeffType;          // 系数类型
+  energySource: "外购" | "自制"; // 能源来源（蒸汽区分外购/自制，其余固定外购）
+  baseAmount: number;            // 换算基准量（>0，默认 1）
+  baseUnit: string;              // 原始单位（kWh / t / GJ / m³，按能源类型约束）
+  value: number;                 // 换算值（>0，支持小数）
+  resultUnit: string;            // 结果单位（kgce / tce 或 kgCO₂e / tCO₂e）
+  effectiveStart: string;        // 生效周期开始 YYYY-MM-DD
+  effectiveEnd: string;          // 生效周期结束 YYYY-MM-DD
+  enabled: boolean;              // 是否启用
+  status: CoeffStatus;           // 状态
+  basis: string;                 // 来源依据（国家标准 / 政府公告 / 公司内部文件，必填）
+  remark?: string;               // 备注（核算口径说明）
+  createdAt: string;             // 创建时间 YYYY-MM-DD HH:mm
+  createdBy: string;             // 创建人
+  changeNote?: string;           // 变更说明（编辑生成新版本时必填，≤200 字）
+  replacedAt?: string;           // 被新版本替代时间
+  disabledAt?: string;           // 停用时间
+  disabledBy?: string;           // 停用操作人
+  disableReason?: string;        // 停用原因
+}
+
+// ========== 重大事件年鉴 ==========
+export type MajorEventType =
+  | "设备故障"
+  | "检修维护"
+  | "技改投运"
+  | "生产计划调整"
+  | "运行或工艺调整"
+  | "能源供应异常"
+  | "外部环境影响"
+  | "其他事件";
+
+export type EventFormation = "AI识别" | "AI识别·人工修订" | "人工补录";
+
+export type EventConfirmStatus = "待确认" | "已确认" | "已排除";
+
+// 事件经过时间轴节点
+export interface EventTimelineItem {
+  time: string; // 节点时间 YYYY-MM-DD HH:mm
+  label: string; // 阶段名（发生 / 扩大 / 处置 / 恢复…）
+  desc?: string; // 节点描述
+}
+
+// 修订记录（AI识别事件被人工修改后保留）
+export interface EventRevision {
+  time: string;
+  user: string;
+  summary: string; // 修改内容摘要
+}
+
+// 重大事件
+export interface MajorEvent {
+  id: string; // SJ + YYYYMMDD + 3位序号
+  title: string;
+  type: MajorEventType;
+  startTime: string; // "YYYY-MM-DD HH:mm"
+  endTime: string | null; // null = 进行中
+  objects: string[]; // 影响对象（车间/网格/设备名）
+  metrics: string[]; // 影响指标名
+  impactSummary: string; // 影响摘要（有数据依据的主要影响结果）
+  process: string; // 事件经过（≤2000 字）
+  timeline: EventTimelineItem[]; // 时间轴（缺处置/恢复信息时为空段）
+  alertIds: string[]; // 关联预警记录 id（技改投运/计划调整等可为空）
+  aiBasis?: string; // AI 识别依据（AI识别事件）
+  isSuspected?: boolean; // 疑似事件（仅有指标异常、缺少业务证据）
+  formation: EventFormation;
+  status: EventConfirmStatus;
+  excludeReason?: string; // 排除原因
+  createdBy: string;
+  createdAt: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  revisions: EventRevision[]; // 修订记录
+}
+
+// 年鉴报告纳入事件的快照行
+export interface ReportEventSnapshot {
+  id: string;
+  title: string;
+  type: string;
+  timeLabel: string; // 起止时间展示
+  impact: string; // 影响摘要
+  duration: string; // 持续时长
+  version: string; // 生成时的版本标记（事件最后更新时间）
+}
+
+// 年鉴报告
+export interface YearbookReport {
+  id: string;
+  year: number;
+  name: string; // ≤100 字，同年度内不重复
+  periodStart: string;
+  periodEnd: string;
+  includedEvents: ReportEventSnapshot[]; // 生成时的事件快照（不随后续变化更新）
+  dataCutoff: string; // 数据截止时间
+  sections: { overview: string; chronicle: string; analysis: string }; // 三章正文
+  generatedAt: string;
+  generatedBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  editLog: { time: string; user: string; note: string }[]; // 人工编辑记录
+}
+
 // ========== 导航 ==========
 export interface NavItem {
   label: string;
@@ -457,4 +609,56 @@ export interface NavItem {
   icon: string;
   children?: NavItem[]; // 二级菜单（可折叠）
   matchPrefixes?: string[]; // 一级激活态匹配前缀（当二级路由分散在多个路径前缀时使用）
+}
+
+// ========== 对象管理（对象结构 + 对象-指标关联） ==========
+// 对象关联的指标（含指标编码，用于列表展示与关联编辑）
+export interface ObjectMetricRef {
+  metricId: string;      // 指标 id（metricList）
+  nameCn: string;        // 指标中文名称
+  code: string;          // 指标编码
+  domain: string;        // 业务域
+}
+
+// 统一维护的企业对象结构及"对象-指标"关联关系
+export interface ObjectRelation {
+  id: string;
+  name: string;             // 对象名称
+  system: string;           // 所属系统
+  org: string;              // 所属组织
+  dept: string;             // 所属部门
+  meterNo: string;          // 对应仪表号
+  metrics: ObjectMetricRef[]; // 关联指标（可多个）
+  createdAt: string;        // 创建时间
+  createdBy: string;        // 创建人
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+// ========== 首页最近访问 ==========
+// 所属板块（首页三板块：生产管理 / 工艺质量 / 能源消耗）
+export type VisitBoard = "生产管理" | "工艺质量" | "能源消耗";
+
+// 内容类型（对应不同的打开方式）
+export type VisitContentType =
+  | "智能问数对话"
+  | "预测分析记录"
+  | "告警记录"
+  | "重大事件记录"
+  | "年鉴报告"
+  | "普通报告"
+  | "重点网格监测"
+  | "指标溯源"
+  | "数据资产";
+
+// 最近访问记录（同一内容重复访问仅更新最近访问时间，不生成重复记录）
+export interface RecentVisit {
+  id: string;                // 内容唯一键（同内容去重依据）
+  title: string;             // 标题
+  board: VisitBoard;         // 所属板块
+  contentType: VisitContentType; // 内容类型
+  creator: string;           // 创建人（告警记录为"系统"）
+  editable: boolean;         // 本人创建且具备编辑权限时可继续编辑
+  lastVisitedAt: string;     // 最近访问时间 YYYY-MM-DD HH:mm
+  route: string;             // 跳转路由（查看/继续处理/继续对话）
 }

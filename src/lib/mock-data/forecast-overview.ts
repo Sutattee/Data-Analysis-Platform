@@ -216,7 +216,7 @@ export function getTargetSeries(period: "本月" | "本年度"): { unit: string;
     }
     points.push(pt);
   }
-  return { unit: "kgce/箱", points, summary: `年末单箱综合能耗预计 ${yearEnd} kgce/箱，目标≤${target}，预计高出 0.6，预计超标，建议结合达标条件反推制定管控措施` };
+  return { unit: "kgce/箱", points, summary: "" };
 }
 
 export { fmt };

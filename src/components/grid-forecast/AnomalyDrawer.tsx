@@ -5,9 +5,11 @@ import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
+import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import type { AnomalyDetail } from "@/lib/mock-data/grid-forecast";
+import { AnomalyAiPanel } from "./AnomalyAiPanel";
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
@@ -38,6 +40,8 @@ export function AnomalyDrawer({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const { state } = useApp();
+  const currentUser = state.user?.nickname || state.user?.username || "当前用户";
   const rec = detail?.recordId ? ALERT_RECORDS.find((r) => r.id === detail.recordId) : undefined;
 
   const metricName = detail?.metricName ?? rec?.metricName ?? "-";
@@ -53,18 +57,43 @@ export function AnomalyDrawer({
   // —— 异常原因编辑态 ——
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const [savedCause, setSavedCause] = useState<string | undefined>(undefined);
+  // 保存后的补录信息：补录人 / 补录时间 / 原因类型（AI生成、人工补录）
+  const [savedMeta, setSavedMeta] = useState<
+    { text: string; by: string; time: string; type: "AI生成" | "人工补录" } | undefined
+  >(undefined);
+  // AI 回填的原文（保存时与 draft 对比：未修改则原因类型=AI生成，修改过=人工补录）
+  const [aiFilledText, setAiFilledText] = useState<string | undefined>(undefined);
+  // AI 辅助对话面板
+  const [aiOpen, setAiOpen] = useState(false);
 
-  // detail 引用变化（点击新异常 / 关闭重开）时重置编辑态；保存只改 savedCause，不触发重置
+  // detail 引用变化（点击新异常 / 关闭重开）时重置编辑态；保存只改 savedMeta，不触发重置
   useEffect(() => {
     setEditing(false);
     setDraft("");
-    setSavedCause(undefined);
+    setSavedMeta(undefined);
+    setAiFilledText(undefined);
+    setAiOpen(false);
   }, [detail]);
 
   const baseCause = detail?.cause ?? rec?.causeSummary;
-  const effectiveCause = savedCause ?? baseCause;
+  const effectiveCause = savedMeta?.text ?? baseCause;
   const hasCause = !!effectiveCause?.trim();
+  // 原因类型：本次会话保存后展示补录信息；否则取页面构造的 causeType / 告警记录的 causeType
+  const causeTypeLabel = savedMeta
+    ? `（${savedMeta.type}）`
+    : detail?.causeType
+      ? `（${detail.causeType}）`
+      : detail?.cause
+        ? "（AI生成）"
+        : rec?.causeType
+          ? `（${rec.causeType}）`
+          : undefined;
+
+  function formatNow(): string {
+    const d = new Date();
+    const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
 
   function startEdit() {
     setDraft(effectiveCause ?? "");
@@ -73,16 +102,30 @@ export function AnomalyDrawer({
   function cancelEdit() {
     setEditing(false);
     setDraft("");
+    setAiFilledText(undefined);
   }
   function handleSave() {
     if (!draft.trim()) return;
-    setSavedCause(draft.trim());
+    // 原因类型：AI 回填后未修改 → AI生成；否则人工补录
+    const type = aiFilledText !== undefined && draft.trim() === aiFilledText ? "AI生成" : "人工补录";
+    setSavedMeta({ text: draft.trim(), by: currentUser, time: formatNow(), type });
     setEditing(false);
     setDraft("");
+    setAiFilledText(undefined);
     toast("异常原因已保存，并关联至本次预警记录", "success");
   }
 
+  // AI 采纳并回填：结论填入异常原因输入框，用户可继续编辑
+  function handleAiAdopt(causeText: string) {
+    setDraft(causeText);
+    setAiFilledText(causeText);
+    setEditing(true);
+    setAiOpen(false);
+    toast("AI分析结论已回填至异常原因，请确认后可保存", "success");
+  }
+
   return (
+    <>
     <Drawer
       open={open}
       onClose={onClose}
@@ -112,7 +155,7 @@ export function AnomalyDrawer({
           {/* 核心异常数据 */}
           <Section title="核心异常数据">
             <Field label="告警等级" value={level ? <AlertLevelBadge level={level} /> : "-"} />
-            {detail?.dept && <Field label="部门" value={detail.dept} />}
+            {detail?.dept && <Field label="对象" value={detail.dept} />}
             <Field label="指标名称" value={metricName} />
             <Field label="基准 / 阈值" value={baseline} />
             {isForecast ? (
@@ -138,6 +181,12 @@ export function AnomalyDrawer({
             {hasCause && !editing ? (
               <div className="space-y-2">
                 <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{effectiveCause}</p>
+                {causeTypeLabel && <p className="text-xs text-gray-400">（原因类型）：{causeTypeLabel}</p>}
+                {savedMeta && (
+                  <p className="text-xs text-gray-400">
+                    补录人：{savedMeta.by}｜补录时间：{savedMeta.time}
+                  </p>
+                )}
                 <div>
                   <Button size="sm" variant="secondary" onClick={startEdit}>修正异常原因</Button>
                 </div>
@@ -158,6 +207,8 @@ export function AnomalyDrawer({
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-400">{draft.length}/500</span>
                   <div className="flex gap-2">
+                    {/* AI 辅助入口：右侧滑出对话面板，分析结论可采纳回填 */}
+                    <Button size="sm" variant="secondary" onClick={() => setAiOpen(true)}>AI辅助</Button>
                     {hasCause && (
                       <Button size="sm" variant="secondary" onClick={cancelEdit}>取消</Button>
                     )}
@@ -179,5 +230,14 @@ export function AnomalyDrawer({
         </div>
       )}
     </Drawer>
+
+    {/* AI 辅助异常原因补录面板（覆盖在异常详情抽屉之上；关闭面板不自动修改异常原因） */}
+    <AnomalyAiPanel
+      open={open && aiOpen}
+      onClose={() => setAiOpen(false)}
+      detail={detail}
+      onAdopt={handleAiAdopt}
+    />
+    </>
   );
 }

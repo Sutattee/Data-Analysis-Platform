@@ -11,6 +11,8 @@ import {
   FORECAST_METRICS,
   CONDITION_DICT,
   HISTORY_RANGE,
+  effectiveTargetOf,
+  formatTargetDir,
   reverseItemsOf,
   type ForecastType,
   type ForecastInput,
@@ -73,7 +75,9 @@ export function ConditionForm({
   const [modelId, setModelId] = useState("");
   const [rangeState, setRangeState] = useState("未来7日");
   const [period, setPeriod] = useState("本年度");
-  const [targetInput, setTargetInput] = useState("");
+  const [targetInput, setTargetInput] = useState(""); // 单值方向的临时测算值
+  const [rangeLowerInput, setRangeLowerInput] = useState(""); // 区间方向的临时下限
+  const [rangeUpperInput, setRangeUpperInput] = useState(""); // 区间方向的临时上限
   const [calcMode, setCalcMode] = useState<"tomorrow" | "date" | "period">("tomorrow");
   const [calcDate, setCalcDate] = useState("2026-08-10");
   const [conds, setConds] = useState<Record<string, string>>({});
@@ -82,8 +86,13 @@ export function ConditionForm({
   const [remainingPlanInput, setRemainingPlanInput] = useState("");
 
   // 联动（派生值，无需 effect）：类型 → 指标 → 对象/模型 → 时间范围
-  const metricsForType = FORECAST_METRICS.filter((m) => m.types.includes(type));
+  // 目标达成预测 / 达标条件反推 仅支持已配置目标值的指标（无目标值指标不支持目标达成预测）
+  const metricsForType = FORECAST_METRICS.filter(
+    (m) => m.types.includes(type) && (type === "未来值预测" || type === "工况情景测算" || effectiveTargetOf(m) !== null)
+  );
   const metric = metricsForType.find((m) => m.key === metricKey) ?? metricsForType[0];
+  // 有效目标值（目标值管理「生效中」版本；无则为 null → 不支持目标达成预测）
+  const effTarget = effectiveTargetOf(metric);
   const models = metric.models.filter((m) => m.types.includes(type));
   const model = models.find((m) => m.id === modelId) ?? models[0];
   const object =
@@ -96,6 +105,8 @@ export function ConditionForm({
   useEffect(() => {
     setConds({});
     setTargetInput("");
+    setRangeLowerInput("");
+    setRangeUpperInput("");
     setReverseItem(reverseItemsOf(metric.name)[0] ?? "");
     setRemainingPlanInput(metric.targetCtx ? String(metric.targetCtx.remainingPlan) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -110,7 +121,7 @@ export function ConditionForm({
     }
     onInvalidate?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, metricKey, modelId, rangeState, period, calcMode, calcDate, conds, compare, reverseItem, targetInput, remainingPlanInput]);
+  }, [type, metricKey, modelId, rangeState, period, calcMode, calcDate, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
 
   // ----- 校验（即时红字）-----
   const condErrors: Record<string, string> = {};
@@ -129,6 +140,20 @@ export function ConditionForm({
   }
   const targetErr =
     targetInput.trim() !== "" && Number.isNaN(Number(targetInput)) ? "请输入数字" : undefined;
+  // 区间方向的临时测算值校验（下限/上限均为数字且下限 < 上限）
+  const isRangeTarget = effTarget?.direction === "处于目标区间";
+  const rangeLowerErr =
+    rangeLowerInput.trim() !== "" && Number.isNaN(Number(rangeLowerInput)) ? "请输入数字" : undefined;
+  const rangeUpperErr =
+    rangeUpperInput.trim() !== "" && Number.isNaN(Number(rangeUpperInput)) ? "请输入数字" : undefined;
+  const rangeOrderErr =
+    rangeLowerInput.trim() !== "" &&
+    rangeUpperInput.trim() !== "" &&
+    !rangeLowerErr &&
+    !rangeUpperErr &&
+    Number(rangeLowerInput) >= Number(rangeUpperInput)
+      ? "下限必须小于上限"
+      : undefined;
   const planErr =
     remainingPlanInput.trim() === ""
       ? "必填"
@@ -138,7 +163,83 @@ export function ConditionForm({
   const hasError =
     Object.keys(condErrors).length > 0 ||
     targetErr !== undefined ||
+    rangeLowerErr !== undefined ||
+    rangeUpperErr !== undefined ||
+    rangeOrderErr !== undefined ||
     (type === "达标条件反推" && planErr !== undefined);
+
+  // 临时测算值：单值方向 → targetValue；区间方向 → targetLower / targetUpper
+  function tempTargetFields() {
+    if (isRangeTarget) {
+      return {
+        ...(rangeLowerInput.trim() !== "" ? { targetLower: Number(rangeLowerInput) } : {}),
+        ...(rangeUpperInput.trim() !== "" ? { targetUpper: Number(rangeUpperInput) } : {}),
+      };
+    }
+    return targetInput.trim() !== "" ? { targetValue: Number(targetInput) } : {};
+  }
+
+  // 目标值字段（目标达成预测 / 达标条件反推共用）：
+  // 系统自动带入有效目标值与判断条件（支持 <、≤、>、≥、=目标值、处于目标区间）并展示单位；
+  // 用户修改视为「临时测算值」，仅用于本次预测，不修改正式目标配置。
+  function renderTargetValueField() {
+    if (!effTarget) return null;
+    const dir = formatTargetDir(effTarget.direction);
+    const tempHint = isRangeTarget
+      ? rangeLowerInput.trim() !== "" || rangeUpperInput.trim() !== ""
+      : targetInput.trim() !== "";
+    return (
+      <Field
+        label="目标值"
+        required
+        hint={
+          tempHint
+            ? "已修改为临时测算值，仅用于本次预测，不修改正式目标配置"
+            : `自动带入生效版本 ${effTarget.version}（${effTarget.period}考核），来自目标值管理`
+        }
+        error={targetErr ?? rangeLowerErr ?? rangeUpperErr ?? rangeOrderErr}
+      >
+        {isRangeTarget ? (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-[38px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500">
+              处于目标区间
+            </span>
+            <input
+              className={`${inputCls} ${rangeLowerErr || rangeOrderErr ? "border-red-400" : ""}`}
+              value={rangeLowerInput}
+              placeholder={effTarget.lower !== undefined ? String(effTarget.lower) : "下限"}
+              onChange={(e) => setRangeLowerInput(e.target.value)}
+            />
+            <span className="text-gray-400">～</span>
+            <input
+              className={`${inputCls} ${rangeUpperErr || rangeOrderErr ? "border-red-400" : ""}`}
+              value={rangeUpperInput}
+              placeholder={effTarget.upper !== undefined ? String(effTarget.upper) : "上限"}
+              onChange={(e) => setRangeUpperInput(e.target.value)}
+            />
+            <span className="inline-flex h-[38px] items-center rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm text-gray-500">
+              {metric.unit}
+            </span>
+          </div>
+        ) : (
+          <div className="flex">
+            <span className="inline-flex items-center rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
+              {dir}
+            </span>
+            <input
+              className={`${inputCls} rounded-l-none rounded-r-none ${targetErr ? "border-red-400" : ""}`}
+              value={targetInput}
+              placeholder={effTarget.value !== undefined ? String(effTarget.value) : "目标值"}
+              onChange={(e) => setTargetInput(e.target.value)}
+            />
+            <span className="inline-flex items-center rounded-r-lg border border-l-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
+              {metric.unit}
+            </span>
+          </div>
+        )}
+      </Field>
+    );
+  }
 
   function handleSubmit() {
     const input: ForecastInput = {
@@ -147,9 +248,7 @@ export function ConditionForm({
       object,
       modelId: model.id,
       ...(type === "未来值预测" ? { range } : {}),
-      ...(type === "目标达成预测"
-        ? { period, ...(targetInput.trim() !== "" ? { targetValue: Number(targetInput) } : {}) }
-        : {}),
+      ...(type === "目标达成预测" ? { period, ...tempTargetFields() } : {}),
       ...(type === "工况情景测算"
         ? {
             calcMode,
@@ -167,7 +266,7 @@ export function ConditionForm({
             period,
             reverseItem,
             remainingPlan: Number(remainingPlanInput),
-            ...(targetInput.trim() !== "" ? { targetValue: Number(targetInput) } : {}),
+            ...tempTargetFields(),
           }
         : {}),
     };
@@ -234,7 +333,7 @@ export function ConditionForm({
           </Field>
         )}
 
-        {type === "目标达成预测" && metric.target && (
+        {type === "目标达成预测" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="考核周期" required>
               <SegmentedControl
@@ -252,36 +351,25 @@ export function ConditionForm({
                 {period === "本月" ? "2026-08-31（月末）" : period === "本季度" ? "2026-09-30（季末）" : "2026-12-31（年末）"}
               </div>
             </Field>
-            <Field
-              label="目标值"
-              required
-              hint={
-                targetInput.trim() !== "" && Number(targetInput) !== metric.target.value
-                  ? "已手动调整，本次按临时测算值处理，不保存至指标配置"
-                  : undefined
-              }
-              error={targetErr}
-            >
-              <div className="flex">
-                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
-                  {metric.target.direction}
-                </span>
-                <input
-                  className={`${inputCls} rounded-l-none`}
-                  value={targetInput}
-                  placeholder={String(metric.target.value)}
-                  onChange={(e) => setTargetInput(e.target.value)}
-                />
+            {effTarget ? (
+              <>
+                {renderTargetValueField()}
+                <Field label="当前累计实际值">
+                  <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
+                </Field>
+                <Field label="剩余生产计划">
+                  <div className={readonlyCls}>
+                    {metric.targetCtx?.remainingPlan.toLocaleString()} 箱
+                  </div>
+                </Field>
+              </>
+            ) : (
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-400">
+                  该指标未配置目标值，不支持目标达成预测（请在指标管理中维护目标值）
+                </p>
               </div>
-            </Field>
-            <Field label="当前累计实际值">
-              <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
-            </Field>
-            <Field label="剩余生产计划">
-              <div className={readonlyCls}>
-                {metric.targetCtx?.remainingPlan.toLocaleString()} 箱
-              </div>
-            </Field>
+            )}
           </div>
         )}
 
@@ -374,7 +462,7 @@ export function ConditionForm({
           </div>
         )}
 
-        {type === "达标条件反推" && metric.target && (
+        {type === "达标条件反推" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="目标周期" required>
               <SegmentedControl
@@ -403,45 +491,34 @@ export function ConditionForm({
                 <div className={readonlyCls}>暂无配置</div>
               )}
             </Field>
-            <Field
-              label="目标值"
-              required
-              hint={
-                targetInput.trim() !== "" && Number(targetInput) !== metric.target.value
-                  ? "已手动调整，本次按临时测算值处理"
-                  : undefined
-              }
-              error={targetErr}
-            >
-              <div className="flex">
-                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
-                  {metric.target.direction}
-                </span>
-                <input
-                  className={`${inputCls} rounded-l-none`}
-                  value={targetInput}
-                  placeholder={String(metric.target.value)}
-                  onChange={(e) => setTargetInput(e.target.value)}
-                />
+            {effTarget ? (
+              <>
+                {renderTargetValueField()}
+                <Field label="当前累计实际值">
+                  <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
+                </Field>
+                <Field label="已完成产量">
+                  <div className={readonlyCls}>{metric.targetCtx?.doneOutput}</div>
+                </Field>
+                <Field label="剩余生产计划" required hint="默认自动加载，可按最新排产调整" error={planErr}>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      className={`${inputCls} pr-8 ${planErr ? "border-red-400" : ""}`}
+                      value={remainingPlanInput}
+                      onChange={(e) => setRemainingPlanInput(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">箱</span>
+                  </div>
+                </Field>
+              </>
+            ) : (
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-400">
+                  该指标未配置目标值，不支持达标条件反推（请在指标管理中维护目标值）
+                </p>
               </div>
-            </Field>
-            <Field label="当前累计实际值">
-              <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
-            </Field>
-            <Field label="已完成产量">
-              <div className={readonlyCls}>{metric.targetCtx?.doneOutput}</div>
-            </Field>
-            <Field label="剩余生产计划" required hint="默认自动加载，可按最新排产调整" error={planErr}>
-              <div className="relative">
-                <input
-                  type="number"
-                  className={`${inputCls} pr-8 ${planErr ? "border-red-400" : ""}`}
-                  value={remainingPlanInput}
-                  onChange={(e) => setRemainingPlanInput(e.target.value)}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">箱</span>
-              </div>
-            </Field>
+            )}
           </div>
         )}
 

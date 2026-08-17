@@ -52,7 +52,9 @@ export function TargetAchievementChart() {
         />
       }
     >
-      <p className="mb-2 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-gray-700">{summary}</p>
+      {summary && (
+        <p className="mb-2 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-gray-700">{summary}</p>
+      )}
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={points} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

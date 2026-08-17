@@ -6,7 +6,7 @@ import { MonitorStatusBadge } from "@/components/alert/alertBadges";
 interface GridMonitorTableProps {
   rows: GridRow[];
   onDevices: (row: GridRow) => void; // 查看关联设备（右侧抽屉）
-  onRecords: (row: GridRow) => void; // 预警记录（跳转告警记录页）
+  onRecords: (row: GridRow) => void; // 告警记录（跳转告警记录页）
 }
 
 // 网格监测表：按 危险→告警→预警→关注→提示→正常 排序（排序在 mock 层完成）
@@ -49,7 +49,7 @@ export function GridMonitorTable({ rows, onDevices, onRecords }: GridMonitorTabl
                   </button>
                   <span className="mx-1.5 text-gray-300">|</span>
                   <button className="text-primary-600 hover:underline" onClick={() => onRecords(r)}>
-                    预警记录
+                    告警记录
                   </button>
                 </td>
               </tr>
@@ -64,9 +64,6 @@ export function GridMonitorTable({ rows, onDevices, onRecords }: GridMonitorTabl
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-gray-400">
-        注：网格监测结果恢复正常后，所在车间异常网格数自动减少；告警状态需在告警记录中人工标记已处理后才会更新。
-      </p>
     </div>
   );
 }

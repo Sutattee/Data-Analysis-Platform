@@ -14,6 +14,7 @@ import {
   ALERT_RECORDS,
   ALERT_LEVELS,
   ALERT_STATUSES,
+  sortAlerts,
   orgPathOf,
   EMPTY_ORG_FILTER,
   type OrgFilter,
@@ -65,10 +66,14 @@ export function AlertRecordsList() {
   const { state } = useApp();
   const currentUser = state.user?.nickname || state.user?.username || "当前用户";
 
-  // 仅展示能源消耗管理（能耗管理）方向的告警记录
-  const [records, setRecords] = useState<AlertRecord[]>(() =>
-    ALERT_RECORDS.filter((r) => r.type === "当前异常").map((r) => ({ ...r }))
-  );
+  // 仅展示能源消耗管理（能耗管理）方向的告警记录：每个等级各取 2 条（共 10 条，覆盖全部等级），按等级+时间排序
+  const [records, setRecords] = useState<AlertRecord[]>(() => {
+    const current = ALERT_RECORDS.filter((r) => r.type === "当前异常");
+    const picked = ALERT_LEVELS.flatMap((lv) =>
+      current.filter((r) => r.level === lv).slice(0, 2).map((r) => ({ ...r }))
+    );
+    return sortAlerts(picked);
+  });
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/domain/date）
   // 支持 URL ?domain= 预筛选业务域（carbon-eval 异常「查看告警记录」跳转用）
   const [applied, setApplied] = useState<AlertFilter>(() => {
@@ -146,7 +151,8 @@ export function AlertRecordsList() {
     );
     if (sortMode === "time_desc") return [...filtered].sort((a, b) => b.triggerTime.localeCompare(a.triggerTime));
     if (sortMode === "time_asc") return [...filtered].sort((a, b) => a.triggerTime.localeCompare(b.triggerTime));
-    return filtered;
+    // 默认：按等级（高→低）+ 告警时间（新→旧）排序
+    return sortAlerts(filtered);
   }, [records, applied, sortMode, orgFilter]);
 
   const total = sorted.length;
@@ -346,7 +352,7 @@ export function AlertRecordsList() {
         )}
       </Card>
 
-      {/* 来源页跳入时展示一键返回（如网格监测「预警记录」） */}
+      {/* 来源页跳入时展示一键返回（如网格监测「告警记录」） */}
       {searchParams.get("from") && (
         <div className="flex justify-center">
           <Button onClick={() => router.back()}>返回</Button>

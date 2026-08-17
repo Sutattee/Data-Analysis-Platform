@@ -1,13 +1,19 @@
 "use client";
 
+// 指标管理列表：搜索 + 导入 + 列表（操作：查看 / 目标值管理 / 达标反推设置）
+// 「目标值管理」进入独立页面（指标管理/目标值管理）；「达标反推设置」右侧滑出窗口配置。
+// 仅 单箱综合能耗（m7）/ 单位产值碳排放量（m1）支持上述两项，且固定排在前两项。
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Drawer } from "@/components/ui/Drawer";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
+import { ReverseSettingsDrawer } from "@/components/settings/ReverseSettingsDrawer";
 import { metricList } from "@/lib/mock-data/metric-management";
+import { isTargetSupported } from "@/lib/mock-data/metric-targets";
 import type { MetricManage } from "@/types";
 
 // 只读字段
@@ -20,9 +26,25 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
+// 指标排序：单箱综合能耗（m7）/ 单位产值碳排放量（m1）固定前两项，其余保持原序
+function sortMetrics(list: MetricManage[]): MetricManage[] {
+  const order = ["m7", "m1"];
+  return [...list].sort((a, b) => {
+    const ia = order.indexOf(a.id);
+    const ib = order.indexOf(b.id);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return 0;
+  });
+}
+
 export default function MetricManagementPage() {
   const toast = useToast();
-  const [metrics, setMetrics] = useState<MetricManage[]>(() => metricList.map((m) => ({ ...m })));
+  const router = useRouter();
+  const [metrics, setMetrics] = useState<MetricManage[]>(() =>
+    sortMetrics(metricList.map((m) => ({ ...m })))
+  );
 
   // 搜索
   const [keyword, setKeyword] = useState("");
@@ -38,62 +60,8 @@ export default function MetricManagementPage() {
 
   // 详情
   const [detailTarget, setDetailTarget] = useState<MetricManage | null>(null);
-
-  // 达标反推设置（详情抽屉内编辑）
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState("");
-  const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
-  const [showReverseAdd, setShowReverseAdd] = useState(false);
-  const [newReverseItem, setNewReverseItem] = useState("");
-
-  const reverseItems = detailTarget?.reverseItems ?? [];
-
-  // 反推内容变更：同步更新列表与详情抽屉
-  function updateReverseItems(next: string[]) {
-    if (!detailTarget) return;
-    setMetrics((prev) => prev.map((m) => (m.id === detailTarget.id ? { ...m, reverseItems: next } : m)));
-    setDetailTarget({ ...detailTarget, reverseItems: next });
-  }
-  // AI 生成：重置为指标配置的推荐内容
-  function regenReverseItems() {
-    const recommend = metricList.find((x) => x.id === detailTarget?.id)?.reverseItems ?? [];
-    updateReverseItems([...recommend]);
-    toast("已按 AI 推荐内容重新生成", "success");
-  }
-  function commitReverseEdit() {
-    if (editingIdx === null) return;
-    const v = editingText.trim();
-    if (v) {
-      updateReverseItems(reverseItems.map((it, i) => (i === editingIdx ? v : it)));
-      toast("已保存", "success");
-    }
-    setEditingIdx(null);
-  }
-  function confirmReverseDelete() {
-    if (deleteIdx === null) return;
-    updateReverseItems(reverseItems.filter((_, i) => i !== deleteIdx));
-    toast("已删除", "success");
-    setDeleteIdx(null);
-  }
-  function addReverseItem() {
-    const v = newReverseItem.trim();
-    if (!v) {
-      toast("请输入反推内容", "warning");
-      return;
-    }
-    updateReverseItems([...reverseItems, v]);
-    setNewReverseItem("");
-    setShowReverseAdd(false);
-    toast("已新增反推内容", "success");
-  }
-  function closeDetail() {
-    setDetailTarget(null);
-    setEditingIdx(null);
-    setEditingText("");
-    setDeleteIdx(null);
-    setShowReverseAdd(false);
-    setNewReverseItem("");
-  }
+  // 达标反推设置（列表操作入口 → 右侧滑出窗口）
+  const [reverseMetric, setReverseMetric] = useState<MetricManage | null>(null);
 
   const filtered = useMemo(() => {
     const kw = applied.trim().toLowerCase();
@@ -110,6 +78,11 @@ export default function MetricManagementPage() {
 
   function handleSearch() { setApplied(keyword); setPage(1); }
   function handleReset() { setKeyword(""); setApplied(""); setPage(1); }
+
+  // 达标反推内容更新（滑出窗保存后同步列表数据）
+  function updateReverseItems(metricId: string, next: string[]) {
+    setMetrics((prev) => prev.map((m) => (m.id === metricId ? { ...m, reverseItems: next } : m)));
+  }
 
   // 下载模板（生成 csv 内容，模拟 xlsx 模板）
   function downloadTemplate() {
@@ -194,7 +167,30 @@ export default function MetricManagementPage() {
                   <td className="px-4 py-3 text-gray-600">{m.owner}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{m.createdAt}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
+                    <div className="inline-flex gap-1">
+                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
+                      {/* 仅 单箱综合能耗 / 单位产值碳排放量 支持目标值管理与达标反推设置 */}
+                      {isTargetSupported(m.id) && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+                            onClick={() => router.push(`/settings/metric-management/${m.id}/targets`)}
+                          >
+                            目标值管理
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+                            onClick={() => setReverseMetric(m)}
+                          >
+                            达标反推设置
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -247,21 +243,21 @@ export default function MetricManagementPage() {
         </div>
       </Modal>
 
-      {/* 指标详情抽屉：基础信息 / 目标值管理 / 达标反推设置 */}
+      {/* 指标详情抽屉（仅基础信息；目标值管理 / 达标反推设置已移至列表操作） */}
       <Drawer
         open={detailTarget !== null}
-        onClose={closeDetail}
+        onClose={() => setDetailTarget(null)}
         title="指标详情"
         width={560}
         footer={
           <div className="flex">
-            <Button onClick={closeDetail}>取消</Button>
+            <Button onClick={() => setDetailTarget(null)}>取消</Button>
           </div>
         }
       >
         {detailTarget && (
           <div className="space-y-3">
-            {/* 一、基础信息 */}
+            {/* 基础信息 */}
             <div className="text-sm font-semibold text-gray-800">基础信息</div>
             <Field label="中文名称" value={detailTarget.nameCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.code}</code>} />
@@ -276,167 +272,19 @@ export default function MetricManagementPage() {
             <Field label="负责人" value={detailTarget.owner} />
             <Field label="创建时间" value={detailTarget.createdAt} />
             <Field label="更新时间" value={detailTarget.updatedAt} />
-
-            {/* 二、目标值管理 */}
-            <div className="mt-4 border-t border-gray-100 pt-4">
-              <div className="mb-2 text-sm font-semibold text-gray-800">目标值管理</div>
-              {detailTarget.target ? (
-                <Field
-                  label="考核目标"
-                  value={
-                    <span>
-                      {detailTarget.target.direction} {detailTarget.target.value} {detailTarget.unit}
-                      <span className="ml-2 text-xs text-gray-400">用于目标达成预测与达标条件反推</span>
-                    </span>
-                  }
-                />
-              ) : (
-                <p className="text-sm text-gray-400">暂未配置目标值</p>
-              )}
-            </div>
-
-            {/* 三、达标反推设置 */}
-            <div className="mt-4 border-t border-gray-100 pt-4">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-semibold text-gray-800">达标反推设置</div>
-                {detailTarget.target && (
-                  <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" onClick={regenReverseItems}>
-                      AI 生成
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setShowReverseAdd(true)}>
-                      + 新增
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {detailTarget.target ? (
-                <div className="space-y-2">
-                  <div className="flex items-center text-xs text-gray-400">
-                    <span>内容由 AI 生成，仅供参考。</span>
-                    <span className="ml-auto">共 {reverseItems.length} 条</span>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-gray-100">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-gray-500">反推内容</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-gray-500 w-28">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {reverseItems.length === 0 ? (
-                          <tr>
-                            <td colSpan={2} className="py-10 text-center text-sm text-gray-400">暂无反推内容</td>
-                          </tr>
-                        ) : (
-                          reverseItems.map((item, i) => (
-                            <tr key={`${item}_${i}`} className="hover:bg-gray-50">
-                              <td className="px-3 py-2.5">
-                                {editingIdx === i ? (
-                                  <input
-                                    autoFocus
-                                    maxLength={50}
-                                    value={editingText}
-                                    onChange={(e) => setEditingText(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") commitReverseEdit();
-                                      else if (e.key === "Escape") setEditingIdx(null);
-                                    }}
-                                    onBlur={commitReverseEdit}
-                                    className="w-full px-2 py-1 border border-primary-400 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                  />
-                                ) : (
-                                  <span className="text-sm text-gray-700">{item}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                                {editingIdx === i ? (
-                                  <div className="inline-flex gap-1">
-                                    <button
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={commitReverseEdit}
-                                      className="px-2 py-0.5 text-xs text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                                    >
-                                      保存
-                                    </button>
-                                    <button
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => setEditingIdx(null)}
-                                      className="px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100 rounded transition-colors"
-                                    >
-                                      取消
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="inline-flex gap-1">
-                                    <button
-                                      onClick={() => {
-                                        setEditingIdx(i);
-                                        setEditingText(item);
-                                      }}
-                                      className="px-2 py-0.5 text-xs text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                                    >
-                                      编辑
-                                    </button>
-                                    <button
-                                      onClick={() => setDeleteIdx(i)}
-                                      className="px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 rounded transition-colors"
-                                    >
-                                      删除
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {showReverseAdd && (
-                    <div className="flex gap-2">
-                      <input
-                        autoFocus
-                        maxLength={50}
-                        value={newReverseItem}
-                        onChange={(e) => setNewReverseItem(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") addReverseItem();
-                          else if (e.key === "Escape") {
-                            setShowReverseAdd(false);
-                            setNewReverseItem("");
-                          }
-                        }}
-                        placeholder="输入反推内容（不超过50字）"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                      <span className="self-center text-xs text-gray-400 whitespace-nowrap">{newReverseItem.length}/50</span>
-                      <Button size="sm" onClick={addReverseItem}>保存</Button>
-                      <Button size="sm" variant="secondary" onClick={() => { setShowReverseAdd(false); setNewReverseItem(""); }}>取消</Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">该指标未配置目标值，暂不支持达标反推设置</p>
-              )}
-            </div>
           </div>
         )}
       </Drawer>
 
-      {/* 反推内容删除确认 */}
-      <Modal open={deleteIdx !== null} onClose={() => setDeleteIdx(null)} title="确认删除" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">确定删除该反推内容吗？删除后不可恢复。</p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setDeleteIdx(null)}>取消</Button>
-            <Button variant="danger" onClick={confirmReverseDelete}>确定</Button>
-          </div>
-        </div>
-      </Modal>
+      {/* 达标反推设置（列表操作入口 → 右侧滑出窗口） */}
+      <ReverseSettingsDrawer
+        open={reverseMetric !== null}
+        onClose={() => setReverseMetric(null)}
+        metric={reverseMetric}
+        onUpdate={(next) => {
+          if (reverseMetric) updateReverseItems(reverseMetric.id, next);
+        }}
+      />
     </div>
   );
 }

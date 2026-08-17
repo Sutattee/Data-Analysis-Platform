@@ -317,7 +317,7 @@ export function AlertStrategiesList() {
             <h2 className="text-lg font-bold text-gray-900">{viewTarget.name}</h2>
             {viewTarget.description && <p className="text-gray-500">{viewTarget.description}</p>}
             <DetailRow label="业务域" value={viewTarget.domain} />
-            <DetailRow label="适用范围" value={`${viewTarget.scope}${viewTarget.scope === "指定对象" ? `（${viewTarget.objects.join("、")}）` : ""}`} />
+            <DetailRow label="告警对象" value={`${viewTarget.objects.join("、") || "全部适用对象"}`} />
             <DetailRow label="检测周期" value={viewTarget.detectCycle} />
             <DetailRow label="条件关系" value={viewTarget.conditions.length > 1 ? `满足${viewTarget.relation === "且" ? "全部" : "任一"}条件（${viewTarget.relation}）` : "—"} />
             <div>

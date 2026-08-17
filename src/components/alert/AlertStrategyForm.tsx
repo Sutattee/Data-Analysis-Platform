@@ -9,13 +9,13 @@ import { AlertConditionBuilder } from "@/components/alert/AlertConditionBuilder"
 import { SearchMultiSelect } from "@/components/alert/SearchMultiSelect";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_LEVELS, ALERT_USERS } from "@/lib/mock-data/alerts";
-import { TreeObjectSelector } from "@/components/alert/TreeObjectSelector";
+import { objectsForMetric } from "@/lib/mock-data/objects";
 import {
-  ALERT_SCOPE_OPTIONS,
   ALERT_DETECT_CYCLES,
   NOTIFY_METHOD_OPTIONS,
   defaultNotifyTemplate,
   domainOfMetric,
+  activeTargetForMetric,
   addAlertStrategy,
   updateAlertStrategy,
 } from "@/lib/mock-data/alert-strategies";
@@ -54,9 +54,9 @@ const EMPTY: FormData = {
   description: "",
   type: "当前异常",
   domain: "生产管理",
-  scope: "全部适用对象",
+  scope: "指定对象", // 告警对象固定为按指标筛选的指定对象
   objects: [],
-  conditions: [{ metric: "", operator: "低于", baselineType: "基准值", baselineValue: "" }],
+  conditions: [{ metric: "", operator: "≤", baselineType: "基准值", baselineValue: "" }],
   relation: "且",
   level: "预警",
   detectCycle: "每5分钟",
@@ -135,18 +135,24 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
     set("notifyMethods", data.notifyMethods.includes(m) ? data.notifyMethods.filter((x) => x !== m) : [...data.notifyMethods, m]);
   }
 
+  // 告警对象候选：按首条条件的指标自动筛选已关联的对象（对象管理维护）
+  const alertObjectOptions = objectsForMetric(data.conditions[0]?.metric ?? "");
+
   function validate(): boolean {
     const e: Record<string, string> = {};
     const ce: string[] = [];
     if (!data.name.trim()) e.name = "请输入告警名称";
-    if (data.scope === "指定对象" && data.objects.length === 0) e.objects = "请选择指定对象";
+    if (data.objects.length === 0) e.objects = "请选择告警对象";
     data.conditions.forEach((c, i) => {
       const miss: string[] = [];
       if (!c.metric.trim()) miss.push("指标");
-      // 历史均值由系统计算，无需用户填写基准值，跳过该项校验
+      if (c.baselineType === "目标值" && c.metric.trim() && !activeTargetForMetric(c.metric)) {
+        ce[i] = "该指标未配置目标值，无法使用「目标值」基准类型";
+        return;
+      }
       if (
-        c.baselineType !== "历史均值" &&
-        (!c.baselineValue.trim() || (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim())))
+        !c.baselineValue.trim() ||
+        (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim()))
       )
         miss.push("基准值");
       ce[i] = miss.length ? `请完善${miss.join("、")}` : "";
@@ -172,8 +178,8 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
       description: data.description.trim() || undefined,
       type: data.type,
       domain: data.domain,
-      scope: data.scope,
-      objects: data.scope === "指定对象" ? data.objects : [],
+      scope: "指定对象", // 告警对象固定为按指标筛选的指定对象
+      objects: data.objects,
       conditions: data.conditions.map((c) => ({
         ...c,
         metric: c.metric.trim(),
@@ -248,31 +254,6 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
             />
           </div>
 
-          {/* 适用范围 */}
-          <div className="md:col-span-2">
-            <label className={labelCls}>适用范围 <span className="text-red-500">*</span></label>
-            <div className="flex items-center gap-5">
-              {ALERT_SCOPE_OPTIONS.map((sc) => (
-                <label key={sc} className="inline-flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
-                  <input type="radio" name="scope" checked={data.scope === sc} onChange={() => set("scope", sc)} className="accent-primary-600" />
-                  {sc}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* 指定对象（scope=指定对象时）：车间—网格—设备 三级树形多选 */}
-          {data.scope === "指定对象" && (
-            <div className="md:col-span-2">
-              <label className={labelCls}>指定对象 <span className="text-red-500">*</span></label>
-              <div className={`rounded-lg border p-3 ${errors.objects ? "border-red-400" : "border-gray-200"} bg-gray-50/50`}>
-                <TreeObjectSelector objects={data.objects} onChange={(v) => set("objects", v)} />
-              </div>
-              <p className="mt-1 text-xs text-gray-400">各层级对象独立选择：勾选父级表示监测其汇总指标，不自动选择下级；展开父级可勾选具体下级对象。</p>
-              {errors.objects && <p className="mt-1 text-xs text-red-500">{errors.objects}</p>}
-            </div>
-          )}
-
           {/* 触发条件 */}
           <div className="md:col-span-2">
             <label className={labelCls}>触发条件 <span className="text-red-500">*</span></label>
@@ -282,15 +263,44 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
               relation={data.relation}
               errors={condErrors}
               onChange={(conditions, relation) => {
-                const firstMetric = conditions[0]?.metric;
+                const firstMetric = conditions[0]?.metric ?? "";
+                // 指标变化时联动告警对象：过滤已选对象，固定对象（唯一候选）自动带入
+                const candidates = objectsForMetric(firstMetric);
+                const objects =
+                  candidates.length === 1
+                    ? [candidates[0]]
+                    : data.objects.filter((o) => candidates.includes(o));
                 setData((prev) => ({
                   ...prev,
                   conditions,
                   relation,
                   domain: firstMetric ? domainOfMetric(firstMetric) : prev.domain,
+                  objects,
                 }));
               }}
             />
+          </div>
+
+          {/* 告警对象（触发条件之后）：按指标自动筛选已关联的对象，支持多选；固定对象自动带入且不可修改 */}
+          <div className="md:col-span-2">
+            <label className={labelCls}>告警对象 <span className="text-red-500">*</span></label>
+            {alertObjectOptions.length === 1 ? (
+              <div className="flex h-[42px] items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
+                {alertObjectOptions[0]}
+                <span className="ml-2 text-xs text-gray-400">（该指标为固定对象，自动带入且不可修改）</span>
+              </div>
+            ) : (
+              <SearchMultiSelect
+                options={alertObjectOptions.map((o) => ({ value: o, label: o }))}
+                value={data.objects}
+                onChange={(v) => set("objects", v)}
+                placeholder="请选择告警对象"
+                error={errors.objects}
+              />
+            )}
+            <p className="mt-1 text-xs text-gray-400">
+              根据所选数据指标自动筛选已关联的对象（对象管理维护）；未选择指标时请先完善触发条件。
+            </p>
           </div>
 
           {/* 检测周期 */}

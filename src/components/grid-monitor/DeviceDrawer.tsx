@@ -98,9 +98,6 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-gray-400">
-        设备读数为当日累计电耗；设备离线、未上报或数据缺失将作为网格异常状态的具体原因展示。
-      </p>
     </Drawer>
   );
 }

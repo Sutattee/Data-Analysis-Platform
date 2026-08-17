@@ -94,14 +94,52 @@ export function TraceTopology({
   const allNodes = Array.from(nodeMap.values());
   const [hoverId, setHoverId] = useState<string | null>(null);
 
+  // ----- 缩放控制（区域内右上角） -----
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 1.8;
+  const ZOOM_STEP = 0.15;
+  const [zoom, setZoom] = useState(1);
+
   const canvasW = Math.max(width + 80, 420);
   const canvasH = Math.max(height + 60, 240);
+
+  const zoomBtnCls =
+    "px-2.5 py-1 text-xs text-gray-600 rounded transition-colors hover:bg-primary-50 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-600";
 
   return (
     <div className="h-full flex flex-col bg-white">
       {/* 拓扑图 */}
-      <div className="flex-1 overflow-auto bg-slate-50/60 p-6">
-        <div className="relative mx-auto" style={{ width: canvasW, height: canvasH }}>
+      <div className="relative flex-1 overflow-auto bg-slate-50/60 p-6">
+        {/* 缩放控制（区域右上角，不随内容滚动） */}
+        <div className="absolute right-4 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white py-0.5 pl-0.5 pr-1 shadow-sm">
+          <button
+            className={zoomBtnCls}
+            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round(((z - ZOOM_STEP) * 100) / 5) * 5 / 100))}
+            disabled={zoom <= ZOOM_MIN}
+            title="缩小"
+          >
+            −
+          </button>
+          <span className="min-w-[38px] text-center text-xs tabular-nums text-gray-500">{Math.round(zoom * 100)}%</span>
+          <button
+            className={zoomBtnCls}
+            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round(((z + ZOOM_STEP) * 100) / 5) * 5 / 100))}
+            disabled={zoom >= ZOOM_MAX}
+            title="放大"
+          >
+            +
+          </button>
+          <span className="mx-0.5 h-3 w-px bg-gray-200" />
+          <button className={zoomBtnCls} onClick={() => setZoom(1)} disabled={zoom === 1} title="恢复原始大小">
+            复位
+          </button>
+        </div>
+        {/* 画布：外层占位按缩放比例撑开（保证滚动范围正确），内层以左上角为基准缩放 */}
+        <div className="relative mx-auto" style={{ width: canvasW * zoom, height: canvasH * zoom }}>
+          <div
+            className="absolute left-0 top-0 origin-top-left"
+            style={{ width: canvasW, height: canvasH, transform: `scale(${zoom})` }}
+          >
           {/* 连线 */}
           <svg className="absolute inset-0 pointer-events-none" width={canvasW} height={canvasH}>
             <defs>
@@ -159,6 +197,7 @@ export function TraceTopology({
               </div>
             );
           })}
+          </div>
         </div>
       </div>
     </div>

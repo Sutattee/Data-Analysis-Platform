@@ -30,7 +30,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 export default function AlertDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { state } = useApp();
+  const { state, addRecentVisit } = useApp();
   const isAdmin = state.user?.role === "管理员";
   const currentUser = state.user?.nickname || state.user?.username || "当前用户";
 
@@ -43,6 +43,21 @@ export default function AlertDetailPage() {
   useEffect(() => {
     setFromDrawer(!!sessionStorage.getItem("anomaly-drawer-return"));
   }, []);
+
+  // 记录最近访问（首页「告警记录」条目；创建人恒为"系统"）
+  useEffect(() => {
+    if (!original) return;
+    addRecentVisit({
+      id: `rv-alert-${original.id}`,
+      title: `${original.title}（${original.status}）`,
+      board: original.domain === "能耗管理" ? "能源消耗" : original.domain === "质量管理" ? "工艺质量" : "生产管理",
+      contentType: "告警记录",
+      creator: "系统",
+      editable: false,
+      route: `/alert/records/${original.id}`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [original?.id]);
 
   if (!record) {
     return (
@@ -137,9 +152,10 @@ export default function AlertDetailPage() {
         <Card title="原因与处置建议">
           <div className="space-y-4">
             <Field
-              label="原因摘要"
+              label="异常原因"
               value={record.causeSummary || <span className="text-gray-400">暂未识别到明确原因</span>}
             />
+            {record.causeSummary && <Field label="原因类型" value={record.causeType || undefined} />}
             <Field label="处置建议" value={record.suggestion} />
           </div>
         </Card>
