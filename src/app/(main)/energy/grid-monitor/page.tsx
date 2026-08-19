@@ -41,48 +41,48 @@ export default function GridMonitorPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* 标题区 + 统计日期筛选 */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">重点网格监测</h1>
-          <p className="mt-0.5 text-sm text-gray-500">数据更新频率：每日｜最新统计日期：{LATEST_ISO}</p>
+    /* AI 助手包裹仪表盘：打开对话时右侧推出面板，左侧自适应收窄 */
+    <AiAssistant>
+      <div className="space-y-4">
+        {/* 标题区 + 统计日期筛选 */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">重点网格监测</h1>
+            <p className="mt-0.5 text-sm text-gray-500">数据更新频率：每日｜最新统计日期：{LATEST_ISO}</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-500">
+            统计日期
+            <input
+              type="date"
+              className={dateCls}
+              value={dateIso}
+              min={MIN_ISO}
+              max={LATEST_ISO}
+              onChange={(e) => setDateIso(e.target.value || LATEST_ISO)}
+            />
+          </label>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-500">
-          统计日期
-          <input
-            type="date"
-            className={dateCls}
-            value={dateIso}
-            min={MIN_ISO}
-            max={LATEST_ISO}
-            onChange={(e) => setDateIso(e.target.value || LATEST_ISO)}
-          />
-        </label>
+
+        {/* 概览指标卡 */}
+        <GridMonitorCards stats={stats} />
+
+        {/* 部门页签 + 网格监测表 */}
+        <Card>
+          <div className="mb-4">
+            <DeptTabs depts={depts} active={activeDept.name} onChange={setDept} />
+          </div>
+          <GridMonitorTable rows={activeDept.grids} onDevices={setDeviceRow} onRecords={handleRecords} />
+        </Card>
+
+        {/* 关联设备详情抽屉 */}
+        <DeviceDrawer
+          open={deviceRow !== null}
+          onClose={() => setDeviceRow(null)}
+          row={deviceRow}
+          devices={devices}
+          dateIso={dateIso}
+        />
       </div>
-
-      {/* 概览指标卡 */}
-      <GridMonitorCards stats={stats} />
-
-      {/* 部门页签 + 网格监测表 */}
-      <Card>
-        <div className="mb-4">
-          <DeptTabs depts={depts} active={activeDept.name} onChange={setDept} />
-        </div>
-        <GridMonitorTable rows={activeDept.grids} onDevices={setDeviceRow} onRecords={handleRecords} />
-      </Card>
-
-      {/* 关联设备详情抽屉 */}
-      <DeviceDrawer
-        open={deviceRow !== null}
-        onClose={() => setDeviceRow(null)}
-        row={deviceRow}
-        devices={devices}
-        dateIso={dateIso}
-      />
-
-      {/* AI 助手（右下角悬浮球 + 侧滑问数窗口） */}
-      <AiAssistant />
-    </div>
+    </AiAssistant>
   );
 }

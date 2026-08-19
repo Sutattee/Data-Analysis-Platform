@@ -32,40 +32,40 @@ export default function EnergyOverviewPage() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">能源总览</h1>
+    /* AI 助手包裹仪表盘：打开对话时右侧推出面板，左侧自适应收窄 */
+    <AiAssistant>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">能源总览</h1>
+        </div>
+
+        {/* 顶部 9 张指标卡 */}
+        <OverviewMetricCards />
+
+        {/* 单箱综合能耗趋势（周 / 月 / 年） */}
+        <ComprehensiveEnergyChart onAnomaly={onAnomaly} />
+
+        {/* 单箱电耗趋势（日 / 月） */}
+        <ElectricityTrendChart onAnomaly={onAnomaly} />
+
+        {/* 车间单位电耗 + 部门电耗对比 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <WorkshopElectricityChart onAnomaly={onAnomaly} />
+          <DeptPowerCompareChart />
+        </div>
+
+        {/* 蒸汽 + 天然气消耗分析 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SteamConsumptionChart onAnomaly={onAnomaly} />
+          <GasConsumptionChart onAnomaly={onAnomaly} />
+        </div>
+
+        {/* 单位产值碳排放趋势 */}
+        <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
+
+        {/* 异常详情抽屉 */}
+        <AnomalyDrawer open={drawer !== null} onClose={() => setDrawer(null)} detail={drawer} />
       </div>
-
-      {/* 顶部 9 张指标卡 */}
-      <OverviewMetricCards />
-
-      {/* 单箱综合能耗趋势（周 / 月 / 年） */}
-      <ComprehensiveEnergyChart onAnomaly={onAnomaly} />
-
-      {/* 单箱电耗趋势（日 / 月） */}
-      <ElectricityTrendChart onAnomaly={onAnomaly} />
-
-      {/* 车间单位电耗 + 部门电耗对比 */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <WorkshopElectricityChart onAnomaly={onAnomaly} />
-        <DeptPowerCompareChart />
-      </div>
-
-      {/* 蒸汽 + 天然气消耗分析 */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SteamConsumptionChart onAnomaly={onAnomaly} />
-        <GasConsumptionChart onAnomaly={onAnomaly} />
-      </div>
-
-      {/* 单位产值碳排放趋势 */}
-      <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
-
-      {/* 异常详情抽屉 */}
-      <AnomalyDrawer open={drawer !== null} onClose={() => setDrawer(null)} detail={drawer} />
-
-      {/* AI 助手（右下角悬浮球 + 侧滑问数窗口） */}
-      <AiAssistant />
-    </div>
+    </AiAssistant>
   );
 }
