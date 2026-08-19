@@ -59,7 +59,7 @@ const EMPTY: FormData = {
   conditions: [{ metric: "", operator: "≤", baselineType: "基准值", baselineValue: "" }],
   relation: "且",
   level: "预警",
-  detectCycle: "每5分钟",
+  detectCycle: "每小时",
   notifyTemplate: defaultNotifyTemplate(),
   notifyMethods: [],
   receivers: [],

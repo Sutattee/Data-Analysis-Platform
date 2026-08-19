@@ -28,7 +28,10 @@ interface StratFilter {
   domain: string;
   enabled: string;
 }
-const EMPTY_FILTER: StratFilter = { keyword: "", type: "", domain: "", enabled: "" };
+const EMPTY_FILTER: StratFilter = { keyword: "", type: "", domain: "能源消耗", enabled: "" };
+
+// 业务域筛选选项
+const BIZ_DOMAINS = ["生产管理", "工艺质量", "能源消耗"];
 
 const selectCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
@@ -55,9 +58,9 @@ export function AlertStrategiesList() {
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
 
-  // 仅展示能耗管理方向的告警策略
+  // 默认展示能源消耗方向的告警策略
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
-    getAlertStrategies().filter((s) => s.domain === "能耗管理" && s.type === "当前异常")
+    getAlertStrategies().filter((s) => s.domain === "能源消耗" && s.type === "当前异常")
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<StratFilter>(EMPTY_FILTER);
@@ -189,7 +192,27 @@ export function AlertStrategiesList() {
             <Button className="ml-auto" onClick={() => router.push("/alert/management/new")}>+ 新建数据告警</Button>
           )}
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">业务域</span>
+            <select
+              className={selectCls}
+              value={applied.domain}
+              onChange={(e) => {
+                const newDomain = e.target.value;
+                setApplied((prev) => ({ ...prev, domain: newDomain }));
+                // 切换业务域时重新加载对应域的策略
+                setStrategies(
+                  getAlertStrategies().filter((s) => s.domain === newDomain && s.type === "当前异常")
+                );
+                setPage(1);
+              }}
+            >
+              {BIZ_DOMAINS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
           <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
         </div>
       </Card>

@@ -14,13 +14,14 @@ interface AppState {
   history: QaMessage[];
   recentVisits: RecentVisit[];
   sidebarOpen: boolean;
+  loading: boolean; // 从 localStorage 加载状态中
 }
 
 // 预置最近访问样例（首次进入首页展示；移除后持久化，全部移除则显示空态）
 const DEFAULT_RECENT_VISITS: RecentVisit[] = [
   {
     id: "rv-alert-1",
-    title: "卷包车间2号包装机包装设备运行效率低于基准（未处理）",
+    title: "卷包车间2号包装机包装设备运行效率低于基准",
     board: "生产管理",
     contentType: "告警记录",
     creator: "系统",
@@ -40,7 +41,7 @@ const DEFAULT_RECENT_VISITS: RecentVisit[] = [
   },
   {
     id: "rv-forecast-1",
-    title: "9月能耗情景测算（产量 +10%）",
+    title: "9月能耗条件测算（产量 +10%）",
     board: "能源消耗",
     contentType: "预测分析记录",
     creator: "admin",
@@ -62,7 +63,7 @@ const DEFAULT_RECENT_VISITS: RecentVisit[] = [
     id: "rv-yearbook-1",
     title: "2025年度重大事件年鉴报告",
     board: "能源消耗",
-    contentType: "年鉴报告",
+    contentType: "年度报告",
     creator: "admin",
     editable: true,
     lastVisitedAt: "2026-08-14 11:12",
@@ -118,6 +119,46 @@ const DEFAULT_RECENT_VISITS: RecentVisit[] = [
     lastVisitedAt: "2026-08-09 11:08",
     route: "/data-assets",
   },
+  {
+    id: "rv-qa-3",
+    title: "制丝车间各产线近 7 天电耗对比情况？",
+    board: "能源消耗",
+    contentType: "智能问数对话",
+    creator: "admin",
+    editable: false,
+    lastVisitedAt: "2026-08-08 10:25",
+    route: "/qa?query=" + encodeURIComponent("制丝车间各产线近 7 天电耗对比情况？"),
+  },
+  {
+    id: "rv-alert-2",
+    title: "锅炉房天然气压力低于安全阈值",
+    board: "能源消耗",
+    contentType: "告警记录",
+    creator: "系统",
+    editable: false,
+    lastVisitedAt: "2026-08-07 08:15",
+    route: "/alert/records/" + ALERT_RECORDS[1].id,
+  },
+  {
+    id: "rv-forecast-2",
+    title: "未来7日空调系统蒸汽耗预测",
+    board: "能源消耗",
+    contentType: "预测分析记录",
+    creator: "系统",
+    editable: false,
+    lastVisitedAt: "2026-08-06 14:30",
+    route: "/energy/forecast/records?record=FR-20260728-006",
+  },
+  {
+    id: "rv-yearbook-2",
+    title: "2024年度重大事件年鉴报告",
+    board: "能源消耗",
+    contentType: "年度报告",
+    creator: "admin",
+    editable: false,
+    lastVisitedAt: "2026-08-05 09:50",
+    route: "/energy/yearbook/reports/YB2024001",
+  },
 ];
 
 const initialState: AppState = {
@@ -127,6 +168,7 @@ const initialState: AppState = {
   history: [],
   recentVisits: DEFAULT_RECENT_VISITS,
   sidebarOpen: true,
+  loading: true, // 初始为 true，从 localStorage 加载完成后设为 false
 };
 
 // ========== Actions ==========
@@ -227,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         history: savedHistory,
         recentVisits: savedVisits,
         sidebarOpen: true,
+        loading: false, // 加载完成
       },
     });
   }, []);

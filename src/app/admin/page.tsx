@@ -13,12 +13,14 @@ export default function AdminPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!state.isLoggedIn) {
-      router.replace("/login");
-    } else {
-      router.replace("/settings");
+    if (!state.loading) {
+      if (!state.isLoggedIn) {
+        router.replace("/login");
+      } else {
+        router.replace("/settings");
+      }
     }
-  }, [state.isLoggedIn, router]);
+  }, [state.isLoggedIn, state.loading, router]);
 
   return (
     <div className="flex items-center justify-center h-screen">

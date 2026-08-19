@@ -15,13 +15,105 @@ import type { RecentVisit } from "@/types";
 
 // 快捷入口（进入对应功能页；不区分生产/质量/能耗入口，页面默认使用最近访问的板块）
 const QUICK_ENTRIES = [
-  { label: "智能问数", desc: "自然语言查询业务数据", icon: "💬", href: "/qa" },
-  { label: "报告生成", desc: "AI 自动撰写分析报告", icon: "📄", href: "/reports" },
-  { label: "指标溯源", desc: "追溯指标定义与数据链路", icon: "🔗", href: "/metric-trace" },
+  {
+    label: "智能问数",
+    desc: "自然语言查询业务数据",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
+        <rect x="2" y="4" width="20" height="16" rx="3" fill="#3B82F6" />
+        <circle cx="8" cy="12" r="1.5" fill="white" />
+        <circle cx="12" cy="12" r="1.5" fill="white" />
+        <circle cx="16" cy="12" r="1.5" fill="white" />
+      </svg>
+    ),
+    href: "/qa",
+  },
+  {
+    label: "报告生成",
+    desc: "AI 自动撰写分析报告",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
+        <rect x="4" y="2" width="16" height="20" rx="2" fill="#8B5CF6" />
+        <rect x="7" y="6" width="10" height="2" rx="1" fill="white" />
+        <rect x="7" y="10" width="10" height="2" rx="1" fill="white" />
+        <rect x="7" y="14" width="6" height="2" rx="1" fill="white" />
+      </svg>
+    ),
+    href: "/reports",
+  },
+  {
+    label: "指标溯源",
+    desc: "追溯指标定义与数据链路",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
+        <circle cx="6" cy="12" r="3" fill="#F59E0B" />
+        <circle cx="18" cy="6" r="3" fill="#10B981" />
+        <circle cx="18" cy="18" r="3" fill="#EF4444" />
+        <path d="M9 12L15 7" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+        <path d="M9 12L15 17" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    ),
+    href: "/metric-trace",
+  },
 ];
 
+// 内容类型图标映射（彩色色块矢量图标）
+const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
+  智能问数对话: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="3" width="16" height="14" rx="2.5" fill="#3B82F6" />
+      <circle cx="7" cy="10" r="1" fill="white" />
+      <circle cx="10" cy="10" r="1" fill="white" />
+      <circle cx="13" cy="10" r="1" fill="white" />
+    </svg>
+  ),
+  预测分析记录: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#8B5CF6" />
+      <path d="M5 14L8 10L11 12L15 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  告警记录: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#F59E0B" />
+      <path d="M10 6V11" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="10" cy="14" r="1" fill="white" />
+    </svg>
+  ),
+  重大事件记录: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#EF4444" />
+      <path d="M10 7L10 13" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="10" cy="15.5" r="1" fill="white" />
+    </svg>
+  ),
+  年度报告: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="3" y="2" width="14" height="16" rx="2" fill="#10B981" />
+      <rect x="6" y="5" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="8" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="11" width="5" height="1.5" rx="0.75" fill="white" />
+    </svg>
+  ),
+  普通报告: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="3" y="2" width="14" height="16" rx="2" fill="#06B6D4" />
+      <rect x="6" y="5" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="8" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="11" width="5" height="1.5" rx="0.75" fill="white" />
+    </svg>
+  ),
+};
 
-// 内容类型（最近访问条目仅展示文字标题，不展示图标）
+// 允许展示的内容类型（其余过滤掉）
+const ALLOWED_CONTENT_TYPES = [
+  "智能问数对话",
+  "预测分析记录",
+  "告警记录",
+  "重大事件记录",
+  "年度报告",
+  "普通报告",
+];
 
 const PAGE_SIZE = 6; // 每 Tab 展示 6 个问题
 
@@ -64,17 +156,6 @@ export default function HomePage() {
   const recommendQuestions = pickQuestions(recommendPool, recOffset);
   const activeQuestions = tab === "hot" ? hotQuestions : recommendQuestions;
 
-  // 问题 → 智能问数页自动发起提问（计入业务问数历史）
-  function askQuestion(q: string) {
-    router.push(`/qa?query=${encodeURIComponent(q)}`);
-  }
-
-  // 打开最近访问内容：更新时间并跳转（查看 / 继续处理 / 继续对话）
-  function openVisit(v: RecentVisit) {
-    addRecentVisit(v);
-    router.push(v.route);
-  }
-
   // 移除：仅删除当前账号的最近访问记录，不删除原始内容
   function handleRemove(v: RecentVisit) {
     removeRecentVisit(v.id);
@@ -102,7 +183,7 @@ export default function HomePage() {
                   href={e.href}
                   className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-primary-200 hover:shadow-md"
                 >
-                  <div className="mb-2 text-2xl">{e.icon}</div>
+                  <div className="mb-2">{e.icon}</div>
                   <div className="text-sm font-medium text-gray-800">{e.label}</div>
                   <div className="mt-0.5 text-xs text-gray-500">{e.desc}</div>
                 </Link>
@@ -113,7 +194,7 @@ export default function HomePage() {
           {/* 最近访问（表格式列表：标题/所属板块/内容类型/创建人/最近访问时间/操作） */}
           <div>
             <h3 className="mb-3 text-sm font-medium text-gray-700">最近访问</h3>
-            {state.recentVisits.length === 0 ? (
+            {state.recentVisits.filter((v) => ALLOWED_CONTENT_TYPES.includes(v.contentType)).length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-gray-100 bg-white py-16 text-gray-400">
                 <span className="mb-3 text-4xl">🕐</span>
                 <p className="text-sm">暂无最近访问记录</p>
@@ -132,36 +213,43 @@ export default function HomePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {state.recentVisits.map((v) => (
-                      <tr
-                        key={v.id}
-                        // 点击条目区域直接进入详情/继续处理（操作列仅「移除」）
-                        onClick={() => openVisit(v)}
-                        className="group cursor-pointer transition-colors hover:bg-primary-50/40"
-                      >
-                        <td className="px-4 py-3">
-                          <span className="block max-w-[320px] truncate font-medium text-gray-800 group-hover:text-primary-600" title={v.title}>
-                            {v.title}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-800">{v.board}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-600">{v.contentType}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-600">{v.creator}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{v.lastVisitedAt}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={(ev) => {
-                              ev.stopPropagation(); // 移除不触发进入详情
-                              handleRemove(v);
-                            }}
-                            className="rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                            title="仅移除访问记录，不删除原始内容"
-                          >
-                            移除
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {state.recentVisits
+                      .filter((v) => ALLOWED_CONTENT_TYPES.includes(v.contentType))
+                      .map((v) => (
+                        <tr
+                          key={v.id}
+                          onClick={() => {
+                            addRecentVisit(v);
+                            router.push(v.route);
+                          }}
+                          className="group cursor-pointer transition-colors hover:bg-primary-50/40"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="flex-shrink-0">{CONTENT_TYPE_ICONS[v.contentType]}</span>
+                              <span className="block max-w-[320px] truncate font-medium text-gray-800 group-hover:text-primary-600" title={v.title}>
+                                {v.title}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-800">{v.board}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-600">{v.contentType}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-600">{v.creator}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">{v.lastVisitedAt}</td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemove(v);
+                              }}
+                              className="rounded px-2 py-1 text-xs text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                              title="仅移除访问记录，不删除原始内容"
+                            >
+                              移除
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -175,20 +263,67 @@ export default function HomePage() {
           <Card padding>
             <h3 className="mb-3 text-sm font-medium text-gray-700">智能能力体验</h3>
             <div className="grid grid-cols-2 gap-3">
-              {ABILITY_CARDS.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => router.push(c.route)}
-                  className="rounded-xl border border-gray-100 p-3 text-left transition-all hover:border-primary-200 hover:shadow-md"
-                  title="点击进入案例演示（演示不计入问数历史与最近访问）"
-                >
-                  <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl text-lg ${c.color}`}>
-                    {c.icon}
-                  </div>
-                  <div className="text-xs font-medium text-gray-800">{c.title}</div>
-                  <div className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{c.desc}</div>
-                </button>
-              ))}
+              {ABILITY_CARDS.map((c) => {
+                const iconMap: Record<string, React.ReactNode> = {
+                  "smart-query": (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="2" y="3" width="16" height="14" rx="2.5" fill="#3B82F6" />
+                      <rect x="5" y="7" width="2" height="6" rx="0.5" fill="white" />
+                      <rect x="9" y="9" width="2" height="4" rx="0.5" fill="white" />
+                      <rect x="13" y="6" width="2" height="7" rx="0.5" fill="white" />
+                    </svg>
+                  ),
+                  "anomaly-alert": (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#F59E0B" />
+                      <path d="M10 5V11" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="10" cy="14" r="1.2" fill="white" />
+                    </svg>
+                  ),
+                  attribution: (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#8B5CF6" />
+                      <circle cx="10" cy="10" r="4" stroke="white" strokeWidth="1.5" fill="none" />
+                      <path d="M13 13L16 16" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  ),
+                  trend: (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#10B981" />
+                      <path d="M5 14L8 10L11 12L15 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="15" cy="6" r="1.2" fill="white" />
+                    </svg>
+                  ),
+                  knowledge: (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="2" y="2" width="16" height="16" rx="2.5" fill="#06B6D4" />
+                      <circle cx="10" cy="8" r="3" stroke="white" strokeWidth="1.5" fill="none" />
+                      <path d="M8 13L10 15L12 13" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ),
+                  yearbook: (
+                    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+                      <rect x="3" y="2" width="14" height="16" rx="2" fill="#EC4899" />
+                      <rect x="6" y="5" width="8" height="1.5" rx="0.75" fill="white" />
+                      <rect x="6" y="8" width="8" height="1.5" rx="0.75" fill="white" />
+                      <rect x="6" y="11" width="5" height="1.5" rx="0.75" fill="white" />
+                    </svg>
+                  ),
+                };
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => router.push(c.route)}
+                    className="rounded-xl border border-gray-100 p-3 text-left transition-all hover:border-primary-200 hover:shadow-md"
+                  >
+                    <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-gray-50">
+                      {iconMap[c.id]}
+                    </div>
+                    <div className="text-xs font-medium text-gray-800">{c.title}</div>
+                    <div className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{c.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </Card>
 
@@ -226,7 +361,7 @@ export default function HomePage() {
               {activeQuestions.map((q, i) => (
                 <li key={q}>
                   <button
-                    onClick={() => askQuestion(q)}
+                    onClick={() => router.push(`/qa?query=${encodeURIComponent(q)}`)}
                     className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700"
                   >
                     <span className="mt-0.5 flex-shrink-0 font-medium text-primary-400">{i + 1}.</span>

@@ -22,8 +22,6 @@ const inputCls =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-800 outline-none transition-all duration-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent";
 const readonlyCls =
   "w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm text-gray-500";
-const dateCls =
-  "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
 
 // 表单字段壳：label + 内容 + 提示
 function Field({
@@ -78,20 +76,19 @@ export function ConditionForm({
   const [targetInput, setTargetInput] = useState(""); // 单值方向的临时测算值
   const [rangeLowerInput, setRangeLowerInput] = useState(""); // 区间方向的临时下限
   const [rangeUpperInput, setRangeUpperInput] = useState(""); // 区间方向的临时上限
-  const [calcMode, setCalcMode] = useState<"tomorrow" | "date" | "period">("tomorrow");
-  const [calcDate, setCalcDate] = useState("2026-08-10");
+  const [calcRangeState, setCalcRangeState] = useState("明日");
   const [conds, setConds] = useState<Record<string, string>>({});
   const [compare, setCompare] = useState(false);
   const [reverseItem, setReverseItem] = useState("");
   const [remainingPlanInput, setRemainingPlanInput] = useState("");
 
   // 联动（派生值，无需 effect）：类型 → 指标 → 对象/模型 → 时间范围
-  // 目标达成预测 / 达标条件反推 仅支持已配置目标值的指标（无目标值指标不支持目标达成预测）
+  // 能否达标预测 / 达标反推 仅支持已配置目标值的指标（无目标值指标不支持能否达标预测）
   const metricsForType = FORECAST_METRICS.filter(
-    (m) => m.types.includes(type) && (type === "未来值预测" || type === "工况情景测算" || effectiveTargetOf(m) !== null)
+    (m) => m.types.includes(type) && (type === "未来值预测" || type === "条件测算" || effectiveTargetOf(m) !== null)
   );
   const metric = metricsForType.find((m) => m.key === metricKey) ?? metricsForType[0];
-  // 有效目标值（目标值管理「生效中」版本；无则为 null → 不支持目标达成预测）
+  // 有效目标值（目标值管理「生效中」版本；无则为 null → 不支持能否达标预测）
   const effTarget = effectiveTargetOf(metric);
   const models = metric.models.filter((m) => m.types.includes(type));
   const model = models.find((m) => m.id === modelId) ?? models[0];
@@ -99,6 +96,7 @@ export function ConditionForm({
     metric.objects.includes(objectKey) && objectKey ? objectKey : metric.objects[0];
   const ranges = metric.ranges.filter((r) => model?.ranges.includes(r));
   const range = ranges.includes(rangeState) ? rangeState : ranges[0] ?? "明日";
+  const calcRange = ranges.includes(calcRangeState) ? calcRangeState : ranges[0] ?? "明日";
   const reverseOptions = reverseItemsOf(metric.name);
 
   // 切换指标时重置与旧指标相关的输入
@@ -121,11 +119,11 @@ export function ConditionForm({
     }
     onInvalidate?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, metricKey, modelId, rangeState, period, calcMode, calcDate, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
+  }, [type, metricKey, modelId, rangeState, period, calcRangeState, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
 
   // ----- 校验（即时红字）-----
   const condErrors: Record<string, string> = {};
-  if (type === "工况情景测算") {
+  if (type === "条件测算") {
     for (const c of metric.conditions) {
       const def = CONDITION_DICT[c.code];
       const raw = conds[c.code];
@@ -166,7 +164,7 @@ export function ConditionForm({
     rangeLowerErr !== undefined ||
     rangeUpperErr !== undefined ||
     rangeOrderErr !== undefined ||
-    (type === "达标条件反推" && planErr !== undefined);
+    (type === "达标反推" && planErr !== undefined);
 
   // 临时测算值：单值方向 → targetValue；区间方向 → targetLower / targetUpper
   function tempTargetFields() {
@@ -179,7 +177,7 @@ export function ConditionForm({
     return targetInput.trim() !== "" ? { targetValue: Number(targetInput) } : {};
   }
 
-  // 目标值字段（目标达成预测 / 达标条件反推共用）：
+  // 目标值字段（能否达标预测 / 达标反推共用）：
   // 系统自动带入有效目标值与判断条件（支持 <、≤、>、≥、=目标值、处于目标区间）并展示单位；
   // 用户修改视为「临时测算值」，仅用于本次预测，不修改正式目标配置。
   function renderTargetValueField() {
@@ -248,11 +246,10 @@ export function ConditionForm({
       object,
       modelId: model.id,
       ...(type === "未来值预测" ? { range } : {}),
-      ...(type === "目标达成预测" ? { period, ...tempTargetFields() } : {}),
-      ...(type === "工况情景测算"
+      ...(type === "能否达标预测" ? { period, ...tempTargetFields() } : {}),
+      ...(type === "条件测算"
         ? {
-            calcMode,
-            calcDate,
+            calcRange,
             conditions: Object.fromEntries(
               Object.entries(conds)
                 .filter(([, v]) => v.trim() !== "")
@@ -261,7 +258,7 @@ export function ConditionForm({
             compareBaseline: compare,
           }
         : {}),
-      ...(type === "达标条件反推"
+      ...(type === "达标反推"
         ? {
             period,
             reverseItem,
@@ -283,6 +280,8 @@ export function ConditionForm({
       <Card>
         <div className="mb-4 text-sm font-semibold text-gray-800">② 配置预测条件</div>
 
+        {/* 表单区：宽度减半，右侧留白 */}
+        <div className="w-full lg:w-1/2">
         {/* 通用条件 */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="预测指标" required>
@@ -304,17 +303,6 @@ export function ConditionForm({
               </select>
             )}
           </Field>
-          <div className="md:col-span-2">
-            <Field label="预测模型" required>
-              <select className={inputCls} value={model?.id ?? ""} onChange={(e) => setModelId(e.target.value)}>
-                {models.map((mm) => (
-                  <option key={mm.id} value={mm.id}>
-                    {mm.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
           <Field label="历史数据范围">
             <div className={readonlyCls}>{HISTORY_RANGE}</div>
           </Field>
@@ -333,7 +321,7 @@ export function ConditionForm({
           </Field>
         )}
 
-        {type === "目标达成预测" && (
+        {type === "能否达标预测" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="考核周期" required>
               <SegmentedControl
@@ -366,33 +354,21 @@ export function ConditionForm({
             ) : (
               <div className="md:col-span-2">
                 <p className="text-sm text-gray-400">
-                  该指标未配置目标值，不支持目标达成预测（请在指标管理中维护目标值）
+                  该指标未配置目标值，不支持能否达标预测（请在指标管理中维护目标值）
                 </p>
               </div>
             )}
           </div>
         )}
 
-        {type === "工况情景测算" && (
+        {type === "条件测算" && (
           <div className="space-y-4">
-            <Field label="测算时段" required>
-              <div className="flex flex-wrap items-center gap-3">
-                <SegmentedControl
-                  options={[
-                    { value: "tomorrow", label: "明日" },
-                    { value: "date", label: "指定日期" },
-                    { value: "period", label: "指定周期" },
-                  ]}
-                  value={calcMode}
-                  onChange={setCalcMode}
-                />
-                {calcMode === "date" && (
-                  <input type="date" className={dateCls} value={calcDate} onChange={(e) => setCalcDate(e.target.value)} />
-                )}
-                {calcMode === "period" && (
-                  <span className="text-xs text-gray-400">默认按数据截止日后 7 日为测算周期</span>
-                )}
-              </div>
+            <Field label="预测时间范围" required>
+              <SegmentedControl
+                options={ranges.map((r) => ({ value: r, label: r }))}
+                value={calcRange}
+                onChange={setCalcRangeState}
+              />
             </Field>
 
             <div>
@@ -462,7 +438,7 @@ export function ConditionForm({
           </div>
         )}
 
-        {type === "达标条件反推" && (
+        {type === "达标反推" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Field label="目标周期" required>
               <SegmentedControl
@@ -515,15 +491,15 @@ export function ConditionForm({
             ) : (
               <div className="md:col-span-2">
                 <p className="text-sm text-gray-400">
-                  该指标未配置目标值，不支持达标条件反推（请在指标管理中维护目标值）
+                  该指标未配置目标值，不支持达标反推（请在指标管理中维护目标值）
                 </p>
               </div>
             )}
           </div>
         )}
 
-        <div className="mt-5 flex items-center justify-end gap-3">
-          {hasError && <span className="text-xs text-red-500">存在未通过校验的条件，请修正后再预测</span>}
+        {/* 操作按钮：左对齐 */}
+        <div className="mt-5 flex items-center gap-3">
           <Button onClick={handleSubmit} disabled={running || hasError}>
             {running ? (
               <>
@@ -533,6 +509,8 @@ export function ConditionForm({
               "开始预测"
             )}
           </Button>
+          {hasError && <span className="text-xs text-red-500">存在未通过校验的条件，请修正后再预测</span>}
+        </div>
         </div>
       </Card>
     </div>

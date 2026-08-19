@@ -1,5 +1,5 @@
-// 情景预测 — 模拟数据与预测引擎（确定性生成：固定锚点 + sin 扰动，无 Date.now / Math.random）
-// 四种预测类型：未来值预测 / 目标达成预测 / 工况情景测算 / 达标条件反推
+// 模拟测算 — 模拟数据与预测引擎（确定性生成：固定锚点 + sin 扰动，无 Date.now / Math.random）
+// 四种预测类型：未来值预测 / 条件测算 / 能否达标预测 / 达标反推
 import { metricList } from "./metric-management";
 import { activeTargetOf } from "./metric-targets";
 import type { MetricTargetVersion } from "@/types";
@@ -9,12 +9,12 @@ export const DATA_END = "2026-08-09"; // 最新完整统计日
 export const HISTORY_RANGE = "2024-01-01 至 2026-08-09"; // 历史数据范围（系统自动确定）
 
 // ===== 预测类型 =====
-export type ForecastType = "未来值预测" | "目标达成预测" | "工况情景测算" | "达标条件反推";
+export type ForecastType = "未来值预测" | "条件测算" | "能否达标预测" | "达标反推";
 export const FORECAST_TYPES: { type: ForecastType; desc: string; icon: string }[] = [
-  { type: "未来值预测", desc: "根据最新实际数据与生产计划、天气等信息，预测指标未来数值", icon: "📈" },
-  { type: "目标达成预测", desc: "结合累计实际值与剩余生产计划，判断考核周期能否达成目标", icon: "🎯" },
-  { type: "工况情景测算", desc: "输入假设的生产、环境和运行工况，测算指定条件下的指标值", icon: "🧪" },
-  { type: "达标条件反推", desc: "在目标值与剩余计划已知时，反向计算达标所需的能耗控制值", icon: "🔁" },
+  { type: "未来值预测", desc: "基于实时数据、生产计划与天气，预测未来指标值。", icon: "📈" },
+  { type: "条件测算", desc: "设定生产环境与工况，测算对应指标值。", icon: "🧪" },
+  { type: "能否达标预测", desc: "结合累计值与剩余计划，判断能否达成周期目标。", icon: "🎯" },
+  { type: "达标反推", desc: "已知目标与剩余计划，反算所需能耗控制值。", icon: "🔁" },
 ];
 
 // ===== 工况条件字典（平台统一维护）=====
@@ -38,10 +38,9 @@ export const CONDITION_DICT: Record<string, ConditionDef> = {
   planned_output: { code: "planned_output", name: "计划产量", unit: "箱", type: "number", source: "生产计划数据", fetchMode: "根据测算时段自动汇总计划产量，允许调整", min: 1, max: 20000, step: 100 },
   silk_output: { code: "silk_output", name: "制丝产量", unit: "kg", type: "number", source: "生产计划数据", fetchMode: "根据测算时段自动汇总，允许调整", min: 1, max: 500000, step: 1000 },
   production_plan: { code: "production_plan", name: "生产计划", unit: "箱", type: "number", source: "生产计划数据", fetchMode: "根据测算时段自动汇总，允许调整", min: 0, max: 20000, step: 100 },
-  production_duration: { code: "production_duration", name: "生产时长", unit: "小时", type: "number", source: "生产计划数据", fetchMode: "根据班次及生产计划自动计算，允许调整", min: 0, max: 24, step: 0.5 },
+  production_duration: { code: "production_duration", name: "生产时长", unit: "小时", type: "number", source: "生产计划数据", fetchMode: "根据预测时间范围及生产计划自动计算，允许调整", min: 0, max: 24, step: 0.5 },
   equipment_runtime: { code: "equipment_runtime", name: "设备运行时长", unit: "小时", type: "number", source: "设备运行计划数据", fetchMode: "优先根据设备运行计划自动获取，获取失败时手动填写", min: 0, max: 24, step: 0.5 },
   equipment_load: { code: "equipment_load", name: "设备负荷", unit: "%", type: "number", source: "设备运行计划数据", fetchMode: "自动带入设备运行计划，允许调整", min: 0, max: 100, step: 5 },
-  shift_type: { code: "shift_type", name: "班次", unit: "", type: "enum", options: ["两班", "三班"], source: "生产计划数据", fetchMode: "自动带入，允许调整" },
   grade_condition: { code: "grade_condition", name: "工艺或牌号条件", unit: "", type: "enum", options: ["常规牌号", "细支牌号", "异型牌号"], source: "生产计划数据", fetchMode: "自动带入，允许调整" },
   meal_headcount: { code: "meal_headcount", name: "就餐人数", unit: "人", type: "number", source: "生产计划数据", fetchMode: "根据在岗人数自动估算，允许调整", min: 0, max: 3000, step: 50 },
   workday_type: { code: "workday_type", name: "工作日类型", unit: "", type: "enum", options: ["工作日", "周末", "节假日"], source: "生产计划数据", fetchMode: "根据测算日期自动判断，允许调整" },
@@ -64,18 +63,18 @@ export interface ForecastModel {
 
 const MODEL_TS: ForecastModel = {
   id: "ts-v21", name: "能耗时序预测模型 v2.1",
-  types: ["未来值预测"], ranges: ["明日", "未来7日", "未来15日"],
+  types: ["未来值预测"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
   requiredInputs: [], outputs: ["预测值", "预测区间"], accuracy: "±3.2%",
 };
 const MODEL_LSTM: ForecastModel = {
   id: "lstm-mv", name: "LSTM 多变量能耗模型",
-  types: ["未来值预测", "工况情景测算"], ranges: ["明日", "未来7日", "未来15日"],
+  types: ["未来值预测", "条件测算"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
   requiredInputs: ["outdoor_temperature", "production_duration"],
   outputs: ["预测值", "预测区间", "基准值", "变化"], accuracy: "±2.8%",
 };
 const MODEL_TARGET: ForecastModel = {
   id: "target-ga", name: "目标达成分析模型",
-  types: ["未来值预测", "目标达成预测", "达标条件反推"], ranges: ["明日", "未来7日", "未来15日"],
+  types: ["未来值预测", "能否达标预测", "达标反推"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
   requiredInputs: ["target_value", "remaining_plan"],
   outputs: ["预测值", "预测区间", "目标差距", "控制值"], accuracy: "±2.1%",
 };
@@ -112,8 +111,8 @@ export interface ForecastMetric {
 export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "steamHvac", name: "空调系统每日蒸汽耗", unit: "t", decimals: 1, agg: "sum",
-    base: 27.5, seed: 29, objects: ["空调系统"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 27.5, seed: 29, objects: ["空调系统"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "outdoor_temperature", required: true, default: 25, sensitivity: 0.055 },
       { code: "outdoor_humidity", default: 61, sensitivity: 0.002 },
@@ -126,11 +125,10 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "packPower", name: "卷包车间单箱电耗", unit: "kWh/箱", decimals: 1, agg: "avg",
-    base: 20.4, seed: 17, objects: ["卷包车间"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 20.4, seed: 17, objects: ["卷包车间"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "planned_output", required: true, default: 3200, sensitivity: -0.00003 },
-      { code: "shift_type", default: "三班", sensitivityMap: { 两班: 0.04, 三班: 0 } },
       { code: "equipment_runtime", default: 22, sensitivity: 0.015 },
       { code: "equipment_load", default: 78, sensitivity: 0.004 },
     ],
@@ -139,8 +137,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "silkPower", name: "制丝车间每公斤电耗", unit: "kWh/kg", decimals: 2, agg: "avg",
-    base: 0.46, seed: 13, objects: ["制丝车间"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 0.46, seed: 13, objects: ["制丝车间"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "silk_output", required: true, default: 420000, sensitivity: -0.0000002 },
       { code: "production_duration", required: true, default: 18, sensitivity: 0.012 },
@@ -151,8 +149,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "powerDept", name: "动力车间电耗", unit: "kWh", decimals: 0, agg: "sum",
-    base: 38600, seed: 31, objects: ["动力车间"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 38600, seed: 31, objects: ["动力车间"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "production_plan", default: 4200, sensitivity: 0.00004 },
       { code: "equipment_runtime", required: true, default: 24, sensitivity: 0.015 },
@@ -163,8 +161,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "canteenPower", name: "食堂总电耗", unit: "kWh", decimals: 0, agg: "sum",
-    base: 3200, seed: 52, objects: ["食堂"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 3200, seed: 52, objects: ["食堂"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "meal_headcount", required: true, default: 1200, sensitivity: 0.0005 },
       { code: "workday_type", default: "工作日", sensitivityMap: { 工作日: 0, 周末: -0.35, 节假日: -0.5 } },
@@ -175,8 +173,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "warehousePower", name: "原辅料仓库总电耗", unit: "kWh", decimals: 0, agg: "sum",
-    base: 2100, seed: 41, objects: ["原辅料仓库"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 2100, seed: 41, objects: ["原辅料仓库"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "outdoor_temperature", default: 25, sensitivity: 0.012 },
       { code: "outdoor_humidity", default: 61, sensitivity: 0.003 },
@@ -188,8 +186,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "gasBoiler", name: "锅炉天然气总能耗", unit: "Nm³", decimals: 0, agg: "sum",
-    base: 2650, seed: 37, objects: ["锅炉房"], types: ["未来值预测", "工况情景测算"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 2650, seed: 37, objects: ["锅炉房"], types: ["未来值预测", "条件测算"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     conditions: [
       { code: "steam_demand", required: true, default: 120, sensitivity: 0.009 },
       { code: "boiler_load", default: 76, sensitivity: -0.002 },
@@ -200,8 +198,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "comprehensive", name: "单箱综合能耗", unit: "kgce/箱", decimals: 1, agg: "avg",
-    base: 29.8, seed: 3, objects: ["全厂"], types: ["未来值预测", "目标达成预测", "达标条件反推"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 29.8, seed: 3, objects: ["全厂"], types: ["未来值预测", "能否达标预测", "达标反推"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     target: { value: 31.0, direction: "不高于" },
     metricId: "m7", // 目标值以目标值管理有效版本为准（单箱综合能耗）
     targetCtx: { currentAcc: "30.9 kgce/箱（截至 2026-08-09）", doneOutput: "386,000 箱", remainingPlan: 214000, currentLevel: 30.9 },
@@ -214,8 +212,8 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   },
   {
     key: "carbon", name: "单位产值碳排放量", unit: "tCO₂e/万元", decimals: 4, agg: "avg",
-    base: 0.0338, seed: 11, objects: ["全厂"], types: ["未来值预测", "目标达成预测", "达标条件反推"],
-    ranges: ["明日", "未来7日", "未来15日"],
+    base: 0.0338, seed: 11, objects: ["全厂"], types: ["未来值预测", "能否达标预测", "达标反推"],
+    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
     target: { value: 0.035, direction: "不高于" },
     metricId: "m1", // 目标值以目标值管理有效版本为准（单位产值碳排放量）
     targetCtx: { currentAcc: "0.0342 tCO₂e/万元（截至 2026-08-09）", doneOutput: "386,000 箱（对应产值 38,200 万元）", remainingPlan: 214000, currentLevel: 0.0342 },
@@ -234,8 +232,8 @@ export function reverseItemsOf(metricName: string): string[] {
 }
 
 // ===== 有效目标值（来自目标值管理，仅支持已配置目标值的指标） =====
-// 目标达成预测 / 达标条件反推 以目标值管理的「生效中」版本为准；
-// 无 metricId（未在指标管理中配置目标值）的指标不支持目标达成预测。
+// 能否达标预测 / 达标反推 以目标值管理的「生效中」版本为准；
+// 无 metricId（未在指标管理中配置目标值）的指标不支持能否达标预测。
 export function effectiveTargetOf(m: ForecastMetric): MetricTargetVersion | null {
   const active = m.metricId ? activeTargetOf(m.metricId) : undefined;
   if (active) return active;
@@ -281,8 +279,7 @@ export interface ForecastInput {
   targetValue?: number; // 临时测算目标值（单值方向）
   targetLower?: number; // 临时测算目标区间下限（区间方向）
   targetUpper?: number; // 临时测算目标区间上限（区间方向）
-  calcMode?: "tomorrow" | "date" | "period"; // 工况情景测算时段
-  calcDate?: string;
+  calcRange?: string; // 条件测算：预测时间范围（明日/未来7日/未来15日/未来30日）
   conditions?: Record<string, number | string>; // 工况输入
   compareBaseline?: boolean;
   reverseItem?: string; // 反推内容
@@ -332,7 +329,7 @@ export interface ForecastResult {
 const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 const fmt = (v: number, d: number) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const daysOf = (range: string) => (range === "明日" ? 1 : range === "未来7日" ? 7 : 15);
+const daysOf = (range: string) => (range === "明日" ? 1 : range === "未来7日" ? 7 : range === "未来15日" ? 15 : 30);
 
 // 未来日期标签（自数据截止日次日起，格式 "8/10"）
 function futureLabel(i: number): string {
@@ -349,8 +346,8 @@ export async function runForecast(input: ForecastInput): Promise<ForecastResult>
   const meta = { model: model.name, historyRange: HISTORY_RANGE, dataEnd: DATA_END };
 
   if (input.type === "未来值预测") return futureForecast(m, input, meta);
-  if (input.type === "目标达成预测") return targetForecast(m, input, meta);
-  if (input.type === "工况情景测算") return scenarioForecast(m, input, meta);
+  if (input.type === "能否达标预测") return targetForecast(m, input, meta);
+  if (input.type === "条件测算") return scenarioForecast(m, input, meta);
   return reverseForecast(m, input, meta);
 }
 
@@ -407,7 +404,7 @@ function futureForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
   };
 }
 
-// ----- 2. 目标达成预测 -----
+// ----- 2. 能否达标预测 -----
 function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const period = input.period ?? "本年度";
   const d = m.decimals;
@@ -500,22 +497,22 @@ function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
     ], verdict === "预计超标" || verdict === "预计超出区间上限"
       ? [
           `建议立即启动节能管控：优先压降辅助系统空转与待机能耗，复核高耗能工序运行参数。`,
-          `如需明确剩余周期的量化控制值，请使用「达标条件反推」测算具体控制要求。`,
+          `如需明确剩余周期的量化控制值，请使用「达标反推」测算具体控制要求。`,
         ]
       : verdict === "预计低于区间下限"
         ? [
             `预测值低于目标区间下限，建议核实数据口径与计量准确性后持续跟踪。`,
-            `如需明确剩余周期的量化控制值，请使用「达标条件反推」测算。`,
+            `如需明确剩余周期的量化控制值，请使用「达标反推」测算。`,
           ]
         : [
           `当前态势可控，建议维持既有运行策略并按周跟踪累计值与预测差距。`,
-          `关注季节性负荷变化对趋势的影响，如需量化控制值可配合「达标条件反推」使用。`,
+          `关注季节性负荷变化对趋势的影响，如需量化控制值可配合「达标反推」使用。`,
     ]),
     meta,
   };
 }
 
-// ----- 3. 工况情景测算 -----
+// ----- 3. 条件测算 -----
 function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const d = m.decimals;
   const conds = input.conditions ?? {};
@@ -543,11 +540,12 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
     ? `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}；较系统当前计划工况的预测结果${diff >= 0 ? "增加" : "减少"} ${fmt(Math.abs(diff), d)} ${m.unit}（${fmt(Math.abs(diffPct), 1)}%）`
     : `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}`;
 
-  // 图表：多日（period）→ 双折线；单日 → 对比柱状图
+  // 图表：多日 → 双折线；单日 → 对比柱状图
+  const days = input.calcRange === "明日" ? 1 : input.calcRange === "未来7日" ? 7 : input.calcRange === "未来15日" ? 15 : 30;
   let chart: ForecastResult["chart"];
-  if (input.calcMode === "period") {
+  if (days > 1) {
     const points: ChartPoint[] = [];
-    for (let j = 1; j <= 7; j++) {
+    for (let j = 1; j <= days; j++) {
       points.push({
         date: futureLabel(j),
         baseline: round(baseline * (1 + Math.sin(m.seed + j) * 0.02), d),
@@ -569,7 +567,7 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
   return {
     headline,
     fields: [
-      { label: "情景预测值", value: `${fmt(scenario, d)} ${m.unit}`, tone: Math.abs(diffPct) > 5 ? "warn" : undefined },
+      { label: "预测值", value: `${fmt(scenario, d)} ${m.unit}`, tone: Math.abs(diffPct) > 5 ? "warn" : undefined },
       { label: "预测区间", value: `${fmt(scenario * 0.97, d)} ～ ${fmt(scenario * 1.03, d)} ${m.unit}`, tone: "muted" },
       ...(compare ? [
         { label: "基准值（当前计划工况）", value: `${fmt(baseline, d)} ${m.unit}`, tone: "muted" as const },
@@ -588,7 +586,7 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
   };
 }
 
-// ----- 4. 达标条件反推 -----
+// ----- 4. 达标反推 -----
 function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const d = m.decimals;
   const eff = effectiveTargetOf(m)!; // 调用前已保证存在（无目标值指标不支持本类型）

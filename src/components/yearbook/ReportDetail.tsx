@@ -158,11 +158,6 @@ export function ReportDetail() {
           <p className="text-xs text-gray-400 mt-2">暂无人工编辑记录</p>
         )}
       </Card>
-
-      {/* 底部返回（首页最近访问进入详情后返回） */}
-      <div className="flex justify-center">
-        <Button variant="secondary" onClick={() => router.push("/home")}>← 返回</Button>
-      </div>
     </div>
   );
 }

@@ -5,17 +5,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
-import { AlertStatusModal } from "@/components/alert/AlertStatusModal";
+import { Drawer } from "@/components/ui/Drawer";
+import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import { generateAnomalyReply } from "@/lib/mock-data/anomaly-ai";
 import type { AlertRecord } from "@/types";
-
-function formatNow(): string {
-  const d = new Date();
-  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 // 详情字段
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -32,25 +27,29 @@ export default function AlertDetailPage() {
   const router = useRouter();
   const { state, addRecentVisit } = useApp();
   const isAdmin = state.user?.role === "管理员";
-  const currentUser = state.user?.nickname || state.user?.username || "当前用户";
 
   const original = ALERT_RECORDS.find((r) => r.id === params.id);
   const [record, setRecord] = useState<AlertRecord | undefined>(original ? { ...original } : undefined);
-  const [modalMode, setModalMode] = useState<"mark" | null>(null);
-  // 是否从能源总览「异常详情抽屉」跳入（存在恢复快照时一键返回抽屉）
-  const [fromDrawer, setFromDrawer] = useState(false);
 
-  useEffect(() => {
-    setFromDrawer(!!sessionStorage.getItem("anomaly-drawer-return"));
-  }, []);
+  // 异常原因修正
+  const [causeEditing, setCauseEditing] = useState(false);
+  const [causeDraft, setCauseDraft] = useState("");
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiInput, setAiInput] = useState("");
+  const [aiResult, setAiResult] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // 处置建议修正
+  const [suggestionEditing, setSuggestionEditing] = useState(false);
+  const [suggestionDraft, setSuggestionDraft] = useState("");
 
   // 记录最近访问（首页「告警记录」条目；创建人恒为"系统"）
   useEffect(() => {
     if (!original) return;
     addRecentVisit({
       id: `rv-alert-${original.id}`,
-      title: `${original.title}（${original.status}）`,
-      board: original.domain === "能耗管理" ? "能源消耗" : original.domain === "质量管理" ? "工艺质量" : "生产管理",
+      title: original.title,
+      board: original.domain,
       contentType: "告警记录",
       creator: "系统",
       editable: false,
@@ -73,13 +72,57 @@ export default function AlertDetailPage() {
     );
   }
 
-  function handleConfirm(note?: string) {
-    setRecord((prev) =>
-      prev
-        ? { ...prev, status: "已处理", handleNote: note || undefined, handledAt: formatNow(), handledBy: currentUser }
-        : prev
-    );
-    setModalMode(null);
+  // 异常原因：进入编辑模式
+  function startCauseEdit() {
+    setCauseDraft(record?.causeSummary || "");
+    setCauseEditing(true);
+  }
+
+  // 异常原因：保存修正
+  function saveCause() {
+    setRecord((prev) => prev ? { ...prev, causeSummary: causeDraft.trim(), causeType: "人工补录" } : prev);
+    setCauseEditing(false);
+  }
+
+  // AI辅助：生成原因建议
+  function handleAiGenerate() {
+    if (!aiInput.trim() || !record) return;
+    setAiLoading(true);
+    // 模拟延迟后生成回复
+    setTimeout(() => {
+      // 构造 AnomalyDetail 兼容对象
+      const mockDetail = {
+        metricName: record.metricName,
+        current: record.valueLabel,
+        baseline: record.baselineLabel,
+        deviation: record.deviation,
+        triggerTime: record.triggerTime,
+        cause: record.causeSummary,
+      };
+      const reply = generateAnomalyReply(mockDetail as any, aiInput, []);
+      setAiResult(reply.causeText || reply.content);
+      setAiLoading(false);
+    }, 800);
+  }
+
+  // AI辅助：采纳结果
+  function adoptAiResult() {
+    setCauseDraft(aiResult);
+    setAiPanelOpen(false);
+    setAiInput("");
+    setAiResult("");
+  }
+
+  // 处置建议：进入编辑模式
+  function startSuggestionEdit() {
+    setSuggestionDraft(record?.suggestion || "");
+    setSuggestionEditing(true);
+  }
+
+  // 处置建议：保存修正
+  function saveSuggestion() {
+    setRecord((prev) => prev ? { ...prev, suggestion: suggestionDraft.trim() } : prev);
+    setSuggestionEditing(false);
   }
 
   return (
@@ -106,7 +149,6 @@ export default function AlertDetailPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
             <Field label="告警编号" value={record.id} />
             <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
-            <Field label="处理状态" value={<AlertStatusText status={record.status} />} />
             <Field label="业务域" value={record.domain} />
             <Field label="告警对象编号" value={<span className="font-mono text-xs">{record.objectCode}</span>} />
             <Field label="告警对象名称" value={record.objectName} />
@@ -150,13 +192,80 @@ export default function AlertDetailPage() {
 
         {/* 原因与处置建议 */}
         <Card title="原因与处置建议">
-          <div className="space-y-4">
-            <Field
-              label="异常原因"
-              value={record.causeSummary || <span className="text-gray-400">暂未识别到明确原因</span>}
-            />
-            {record.causeSummary && <Field label="原因类型" value={record.causeType || undefined} />}
-            <Field label="处置建议" value={record.suggestion} />
+          <div className="space-y-5">
+            {/* 异常原因 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">异常原因</span>
+                {!causeEditing && (
+                  <button
+                    onClick={startCauseEdit}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    ✏️ 修正
+                  </button>
+                )}
+              </div>
+              {causeEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={causeDraft}
+                    onChange={(e) => setCauseDraft(e.target.value)}
+                    placeholder="请输入异常原因分析..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    rows={3}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={saveCause}>保存</Button>
+                    <Button size="sm" variant="secondary" onClick={() => setCauseEditing(false)}>取消</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setAiPanelOpen(true)}>🤖 AI辅助</Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-800 break-words">
+                  {record.causeSummary || <span className="text-gray-400">暂未识别到明确原因</span>}
+                </p>
+              )}
+              {record.causeSummary && !causeEditing && (
+                <p className="text-xs text-gray-400 mt-1">原因类型：{record.causeType || "—"}</p>
+              )}
+            </div>
+
+            {/* 处置建议 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">处置建议</span>
+                {!suggestionEditing && (
+                  <button
+                    onClick={startSuggestionEdit}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    ✏️ 修正
+                  </button>
+                )}
+              </div>
+              {suggestionEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={suggestionDraft}
+                    onChange={(e) => setSuggestionDraft(e.target.value.slice(0, 500))}
+                    placeholder="请填写实际采取的措施和处置结果"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    rows={3}
+                    maxLength={500}
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">{suggestionDraft.length}/500</span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={saveSuggestion}>保存</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setSuggestionEditing(false)}>取消</Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-800 break-words">{record.suggestion || "—"}</p>
+              )}
+            </div>
           </div>
         </Card>
 
@@ -187,17 +296,42 @@ export default function AlertDetailPage() {
         </Card>
       </div>
 
-      {/* ===== 底部固定：操作按钮 ===== */}
-      <div className="flex-shrink-0 flex justify-center gap-2 pt-3 border-t border-gray-100">
-        <Button onClick={() => router.back()}>{fromDrawer ? "返回异常详情" : "返回"}</Button>
-      </div>
-
-      <AlertStatusModal
-        open={modalMode !== null}
-        mode={modalMode ?? "mark"}
-        onClose={() => setModalMode(null)}
-        onConfirm={handleConfirm}
-      />
+      {/* AI辅助面板 */}
+      <Drawer
+        open={aiPanelOpen}
+        onClose={() => { setAiPanelOpen(false); setAiInput(""); setAiResult(""); }}
+        title="AI辅助 - 异常原因分析"
+        width={480}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">补充信息</label>
+            <textarea
+              value={aiInput}
+              onChange={(e) => setAiInput(e.target.value)}
+              placeholder="请补充您掌握的异常现象、设备状态、操作变化或相关事件..."
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              rows={4}
+            />
+          </div>
+          <Button onClick={handleAiGenerate} disabled={!aiInput.trim() || aiLoading}>
+            {aiLoading ? "分析中..." : "🤖 生成分析"}
+          </Button>
+          {aiResult && (
+            <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
+              <p className="text-xs text-blue-600 font-medium mb-2">AI分析结果：</p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{aiResult}</p>
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" onClick={adoptAiResult}>✅ 采纳并回填</Button>
+                <Button size="sm" variant="secondary" onClick={() => { setAiInput(""); setAiResult(""); }}>重新生成</Button>
+              </div>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            提示：AI分析仅供参考，采纳后将回填至异常原因输入框，需点击「保存」才会生效。
+          </p>
+        </div>
+      </Drawer>
     </div>
   );
 }

@@ -70,7 +70,7 @@ export function ForecastRecordsView() {
     setPage(1);
   }
 
-  // 按原条件再次预测：恢复类型与指标，跳转情景预测（重挂载 ConditionForm）
+  // 按原条件再次预测：恢复类型与指标，跳转模拟测算（重挂载 ConditionForm）
   function replay(r: ForecastRecord) {
     const key = FORECAST_METRICS.find((m) => m.name === r.metricName)?.key;
     if (!key) {

@@ -12,14 +12,16 @@ import { MetadataTableList } from "./MetadataTableList";
 import { BasicInfoTab } from "./BasicInfoTab";
 import { FieldListTab } from "./FieldListTab";
 import { RelationGraphTab } from "./RelationGraphTab";
+import { LineageGraphTab } from "./LineageGraphTab";
 import { DataPreviewTab } from "./DataPreviewTab";
 import { RecommendedQuestionsTab } from "./RecommendedQuestionsTab";
 
-type Tab = "basic" | "fields" | "relation" | "preview" | "recommended";
+type Tab = "basic" | "fields" | "relation" | "lineage" | "preview" | "recommended";
 const TAB_LABELS: Record<Tab, string> = {
   basic: "基础信息",
   fields: "字段列表",
   relation: "关系图",
+  lineage: "血缘关系",
   preview: "数据预览",
   recommended: "推荐问题配置",
 };
@@ -39,8 +41,8 @@ interface Props {
 export function MetadataExplorer({ readOnly = false, defaultTab = "basic", tabOrder, toolbarExtra, showRecommended = false }: Props) {
   const toast = useToast();
   const defaultOrder: Tab[] = showRecommended
-    ? ["basic", "fields", "relation", "preview", "recommended"]
-    : ["basic", "fields", "relation", "preview"];
+    ? ["basic", "fields", "relation", "lineage", "preview", "recommended"]
+    : ["basic", "fields", "relation", "lineage", "preview"];
   const order: Tab[] = tabOrder ?? defaultOrder;
 
   const [tables, setTables] = useState<MetadataTable[]>(() =>
@@ -184,6 +186,7 @@ export function MetadataExplorer({ readOnly = false, defaultTab = "basic", tabOr
                       <FieldListTab table={selected} allTables={tables} onSaveField={saveField} readOnly={readOnly} />
                     )}
                     {tab === "relation" && <RelationGraphTab table={selected} />}
+                    {tab === "lineage" && <LineageGraphTab table={selected} />}
                     {tab === "preview" && <DataPreviewTab table={selected} />}
                     {tab === "recommended" && <RecommendedQuestionsTab key={selected.id} table={selected} />}
                   </>

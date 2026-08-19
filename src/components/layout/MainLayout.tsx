@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Modal } from "@/components/ui/Modal";
 import { useApp } from "@/lib/store/AppContext";
 import { PRIMARY_NAV } from "@/lib/constants";
+import { MENU_ICON_MAP } from "@/components/layout/NavIcon";
 import type { NavItem } from "@/types";
 
 // 判断一级导航项是否激活：优先用 matchPrefixes（用于二级路由分散的组），否则用 href 前缀
@@ -64,7 +65,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             D
           </div>
           <span className="hidden whitespace-nowrap text-sm font-semibold text-gray-800 md:inline">
-            什邡卷烟厂数智分析平台
+            什邡卷烟厂产质耗KPI分析平台
           </span>
         </div>
 
@@ -109,14 +110,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 onClick={() => go("/settings")}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
               >
-                <span>⚙️</span>
+                {MENU_ICON_MAP.settings}
                 <span>管理后台</span>
               </button>
               <button
                 onClick={() => go("/profile")}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
               >
-                <span>👤</span>
+                {MENU_ICON_MAP.profile}
                 <span>个人信息</span>
               </button>
               <div className="my-1 border-t border-gray-100" />
@@ -127,7 +128,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
               >
-                <span>🚪</span>
+                {MENU_ICON_MAP.logout}
                 <span>退出登录</span>
               </button>
             </div>

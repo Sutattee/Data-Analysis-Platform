@@ -1,6 +1,7 @@
 "use client";
 
 import { FORECAST_TYPES, type ForecastType } from "@/lib/mock-data/forecast";
+import { FORECAST_TYPE_ICONS } from "@/components/layout/NavIcon";
 
 // 预测类型单选卡片：切换后动态调整下方预测条件
 export function TypeCards({ value, onChange }: { value: ForecastType; onChange: (t: ForecastType) => void }) {
@@ -19,11 +20,12 @@ export function TypeCards({ value, onChange }: { value: ForecastType; onChange: 
                 : "border-gray-100 bg-white hover:border-gray-300"
             }`}
           >
-            <div className="text-sm font-medium text-gray-800">
-              {t.icon} {t.type}
+            <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+              {FORECAST_TYPE_ICONS[t.type]}
+              {t.type}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-gray-500">{t.desc}</p>
-            {(t.type === "目标达成预测" || t.type === "达标条件反推") && (
+            {(t.type === "能否达标预测" || t.type === "达标反推") && (
               <p className="mt-1 text-[10px] text-gray-400">仅已配置目标值的指标支持</p>
             )}
           </button>

@@ -64,12 +64,6 @@ export default function QaPage() {
       )}
 
       <div className="flex-1 min-w-0">
-        {/* 案例演示标识（演示操作不计入业务问数历史） */}
-        {demoMode && (
-          <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-            <span>🎬</span>案例演示：内容为预设示例，不计入业务问数历史与最近访问
-          </div>
-        )}
         <ChatPanel key={chatKey} initialQuery={chatInitialQuery} suppressHistory={demoMode} />
       </div>
 

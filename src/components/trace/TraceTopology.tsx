@@ -108,32 +108,9 @@ export function TraceTopology({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* 拓扑图 */}
-      <div className="relative flex-1 overflow-auto bg-slate-50/60 p-6">
-        {/* 缩放控制（区域右上角，不随内容滚动） */}
-        <div className="absolute right-4 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white py-0.5 pl-0.5 pr-1 shadow-sm">
-          <button
-            className={zoomBtnCls}
-            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round(((z - ZOOM_STEP) * 100) / 5) * 5 / 100))}
-            disabled={zoom <= ZOOM_MIN}
-            title="缩小"
-          >
-            −
-          </button>
-          <span className="min-w-[38px] text-center text-xs tabular-nums text-gray-500">{Math.round(zoom * 100)}%</span>
-          <button
-            className={zoomBtnCls}
-            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round(((z + ZOOM_STEP) * 100) / 5) * 5 / 100))}
-            disabled={zoom >= ZOOM_MAX}
-            title="放大"
-          >
-            +
-          </button>
-          <span className="mx-0.5 h-3 w-px bg-gray-200" />
-          <button className={zoomBtnCls} onClick={() => setZoom(1)} disabled={zoom === 1} title="恢复原始大小">
-            复位
-          </button>
-        </div>
+      {/* 拓扑图：滚动区内嵌，缩放控制固定在外层右上角（不随内容滚动） */}
+      <div className="relative flex-1 overflow-hidden">
+        <div className="absolute inset-0 overflow-auto bg-slate-50/60 p-6">
         {/* 画布：外层占位按缩放比例撑开（保证滚动范围正确），内层以左上角为基准缩放 */}
         <div className="relative mx-auto" style={{ width: canvasW * zoom, height: canvasH * zoom }}>
           <div
@@ -198,6 +175,31 @@ export function TraceTopology({
             );
           })}
           </div>
+        </div>
+        </div>
+        {/* 缩放控制（固定区域右上角，不随内容滚动） */}
+        <div className="absolute right-4 top-3 z-20 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white py-0.5 pl-0.5 pr-1 shadow-sm">
+          <button
+            className={zoomBtnCls}
+            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round(((z - ZOOM_STEP) * 100) / 5) * 5 / 100))}
+            disabled={zoom <= ZOOM_MIN}
+            title="缩小"
+          >
+            −
+          </button>
+          <span className="min-w-[38px] text-center text-xs tabular-nums text-gray-500">{Math.round(zoom * 100)}%</span>
+          <button
+            className={zoomBtnCls}
+            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round(((z + ZOOM_STEP) * 100) / 5) * 5 / 100))}
+            disabled={zoom >= ZOOM_MAX}
+            title="放大"
+          >
+            +
+          </button>
+          <span className="mx-0.5 h-3 w-px bg-gray-200" />
+          <button className={zoomBtnCls} onClick={() => setZoom(1)} disabled={zoom === 1} title="恢复原始大小">
+            复位
+          </button>
         </div>
       </div>
     </div>

@@ -33,14 +33,14 @@ function TargetTip({ active, payload, label }: { active?: boolean; payload?: { p
   );
 }
 
-// 单箱综合能耗目标达成预测：实际（周更新）+ 预测 + 区间 + 目标线
+// 单箱综合能耗能否达标预测：实际（周更新）+ 预测 + 区间 + 目标线
 export function TargetAchievementChart() {
   const [period, setPeriod] = useState<"本月" | "本年度">("本年度");
   const { points, summary } = useMemo(() => getTargetSeries(period), [period]);
 
   return (
     <Card
-      title="单箱综合能耗目标达成预测"
+      title="单箱综合能耗能否达标预测"
       headerRight={
         <SegmentedControl
           options={[
@@ -78,7 +78,6 @@ export function TargetAchievementChart() {
           />
         </ComposedChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-gray-400">实际数据按周更新；预测区间为 90% 置信水平。</p>
     </Card>
   );
 }

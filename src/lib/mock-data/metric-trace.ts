@@ -11,7 +11,6 @@ export interface MetricOverview {
   period?: string;
   scope?: string;
   dataAsOf?: string;
-  evalCycle?: string;
 }
 // 结果及查询上下文（技术）
 export interface TechContext {
@@ -59,6 +58,10 @@ export interface TraceDetail {
   upstream?: string;
   updateFreq?: string;
   calcScope?: string;
+  // 统计对象：statObjects 为指标关联的全部统计对象（指标列表/定义溯源自展示）；
+  // statObject 为当次统计对象（历史记录/计算过程展示）
+  statObjects?: string;
+  statObject?: string;
 }
 
 export interface TraceMetric {
@@ -140,6 +143,28 @@ const DATA_AS_OF = "2026-07-31 23:59";
 const TIME_RANGE = "2026-07-01 00:00:00 ~ 2026-08-01 00:00:00";
 const CALC_TIME = "2026-08-01 08:10";
 const ORG_SCOPE = "当前用户有权访问的企业组织范围";
+
+// 更新频率（实时 / 天 / 周 / 月 / 季度 / 年）
+const FREQ_MAP: Record<string, string> = { 日: "天", 月度: "月", 周: "周", 季度: "季度", 年度: "年", 实时: "实时" };
+const updateFreqOf = (period: string) => FREQ_MAP[period] ?? period;
+
+// 统计对象：指标关联的全部统计对象（首项为当次统计对象）
+// 指标列表（定义溯源）展示全部；历史记录 / 计算过程展示当次统计对象
+const METRIC_STAT_OBJECTS: Record<string, string[]> = {
+  carbon: ["制丝车间", "卷包车间", "物资管理科"],
+  packagingEff: ["卷包车间", "制丝车间", "动力车间"],
+  controllableCost: ["财务管理科", "卷包车间", "制丝车间"],
+  rollingEff: ["卷包车间", "制丝车间"],
+  inventoryTurnover: ["物资管理科", "卷包车间", "制丝车间"],
+  laborProductivity: ["人力资源部", "生产管理科", "卷包车间"],
+  netEquipmentEff: ["设备管理科", "卷包车间", "制丝车间"],
+  productionEff: ["生产管理科", "制丝车间", "卷包车间"],
+  operationCost: ["财务管理科", "生产管理科", "物资管理科"],
+  paperConsumption: ["卷包车间", "物资管理科"],
+  labelPaperConsumption: ["卷包车间", "物资管理科"],
+  tobaccoConsumption: ["制丝车间", "物资管理科"],
+  filterRodConsumption: ["卷包车间", "物资管理科"],
+};
 
 // ========== 指标元数据 ==========
 type MetricCategory =
@@ -236,6 +261,10 @@ const TEMPLATES: Record<MetricCategory, {
 function generateMetric(m: MetricMeta): TraceMetric {
   const hasDen = !!m.denominator;
   const tpl = TEMPLATES[m.category];
+  // 统计对象：全部（定义溯源展示）与当次（结果溯源展示，取首项）
+  const statList = METRIC_STAT_OBJECTS[m.id] ?? [m.object];
+  const statObjects = statList.join("、");
+  const statObject = statList[0];
   // 指标组成（定义溯源用，无数值）：将口径中的 ÷ 替换为 ＋，得到组成项
   const composition = m.formulaBiz.includes("÷") ? m.formulaBiz.replace(/\s*÷\s*/g, " ＋ ") : m.formulaBiz;
   // 中英文补充
@@ -297,7 +326,7 @@ function generateMetric(m: MetricMeta): TraceMetric {
   };
   const businessDetailDefine: TraceDetail = {
     name: m.name, unit: m.unit, period: m.period,
-    overview: { period: m.period, scope: ORG_SCOPE, dataAsOf: DATA_AS_OF, evalCycle: m.period },
+    overview: { period: m.period, scope: ORG_SCOPE, dataAsOf: DATA_AS_OF },
     definition: m.meaning,
     formula: m.formulaBiz,
     calcSteps: tpl.steps(m),
@@ -305,6 +334,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
     formationPath: tpl.path(m),
     influenceFactors: tpl.factors(),
     application: tpl.app(),
+    updateFreq: updateFreqOf(m.period),
+    statObjects,
   };
   const technicalDetailDefine: TraceDetail = {
     name: m.name, unit: m.unit, period: m.period,
@@ -316,7 +347,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
     dslLogic: `① 按时间范围与组织范围过滤 ${m.table}；\n② 对 ${m.field} 执行聚合计算（${m.formulaTech}）；\n③ 计算 ${m.formulaBiz} 得到 ${m.name}。`,
     sourceSystem: m.sources, sourceSystemEn: ex.sourcesEn, db: m.db, dbEn: ex.dbEn, sourceTable: m.table, coreField: `${m.field}（指标字段）`,
     dataFlow: [`${m.sources} → ${m.table}（${m.model}）→ ${m.name} 计算`],
-    updateFreq: m.period, calcScope: `按${m.object}维度聚合`,
+    updateFreq: updateFreqOf(m.period), calcScope: `按${m.object}维度聚合`,
+    statObjects,
   };
 
   return {
@@ -325,7 +357,7 @@ function generateMetric(m: MetricMeta): TraceMetric {
     businessTreeDefine, technicalTreeDefine, businessDetailDefine, technicalDetailDefine,
     businessDetail: {
       name: m.name, value: m.value, unit: m.unit, period: m.period,
-      overview: { result: `${m.value}${m.unit}`, period: m.period, scope: ORG_SCOPE, dataAsOf: DATA_AS_OF, evalCycle: m.period },
+      overview: { result: `${m.value}${m.unit}`, period: m.period, scope: ORG_SCOPE, dataAsOf: DATA_AS_OF },
       definition: m.meaning,
       formula: m.formulaBiz,
       formationDescription,
@@ -336,6 +368,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
       formationPath: tpl.path(m),
       influenceFactors: tpl.factors(),
       application: tpl.app(),
+      updateFreq: updateFreqOf(m.period),
+      statObject,
     },
     technicalDetail: {
       name: m.name, value: m.value, unit: m.unit, period: m.period,
@@ -352,7 +386,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
       executionResult: execResultText,
       sourceSystem: m.sources, sourceSystemEn: ex.sourcesEn, db: m.db, dbEn: ex.dbEn, sourceTable: m.table, coreField: `${m.field}（指标字段）`,
       dataFlow: [`${m.sources} → ${m.table}（${m.model}）→ ${m.name} 计算`],
-      updateFreq: m.period, calcScope: `按${m.object}维度聚合`,
+      updateFreq: updateFreqOf(m.period), calcScope: `按${m.object}维度聚合`,
+      statObject,
     },
   };
 }
@@ -563,7 +598,7 @@ const carbonMetric: TraceMetric = {
   },
   businessDetail: {
     name: "单位产值碳排放量", value: "0.1444", unit: "吨/万元", period: "2026年7月",
-    overview: { result: "0.1444 吨/万元", period: "2026年7月", scope: ORG_SCOPE, dataAsOf: DATA_AS_OF, evalCycle: "月度/季度" },
+    overview: { result: "0.1444 吨/万元", period: "2026年7月", scope: ORG_SCOPE, dataAsOf: DATA_AS_OF },
     definition: "单位产值碳排放量用于反映企业每创造一万元产值所产生的 CO₂排放当量，是衡量生产经营活动碳排放强度和绿色发展水平的重要指标。指标值越低，表示在相同产值下产生的碳排放越少。该指标用于描述碳排放强度，不直接代表企业碳排放总量。",
     formationDescription: "2026年7月单位产值碳排放量为 0.1444 吨/万元，由当月 CO₂排放当量除以当月产值得到。",
     calcSteps: [
@@ -590,6 +625,8 @@ const carbonMetric: TraceMetric = {
     ],
     influenceFactors: ["能源使用结构", "能源消耗规模", "产值规模", "生产组织范围"],
     application: "该指标可用于评价企业碳排放强度，开展不同月份、季度或组织之间的绿色生产水平对比，为节能降碳管理提供数据依据。",
+    updateFreq: "月",
+    statObject: "制丝车间",
   },
   technicalDetail: {
     name: "单位产值碳排放量", value: "0.1444", unit: "吨/万元", period: "2026年7月",
@@ -614,7 +651,8 @@ const carbonMetric: TraceMetric = {
     executionResult: "co2_equivalent = 12,480 吨\ntotal_output_value = 86,400 万元\ncarbon_per_output_value = 0.1444 吨/万元",
     sourceSystem: "能源管理系统、财务系统", sourceSystemEn: "Energy Management System, Finance System", db: "能源数据库、财务数据库", dbEn: "energy_db, finance_db", sourceTable: "energy_consumption_fact / emission_factor / output_value_fact", coreField: "energy_consumption / emission_factor / output_value",
     dataFlow: ["能源管理系统 → energy_consumption_fact", "财务系统 → output_value_fact", "碳排放因子表 → emission_factor", "指标计算引擎 → 单位产值碳排放量"],
-    updateFreq: "T+1（日级同步）", calcScope: "按统计周期、组织范围聚合计算。",
+    updateFreq: "月", calcScope: "按统计周期、组织范围聚合计算。",
+    statObject: "制丝车间",
   },
   // 指标定义溯源（不展示具体数值）
   businessTreeDefine: {
@@ -656,13 +694,15 @@ const carbonMetric: TraceMetric = {
   },
   businessDetailDefine: {
     name: "单位产值碳排放量", unit: "吨/万元", period: "2026年7月",
-    overview: { period: "2026年7月", scope: ORG_SCOPE, dataAsOf: DATA_AS_OF, evalCycle: "月度/季度" },
+    overview: { period: "2026年7月", scope: ORG_SCOPE, dataAsOf: DATA_AS_OF },
     definition: "单位产值碳排放量用于反映企业每创造一万元产值所产生的 CO₂排放当量，是衡量生产经营活动碳排放强度和绿色发展水平的重要指标。",
     calcSteps: ["汇总统计周期内电力、燃气、蒸汽等能源消耗数据；", "按照已确认的碳排放因子，将能源消耗量折算为 CO₂排放当量；", "汇总各类能源产生的 CO₂排放当量；", "从财务数据获取同一周期的产值；", "使用 CO₂排放当量除以产值，得到单位产值碳排放量。"],
     calcFormula: "单位产值碳排放量 = CO₂排放当量 ÷ 产值",
     formationPath: ["企业生产经营活动", "消耗电力、燃气、蒸汽等能源", "能源消耗量按排放因子折算为 CO₂排放当量", "与同期产值进行比值计算", "形成单位产值碳排放量"],
     influenceFactors: ["能源使用结构", "能源消耗规模", "产值规模", "生产组织范围"],
     application: "用于评价企业碳排放强度，开展绿色生产水平对比，为节能降碳管理提供数据依据。",
+    updateFreq: "月",
+    statObjects: "制丝车间、卷包车间、物资管理科",
   },
   technicalDetailDefine: {
     name: "单位产值碳排放量", unit: "吨/万元", period: "月度/季度",
@@ -674,7 +714,8 @@ const carbonMetric: TraceMetric = {
     dslLogic: `接收运行时统计周期和组织范围；\n根据统计周期及组织范围筛选能源消耗数据和产值数据；\n为各类能源匹配对应有效期内的碳排放因子；\n计算并汇总CO₂排放当量；\n汇总同期产值；\n使用CO₂排放当量除以产值，得到单位产值碳排放量。`,
     sourceSystem: "能源管理系统、财务系统", sourceSystemEn: "Energy Management System, Finance System", db: "能源数据库、财务数据库", dbEn: "energy_db, finance_db", sourceTable: "energy_consumption_fact / emission_factor / output_value_fact", coreField: "energy_consumption / emission_factor / output_value",
     dataFlow: ["能源管理系统 → energy_consumption_fact", "财务系统 → output_value_fact", "碳排放因子表 → emission_factor", "指标计算引擎 → 单位产值碳排放量"],
-    updateFreq: "T+1（日级同步）", calcScope: "按统计周期、组织范围聚合计算。",
+    updateFreq: "月", calcScope: "按统计周期、组织范围聚合计算。",
+    statObjects: "制丝车间、卷包车间、物资管理科",
   },
 };
 

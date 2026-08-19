@@ -213,7 +213,7 @@ export function ReverseSettingsDrawer({
             )}
 
             <p className="text-xs leading-relaxed text-gray-400">
-              达标反推内容用于「情景测算 → 达标条件反推」的反推内容选项；修改后仅本次生效，历史测算记录不受影响。
+              达标反推内容用于「模拟测算 → 达标反推」的反推内容选项；修改后仅本次生效，历史测算记录不受影响。
             </p>
           </div>
         )}

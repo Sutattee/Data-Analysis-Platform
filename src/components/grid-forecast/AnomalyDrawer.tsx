@@ -66,6 +66,11 @@ export function AnomalyDrawer({
   // AI 辅助对话面板
   const [aiOpen, setAiOpen] = useState(false);
 
+  // —— 处置建议编辑态 ——
+  const [suggestionEditing, setSuggestionEditing] = useState(false);
+  const [suggestionDraft, setSuggestionDraft] = useState("");
+  const [savedSuggestion, setSavedSuggestion] = useState<string | undefined>(undefined);
+
   // detail 引用变化（点击新异常 / 关闭重开）时重置编辑态；保存只改 savedMeta，不触发重置
   useEffect(() => {
     setEditing(false);
@@ -73,6 +78,9 @@ export function AnomalyDrawer({
     setSavedMeta(undefined);
     setAiFilledText(undefined);
     setAiOpen(false);
+    setSuggestionEditing(false);
+    setSuggestionDraft("");
+    setSavedSuggestion(undefined);
   }, [detail]);
 
   const baseCause = detail?.cause ?? rec?.causeSummary;
@@ -188,7 +196,7 @@ export function AnomalyDrawer({
                   </p>
                 )}
                 <div>
-                  <Button size="sm" variant="secondary" onClick={startEdit}>修正异常原因</Button>
+                  <Button size="sm" variant="secondary" onClick={startEdit}>修正</Button>
                 </div>
               </div>
             ) : (
@@ -219,8 +227,55 @@ export function AnomalyDrawer({
             )}
           </div>
 
-          {/* 处置建议 */}
-          <Field label="处置建议" value={suggestion} />
+          {/* 处置建议（支持修正） */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">处置建议</span>
+              {!suggestionEditing && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSuggestionDraft(savedSuggestion ?? suggestion ?? "");
+                    setSuggestionEditing(true);
+                  }}
+                >
+                  修正
+                </Button>
+              )}
+            </div>
+            {suggestionEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={suggestionDraft}
+                  onChange={(e) => setSuggestionDraft(e.target.value.slice(0, 500))}
+                  placeholder="请填写实际采取的措施和处置结果"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  rows={3}
+                  maxLength={500}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">{suggestionDraft.length}/500</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSavedSuggestion(suggestionDraft.trim());
+                        setSuggestionEditing(false);
+                        toast("处置建议已保存", "success");
+                      }}
+                    >
+                      保存
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => setSuggestionEditing(false)}>
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span className="break-words text-sm text-gray-800">{savedSuggestion ?? suggestion ?? "-"}</span>
+            )}
+          </div>
 
           {/* 判定依据 */}
           <Field

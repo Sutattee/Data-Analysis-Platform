@@ -4,7 +4,7 @@
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { EventTimeline } from "./EventTimeline";
-import { ConfirmStatusBadge, EventTypeBadge, FormationBadge } from "./eventBadges";
+import { ConfirmStatusBadge, FormationBadge } from "./eventBadges";
 import { computeDuration, timeLabelOf } from "@/lib/mock-data/major-events";
 import type { MajorEvent } from "@/types";
 
@@ -65,11 +65,10 @@ export function EventDetailDrawer({
             )}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="事件编号" value={<span className="font-mono">{e.id}</span>} />
-              <Field label="事件类型" value={<EventTypeBadge type={e.type} />} />
+              <Field label="发生时间" value={timeLabelOf(e)} />
               <div className="col-span-2">
                 <Field label="事件标题" value={<span className="font-medium">{e.title}</span>} />
               </div>
-              <Field label="发生时间" value={timeLabelOf(e)} />
               <Field label="持续时长" value={computeDuration(e.startTime, e.endTime)} />
               <Field label="形成方式" value={<FormationBadge formation={e.formation} />} />
               <Field label="确认状态" value={<ConfirmStatusBadge status={e.status} />} />

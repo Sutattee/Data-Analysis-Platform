@@ -352,7 +352,7 @@ export type AlertType = "当前异常" | "预测风险";
 export type AlertStatus = "未处理" | "已处理";
 
 // 业务领域
-export type AlertDomain = "生产管理" | "质量管理" | "能耗管理" | "设备管理";
+export type AlertDomain = "生产管理" | "工艺质量" | "能源消耗";
 
 // 一条告警记录
 export interface AlertRecord {
@@ -393,7 +393,7 @@ export interface AlertRecord {
 // ========== 告警管理（数据告警策略）==========
 export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间";
 export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "正常区间";
-export type AlertDetectCycle = "每5分钟" | "每15分钟" | "每30分钟" | "每小时" | "每日" | "每月";
+export type AlertDetectCycle = "每小时" | "每日" | "每月";
 export type AlertScope = "全部适用对象" | "指定对象"; // 保留类型兼容；新表单固定为指定对象
 
 // 单条触发条件
@@ -488,7 +488,7 @@ export interface MetricTargetVersion {
 }
 
 // ========== 折标系数管理（能源折标准煤系数 / 能源碳排放因子，版本化） ==========
-export type CoeffEnergyType = "电" | "蒸汽" | "水" | "天然气";
+export type CoeffEnergyType = "电" | "蒸汽" | "天然气";
 
 export type CoeffType = "折标准煤系数" | "能源碳排放因子";
 
@@ -645,6 +645,7 @@ export type VisitContentType =
   | "预测分析记录"
   | "告警记录"
   | "重大事件记录"
+  | "年度报告"
   | "年鉴报告"
   | "普通报告"
   | "重点网格监测"

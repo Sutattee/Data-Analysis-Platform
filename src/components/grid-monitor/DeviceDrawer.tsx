@@ -3,7 +3,6 @@
 import type { DeviceRow, GridRow } from "@/lib/mock-data/grid-monitor";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
-import { MonitorStatusBadge } from "@/components/alert/alertBadges";
 
 interface DeviceDrawerProps {
   open: boolean;
@@ -11,6 +10,14 @@ interface DeviceDrawerProps {
   row: GridRow | null; // 当前网格（提供上下文信息）
   devices: DeviceRow[]; // 关联设备明细
   dateIso: string; // 统计日期
+}
+
+// 简单状态标签：异常 / 正常
+function StatusBadge({ status }: { status: string }) {
+  if (status === "正常") {
+    return <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">正常</span>;
+  }
+  return <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">异常</span>;
 }
 
 // 关联设备详情抽屉：右侧滑出，展示网格下设备读数 / 偏差 / 监测状态
@@ -50,7 +57,7 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
           </div>
           <div className="flex items-center gap-1">
             <span className="text-gray-400">网格监测状态：</span>
-            <MonitorStatusBadge status={row.status} />
+            <StatusBadge status={row.status} />
           </div>
         </div>
       )}
@@ -83,7 +90,7 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
                 <td className="px-3 py-2.5 text-right tabular-nums text-gray-500">{d.avg.toLocaleString()}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-gray-700">{fmtDev(d.deviation)}</td>
                 <td className="px-3 py-2.5">
-                  <MonitorStatusBadge status={d.status} />
+                  <StatusBadge status={d.status} />
                 </td>
                 <td className="px-3 py-2.5 text-gray-500">{d.time ?? <span className="text-gray-400">--</span>}</td>
               </tr>

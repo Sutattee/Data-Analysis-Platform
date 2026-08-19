@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
 import { Card } from "@/components/ui/Card";
 import { GRADE_STYLE, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
@@ -7,26 +8,58 @@ import { CARBON_MONTHLY, buildOverviewAnomaly } from "@/lib/mock-data/energy-ove
 
 const NAME_MAP: Record<string, string> = { actual: "实际值", target: "目标值" };
 
-// 单位产值碳排放趋势：按月展示实际值与目标值，实际值高于目标值标记异常点（2024 年起）
+// 单位产量碳排放趋势：按月展示实际值与目标值，支持箱/万支单位切换
 export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: AnomalyDetail) => void }) {
-  const data = CARBON_MONTHLY;
+  const [unitMode, setUnitMode] = useState<"万支" | "箱">("万支");
+  const convertFactor = unitMode === "万支" ? 1000 : 1000 * 0.2; // tCO₂e → kg CO₂，箱=万支×0.2
+  const unitLabel = unitMode === "万支" ? "kg CO₂/万支" : "kg CO₂/箱";
+
+  // 转换数据：tCO₂e → kg CO₂
+  const data = useMemo(() => {
+    return CARBON_MONTHLY.map((d) => ({
+      ...d,
+      actual: d.actual * convertFactor,
+      target: d.target ? d.target * convertFactor : undefined,
+    }));
+  }, [convertFactor]);
 
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    if (pt?.anomaly) onAnomaly(buildOverviewAnomaly("carbon", pt));
+    if (pt?.anomaly) onAnomaly(buildOverviewAnomaly("carbon", CARBON_MONTHLY.find((d) => d.date === e.activeLabel)!));
   }
 
   return (
-    <Card title="🌱 单位产值碳排放趋势（tCO₂e/万元，按月）">
+    <Card
+      title="🌱 单位产量碳排放趋势（按月）"
+      headerRight={
+        <span className="flex items-center text-xs leading-none">
+          <button
+            type="button"
+            onClick={() => setUnitMode("万支")}
+            className={unitMode === "万支" ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+          >
+            万支
+          </button>
+          <span className="mx-1 text-gray-300">｜</span>
+          <button
+            type="button"
+            onClick={() => setUnitMode("箱")}
+            className={unitMode === "箱" ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+          >
+            箱
+          </button>
+        </span>
+      }
+    >
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={2} />
-          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={52} domain={["auto", "auto"]} />
+          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={60} domain={["auto", "auto"]} unit={unitLabel} />
           <Tooltip
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
-            formatter={(v: any, n: any) => [v, NAME_MAP[n as string] ?? n]}
+            formatter={(v: any, n: any) => [`${Number(v).toFixed(2)} ${unitLabel}`, NAME_MAP[n as string] ?? n]}
           />
           <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
           <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
@@ -47,9 +80,23 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
             ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-gray-400">
-        蓝色实线为实际值、橙色线为目标值（≤0.035）；实际值高于目标值的异常点以黄 / 橙标记，可点击查看详情。数据自 2024 年起。
-      </p>
+      <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 bg-blue-500" /> 实际值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-orange-500" /> 目标值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-yellow-400" /> 关注
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-orange-500" /> 告警
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500" /> 危险
+        </span>
+      </div>
     </Card>
   );
 }

@@ -12,6 +12,7 @@ import { useApp } from "@/lib/store/AppContext";
 import { listReports, removeReport } from "@/lib/mock-data/major-events";
 import { exportReportPdf, exportReportWord } from "@/lib/export-report";
 import { GenerateReportModal } from "./GenerateReportModal";
+import { YEARBOOK_REPORT_ICON } from "@/components/layout/NavIcon";
 import type { YearbookReport } from "@/types";
 
 type ViewMode = "list" | "card";
@@ -253,7 +254,7 @@ export function ReportList() {
                   <span className="text-2xl font-bold text-primary-600">{r.year}</span>
                   <span className="text-xs text-gray-400 ml-1">年度</span>
                 </div>
-                <span className="text-2xl">📚</span>
+                {YEARBOOK_REPORT_ICON}
               </div>
               <h3 className="font-medium text-gray-900 mt-2 truncate" title={r.name}>{r.name}</h3>
               <p className="text-xs text-gray-400 mt-1">

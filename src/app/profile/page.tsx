@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { PROFILE_ICON_MAP } from "@/components/layout/NavIcon";
 
 // 手机号脱敏：178****1516
 function maskPhone(phone: string): string {
@@ -141,7 +142,7 @@ export default function ProfilePage() {
           <div className="divide-y divide-gray-100">
             {/* 我的头像 */}
             <section className="py-4 first:pt-0">
-              <SectionTitle>🖼️ 我的头像</SectionTitle>
+              <SectionTitle>{PROFILE_ICON_MAP.avatar} 我的头像</SectionTitle>
               <AvatarUpload
                 currentAvatar={user.avatar}
                 fallbackText={user.nickname || user.username || "U"}
@@ -151,7 +152,7 @@ export default function ProfilePage() {
 
             {/* 我的名称 */}
             <section className="py-4">
-              <SectionTitle>✏️ 我的名称</SectionTitle>
+              <SectionTitle>{PROFILE_ICON_MAP.nickname} 我的名称</SectionTitle>
               <div className="flex items-end gap-3">
                 <div className="flex-1 max-w-md">
                   <Input label="昵称" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="2~20个字符，中英文、数字、下划线" />
@@ -163,7 +164,7 @@ export default function ProfilePage() {
 
             {/* 我的手机 */}
             <section className="py-4">
-              <SectionTitle>📱 我的手机</SectionTitle>
+              <SectionTitle>{PROFILE_ICON_MAP.phone} 我的手机</SectionTitle>
               {isEditingPhone ? (
                 <div className="flex items-end gap-3">
                   <div className="flex-1 max-w-md">
@@ -185,7 +186,7 @@ export default function ProfilePage() {
 
             {/* 我的邮箱 */}
             <section className="py-4">
-              <SectionTitle>📧 我的邮箱</SectionTitle>
+              <SectionTitle>{PROFILE_ICON_MAP.email} 我的邮箱</SectionTitle>
               {isEditingEmail ? (
                 <div className="flex items-end gap-3">
                   <div className="flex-1 max-w-md">
@@ -207,7 +208,7 @@ export default function ProfilePage() {
 
             {/* 我的密码 */}
             <section className="py-4">
-              <SectionTitle>🔒 我的密码</SectionTitle>
+              <SectionTitle>{PROFILE_ICON_MAP.password} 我的密码</SectionTitle>
               <div className="flex items-center justify-between max-w-md">
                 <div>
                   <div className="text-sm text-gray-400 mb-0.5">登录密码</div>
@@ -231,7 +232,7 @@ export default function ProfilePage() {
 
             {/* 退出登录 */}
             <section className="py-4">
-              <Button variant="secondary" onClick={handleLogout}>🚪 退出登录</Button>
+              <Button variant="secondary" onClick={handleLogout} className="flex items-center gap-1.5">{PROFILE_ICON_MAP.logout} 退出登录</Button>
             </section>
           </div>
         </div>

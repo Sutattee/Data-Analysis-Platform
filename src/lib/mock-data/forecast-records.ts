@@ -1,7 +1,7 @@
 // 预测记录 — 模拟数据（预测完成后的独立快照，不随模型/数据/配置更新而变化）
 // 数据处理规则：
 //  · 周期结束后按相同指标/对象/周期/口径匹配实际结果并计算预测误差
-//  · 未来值预测、目标达成预测可验证；工况情景测算、达标条件反推不计算误差（"—"）
+//  · 未来值预测、能否达标预测可验证；条件测算、达标反推不计算误差（"—"）
 //  · 预测失败记录状态与原因，不展示无效预测结果
 import type { ForecastType } from "./forecast";
 
@@ -40,7 +40,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260809-012",
     source: "用户手动",
-    type: "工况情景测算",
+    type: "条件测算",
     metricName: "空调系统每日蒸汽耗",
     object: "空调系统",
     periodLabel: "明日",
@@ -114,7 +114,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260802-009",
     source: "系统自动",
-    type: "目标达成预测",
+    type: "能否达标预测",
     metricName: "单位产值碳排放量",
     object: "全厂",
     periodLabel: "本季度",
@@ -170,7 +170,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260730-007",
     source: "用户手动",
-    type: "达标条件反推",
+    type: "达标反推",
     metricName: "单位产值碳排放量",
     object: "全厂",
     periodLabel: "本年度",
@@ -226,7 +226,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260725-005",
     source: "用户手动",
-    type: "工况情景测算",
+    type: "条件测算",
     metricName: "卷包车间单箱电耗",
     object: "卷包车间",
     periodLabel: "明日",
@@ -242,7 +242,6 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
     actualResult: "20.9 kWh/箱（2026-07-26 实际，实际按三班执行）",
     conditions: [
       { name: "计划产量", value: "2,600 箱", source: "生产计划数据", adjusted: true },
-      { name: "班次", value: "两班", source: "自动带入（原为三班，人工调整）", adjusted: true },
       { name: "设备运行时长", value: "22 小时", source: "设备运行计划数据" },
     ],
     conclusions: [
@@ -282,7 +281,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260715-003",
     source: "用户手动",
-    type: "达标条件反推",
+    type: "达标反推",
     metricName: "单箱综合能耗",
     object: "全厂",
     periodLabel: "本年度",
@@ -309,7 +308,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
   {
     id: "FR-20260630-002",
     source: "系统自动",
-    type: "目标达成预测",
+    type: "能否达标预测",
     metricName: "单箱综合能耗",
     object: "全厂",
     periodLabel: "本年度",
@@ -330,7 +329,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
     conclusions: [
       "上半年累计已接近目标上限，按剩余计划测算年末存在超标风险。",
       "预测模型：目标达成分析模型；历史预测误差 ±2.1%（近 90 天回测）。",
-      "建议结合达标条件反推制定剩余周期管控措施。",
+      "建议结合达标反推制定剩余周期管控措施。",
     ],
   },
   {

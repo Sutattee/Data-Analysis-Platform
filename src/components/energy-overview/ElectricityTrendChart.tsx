@@ -68,9 +68,23 @@ export function ElectricityTrendChart({ onAnomaly }: { onAnomaly: (d: AnomalyDet
             ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-gray-400">
-        实际值偏离历史均值的异常时间点以黄 / 橙 / 红标记，可点击查看详情；日档展示近 90 天，月档自 2024 年起。
-      </p>
+      <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 bg-blue-500" /> 实际值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-blue-500" /> 历史均值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-yellow-400" /> 关注
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-orange-500" /> 告警
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500" /> 危险
+        </span>
+      </div>
     </Card>
   );
 }

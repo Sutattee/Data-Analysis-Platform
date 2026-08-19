@@ -34,7 +34,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg shadow-primary-200">
             D
           </div>
-          <h1 className="text-xl font-bold text-gray-900">什邡卷烟厂数智分析平台</h1>
+          <h1 className="text-xl font-bold text-gray-900">什邡卷烟厂产质耗KPI分析平台</h1>
           <p className="text-sm text-gray-500 mt-2">请登录您的账号</p>
         </div>
 

@@ -73,7 +73,7 @@ export function getOverviewCards(): OverviewCardData[] {
         { label: "预测峰值", value: "46.5 t · 预计 8月13日出现", tone: "orange" },
         { label: "同工况历史累计", value: "279.0 t", tone: "muted" },
         { label: "预计差异", value: "增加 7.4 t（2.7%）", tone: "orange" },
-        { label: "每日预测区间包络", value: "34.3 ～ 48.8 t", tone: "muted" },
+        { label: "每日预测区间", value: "34.3 ～ 48.8 t", tone: "muted" },
       ],
       spark: {
         kind: "bar",
@@ -167,7 +167,7 @@ export function getTrendSeries(metric: TrendMetric, days: 7 | 15 | 30): TrendSer
   return { title: p.title, unit: p.unit, decimals: p.decimals, points, peakInfo };
 }
 
-// ===== 单箱综合能耗目标达成预测图（实际按周更新）=====
+// ===== 单箱综合能耗能否达标预测图（实际按周更新）=====
 export interface TargetPoint {
   date: string;
   actual?: number;

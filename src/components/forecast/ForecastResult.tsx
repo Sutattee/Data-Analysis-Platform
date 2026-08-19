@@ -18,23 +18,27 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
 
   return (
     <div className="space-y-4">
-      {/* 一句话核心结论 */}
-      <div className="rounded-lg border border-primary-100 bg-primary-50 p-4 text-sm leading-relaxed text-gray-800">
+      {/* 一句话核心结论：加粗展示，宽度减半 */}
+      <div className="w-full lg:w-1/2 rounded-lg border border-primary-100 bg-primary-50 p-4 text-sm font-bold leading-relaxed text-gray-800">
         {result.headline}
       </div>
 
-      {/* 核心结果字段 */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {result.fields.map((f) => (
-          <div key={f.label} className="rounded-lg border border-gray-100 bg-white p-3.5">
-            <p className="text-xs text-gray-400">{f.label}</p>
-            <p className={`mt-1 text-base font-semibold ${f.tone ? TONE_CLS[f.tone] : "text-gray-900"}`}>{f.value}</p>
-          </div>
-        ))}
+      {/* 核心结果字段：同一卡片内竖排展示，数值加大加粗凸显（不展示预测模型） */}
+      <div className="w-full lg:w-1/2 rounded-lg border border-gray-100 bg-white p-4">
+        <div className="divide-y divide-gray-50">
+          {result.fields
+            .filter((f) => f.label !== "预测模型")
+            .map((f) => (
+              <div key={f.label} className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+                <span className="text-sm text-gray-500 flex-shrink-0">{f.label}</span>
+                <span className={`text-xl font-bold ${f.tone ? TONE_CLS[f.tone] : "text-gray-900"}`}>{f.value}</span>
+              </div>
+            ))}
+        </div>
       </div>
 
-      {/* 类型专属图表 */}
-      <div className="rounded-lg border border-gray-100 bg-white p-4">
+      {/* 类型专属图表：宽度减半 */}
+      <div className="w-full lg:w-1/2 rounded-lg border border-gray-100 bg-white p-4">
         <div className="mb-2 flex items-center justify-between">
           <h4 className="text-sm font-semibold text-gray-800">预测图表</h4>
           <span className="text-xs text-gray-400">

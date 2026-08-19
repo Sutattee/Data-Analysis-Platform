@@ -9,7 +9,7 @@ import type {
 // ========== 筛选项枚举 ==========
 export const ALERT_LEVELS: AlertLevel[] = ["提示", "关注", "预警", "告警", "危险"];
 export const ALERT_TYPES: AlertType[] = ["当前异常", "预测风险"];
-export const ALERT_DOMAINS: AlertDomain[] = ["生产管理", "质量管理", "能耗管理", "设备管理"];
+export const ALERT_DOMAINS: AlertDomain[] = ["生产管理", "工艺质量", "能源消耗"];
 export const ALERT_STATUSES: AlertStatus[] = ["未处理", "已处理"];
 
 // ========== 等级优先级（数值越大越严重，用于默认排序） ==========
@@ -45,16 +45,18 @@ export interface AlertObject {
 export const ALERT_OBJECTS: AlertObject[] = [
   { code: "PACK-002", name: "卷包车间2号包装机", domain: "生产管理", metric: "包装设备运行效率", target: 85, unit: "%", low: true },
   { code: "BF-001", name: "1号高炉", domain: "生产管理", metric: "高炉利用系数", target: 2.4, unit: "t/(m³·d)", low: true },
-  { code: "BF-002", name: "2号高炉", domain: "设备管理", metric: "热风温度", target: 1180, unit: "℃", low: true },
+  { code: "BF-002", name: "2号高炉", domain: "生产管理", metric: "热风温度", target: 1180, unit: "℃", low: true },
   { code: "HR-003", name: "热轧产线3号", domain: "生产管理", metric: "轧制节奏", target: 22, unit: "块/小时", low: true },
-  { code: "CR-001", name: "冷轧产线1号", domain: "质量管理", metric: "板形合格率", target: 96, unit: "%", low: true },
-  { code: "CC-001", name: "1号连铸机", domain: "质量管理", metric: "铸坯合格率", target: 98.5, unit: "%", low: true },
-  { code: "GA-001", name: "镀锌线1号", domain: "质量管理", metric: "锌层重量合格率", target: 95, unit: "%", low: true },
-  { code: "EM-01", name: "厂区电力能源网格", domain: "能耗管理", metric: "吨钢综合能耗", target: 580, unit: "kgce/t", low: false },
-  { code: "EM-02", name: "高炉煤气能源网格", domain: "能耗管理", metric: "煤气放散率", target: 1.5, unit: "%", low: false },
-  { code: "EQ-MILL-7", name: "7号轧机主电机", domain: "设备管理", metric: "设备振动幅值", target: 4.5, unit: "mm/s", low: false },
-  { code: "EQ-BLV-1", name: "高炉鼓风机", domain: "设备管理", metric: "轴承温度", target: 78, unit: "℃", low: false },
-  { code: "WQ-01", name: "循环水能源网格", domain: "能耗管理", metric: "循环水吨钢电耗", target: 32, unit: "kWh/t", low: false },
+  { code: "CR-001", name: "冷轧产线1号", domain: "工艺质量", metric: "板形合格率", target: 96, unit: "%", low: true },
+  { code: "CC-001", name: "1号连铸机", domain: "工艺质量", metric: "铸坯合格率", target: 98.5, unit: "%", low: true },
+  { code: "GA-001", name: "镀锌线1号", domain: "工艺质量", metric: "锌层重量合格率", target: 95, unit: "%", low: true },
+  { code: "EM-01", name: "厂区电力能源网格", domain: "能源消耗", metric: "吨钢综合能耗", target: 580, unit: "kgce/t", low: false },
+  { code: "EM-02", name: "高炉煤气能源网格", domain: "能源消耗", metric: "煤气放散率", target: 1.5, unit: "%", low: false },
+  { code: "EQ-MILL-7", name: "7号轧机主电机", domain: "生产管理", metric: "设备振动幅值", target: 4.5, unit: "mm/s", low: false },
+  { code: "EQ-BLV-1", name: "高炉鼓风机", domain: "生产管理", metric: "轴承温度", target: 78, unit: "℃", low: false },
+  { code: "WQ-01", name: "循环水能源网格", domain: "能源消耗", metric: "循环水吨钢电耗", target: 32, unit: "kWh/t", low: false },
+  { code: "EM-03", name: "空压能源网格", domain: "能源消耗", metric: "空压站吨钢电耗", target: 45, unit: "kWh/t", low: false },
+  { code: "EM-04", name: "蒸汽能源网格", domain: "能源消耗", metric: "蒸汽管网损耗率", target: 8, unit: "%", low: false },
 ];
 
 // ========== 接收人候选池（供策略页"接收人"多选搜索复用） ==========
@@ -73,10 +75,8 @@ export const ALERT_USERS = [
 
 const NOTIFY_COMBOS: string[][] = [
   ["站内消息"],
-  ["站内消息", "短信"],
   ["站内消息", "邮件"],
-  ["站内消息", "短信", "邮件"],
-  ["短信", "邮件"],
+  ["邮件"],
 ];
 const HANDLE_NOTES = [
   "检查发现封签供给装置卡料，清理后设备恢复运行。",
@@ -113,8 +113,8 @@ function tsAt(offsetMin: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-// ========== 生成 40 条告警记录（确定性） ==========
-export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 40 }, (_, i) => {
+// ========== 生成 56 条告警记录（确定性；对象 14 个 × 4 条，保证各业务域均有 5 个等级样本） ==========
+export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) => {
   const obj = ALERT_OBJECTS[i % ALERT_OBJECTS.length];
   const level = ALERT_LEVELS[i % ALERT_LEVELS.length];
   const type = ALERT_TYPES[i % 2 === 0 ? 0 : 1];

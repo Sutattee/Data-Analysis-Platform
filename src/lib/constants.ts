@@ -6,16 +6,20 @@ const ENERGY_NAV: NavItem[] = [
   { label: "网格监控",       href: "/energy/grid-monitor", icon: "🖥️" },
   { label: "预测分析", href: "/energy/forecast", icon: "📈", children: [
     { label: "预测总览", href: "/energy/forecast/overview", icon: "📊" },
-    { label: "情景预测", href: "/energy/forecast/scenario", icon: "🧪" },
+    { label: "模拟测算", href: "/energy/forecast/scenario", icon: "🧪" },
     { label: "预测记录", href: "/energy/forecast/records",  icon: "📑" },
-  ]},
-  { label: "告警中心",     href: "/alert", icon: "⚠️", children: [
-    { label: "告警记录", href: "/alert/records",    icon: "📋" },
-    { label: "告警管理", href: "/alert/management", icon: "🛠️" },
   ]},
   { label: "重大事件年鉴", href: "/energy/yearbook", icon: "🗓️", children: [
     { label: "事件列表", href: "/energy/yearbook/events",  icon: "📋" },
     { label: "年鉴报告", href: "/energy/yearbook/reports", icon: "📚" },
+  ]},
+];
+
+// 智能应用 - 二级导航（左侧纵向）
+const SMART_APP_NAV: NavItem[] = [
+  { label: "告警中心",     href: "/alert", icon: "⚠️", children: [
+    { label: "告警记录", href: "/alert/records",    icon: "📋" },
+    { label: "告警管理", href: "/alert/management", icon: "🛠️" },
   ]},
   { label: "智能问数", href: "/qa",          icon: "💬" },
   { label: "指标溯源", href: "/metric-trace", icon: "🔗" },
@@ -33,8 +37,14 @@ export const PRIMARY_NAV: NavItem[] = [
     href: "/energy",
     icon: "⚡",
     children: ENERGY_NAV,
-    // 能源组二级路由分散在多个前缀，需显式声明用于一级激活态判断
-    matchPrefixes: ["/energy", "/dashboard/energy", "/qa", "/metric-trace", "/reports", "/alert"],
+    matchPrefixes: ["/energy", "/dashboard/energy"],
+  },
+  {
+    label: "智能应用",
+    href: "/alert",
+    icon: "🤖",
+    children: SMART_APP_NAV,
+    matchPrefixes: ["/alert", "/qa", "/metric-trace", "/reports"],
   },
   { label: "大模型平台", href: "/llm-platform", icon: "🧠" },
 ];

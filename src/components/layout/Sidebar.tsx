@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { NavItem } from "@/types";
+import { NavIcon } from "./NavIcon";
 
 interface SidebarProps {
   items: NavItem[];
@@ -64,7 +65,7 @@ export function Sidebar({ items }: SidebarProps) {
                     : "text-gray-600 hover:bg-slate-200 hover:text-gray-800"
                 }`}
             >
-              <span className="text-lg flex-shrink-0">{item.icon}</span>
+              <span className="flex-shrink-0"><NavIcon icon={item.icon} /></span>
               <span className="whitespace-nowrap">{item.label}</span>
             </Link>
           );
@@ -86,7 +87,7 @@ export function Sidebar({ items }: SidebarProps) {
                     : "text-gray-600 hover:bg-slate-200 hover:text-gray-800"
                 }`}
             >
-              <span className="text-lg flex-shrink-0">{item.icon}</span>
+              <span className="flex-shrink-0"><NavIcon icon={item.icon} /></span>
               <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
               <span
                 className={`text-[10px] text-gray-400 inline-block transition-transform ${

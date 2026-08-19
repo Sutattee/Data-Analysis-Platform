@@ -453,7 +453,7 @@ export interface AnomalyItem {
 // 取节点关联的能耗告警记录（车间=其网格记录；网格=其记录；设备=所属网格记录）
 function recordsForNode(name: string, level: "workshop" | "grid" | "equipment", parent: string | null) {
   return ALERT_RECORDS.filter((r) => {
-    if (r.domain !== "能耗管理") return false;
+    if (r.domain !== "能源消耗") return false;
     const p = orgPathOf(r.objectName);
     if (level === "workshop") return p.workshop === name;
     if (level === "grid") return p.grid === name;
@@ -484,9 +484,9 @@ function rankToLevel(rank: number): AlertLevel | null {
 export function pickAlertRecordId(object: string): string | undefined {
   const p = orgPathOf(object);
   const inObj = ALERT_RECORDS.find(
-    (r) => r.domain === "能耗管理" && (p.level === "workshop" ? orgPathOf(r.objectName).workshop === p.workshop : true)
+    (r) => r.domain === "能源消耗" && (p.level === "workshop" ? orgPathOf(r.objectName).workshop === p.workshop : true)
   );
-  return (inObj ?? ALERT_RECORDS.find((r) => r.domain === "能耗管理"))?.id;
+  return (inObj ?? ALERT_RECORDS.find((r) => r.domain === "能源消耗"))?.id;
 }
 
 // 异常数聚合：网格=其设备异常数之和；车间=其网格异常数之和

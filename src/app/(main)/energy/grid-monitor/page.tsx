@@ -36,7 +36,7 @@ export default function GridMonitorPage() {
 
   function handleRecords(row: GridRow) {
     router.push(
-      `/alert/records?object=${encodeURIComponent(row.name)}&domain=${encodeURIComponent("能耗管理")}&from=${encodeURIComponent("grid-monitor")}`
+      `/alert/records?object=${encodeURIComponent(row.name)}&domain=${encodeURIComponent("能源消耗")}&from=${encodeURIComponent("grid-monitor")}`
     );
   }
 

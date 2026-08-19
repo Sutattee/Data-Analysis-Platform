@@ -383,6 +383,13 @@ export interface OverviewCard {
   mom?: number; // 环比 %
   goodDirection: "down" | "up"; // 值下降为好 / 上升为好（决定涨跌配色语义）
   grade?: EvalGrade; // 评价等级（色条 + 角标；预警/危险加异常图标）
+  // 单位切换支持：箱 ↔ 万支
+  unitToggle?: {
+    altUnit: string; // 切换后的单位
+    convertFactor: number; // 原值 × convertFactor = 切换后的值
+    altDecimals?: number; // 切换后的小数位（可选，不指定则保持原 decimals）
+    altCompare?: { label: string; text: string; good: boolean }; // 切换后的对比文案
+  };
 }
 
 export const overviewCards: OverviewCard[] = [
@@ -391,12 +398,20 @@ export const overviewCards: OverviewCard[] = [
     value: 29.8, unit: "kgce/箱", decimals: 1,
     compare: { label: "目标 ≤31.0", text: "低于目标 1.2 kgce/箱（3.9%）", good: true },
     yoy: -3.5, mom: -1.8, goodDirection: "down", grade: "良好",
+    unitToggle: {
+      altUnit: "kgce/万支", convertFactor: 0.2, altDecimals: 2,
+      altCompare: { label: "目标 ≤6.20", text: "低于目标 0.24 kgce/万支（3.9%）", good: true },
+    },
   },
   {
     key: "electricity", label: "单箱电耗", period: "本月",
     value: 24.6, unit: "kWh/箱", decimals: 1,
     compare: { label: "历史均值 25.0", text: "低于历史均值 0.4 kWh/箱（-1.6%）", good: true },
     yoy: -2.7, mom: -0.9, goodDirection: "down", grade: "优秀",
+    unitToggle: {
+      altUnit: "kWh/万支", convertFactor: 0.2, altDecimals: 2,
+      altCompare: { label: "历史均值 5.00", text: "低于历史均值 0.08 kWh/万支（1.6%）", good: true },
+    },
   },
   {
     key: "steam", label: "蒸汽耗总量", period: "本月",
@@ -409,31 +424,37 @@ export const overviewCards: OverviewCard[] = [
     value: 0.82, unit: "Nm³/箱", decimals: 2,
     compare: { label: "历史均值 0.90", text: "低于历史均值 0.08 Nm³/箱（-8.9%）", good: true },
     yoy: -5.7, mom: -2.2, goodDirection: "down", grade: "优秀",
+    unitToggle: {
+      altUnit: "Nm³/万支", convertFactor: 0.2, altDecimals: 3,
+      altCompare: { label: "历史均值 0.180", text: "低于历史均值 0.016 Nm³/万支（8.9%）", good: true },
+    },
   },
   {
-    key: "carbon", label: "单位产值碳排放量", period: "本季度",
-    value: 0.032, unit: "tCO₂e/万元", decimals: 3,
-    compare: { label: "目标 ≤0.035", text: "低于目标 0.003 tCO₂e/万元", good: true },
+    key: "carbon", label: "单位产量碳排放量", period: "本季度",
+    value: 0.032, unit: "tCO₂e/万支", decimals: 3,
+    compare: { label: "目标 ≤0.035", text: "低于目标 0.003 tCO₂e/万支", good: true },
     yoy: -5.6, mom: -2.1, goodDirection: "down", grade: "优秀",
+    unitToggle: {
+      altUnit: "tCO₂e/箱", convertFactor: 5, altDecimals: 4,
+      altCompare: { label: "目标 ≤0.175", text: "低于目标 0.015 tCO₂e/箱", good: true },
+    },
   },
   {
-    key: "water", label: "水资源重复利用率", period: "本季度",
-    value: 82.6, unit: "%", decimals: 1,
-    yoy: 3.1, mom: 1.2, goodDirection: "up", grade: "优秀",
+    key: "waterPerOutput", label: "单位产量水耗", period: "本季度",
+    value: 0.12, unit: "m³/万支", decimals: 2,
+    yoy: -4.1, mom: -1.6, goodDirection: "down", grade: "优秀",
+    unitToggle: {
+      altUnit: "m³/箱", convertFactor: 5, altDecimals: 2,
+    },
   },
   {
-    key: "codPerBox", label: "单箱化学需氧量排放量", period: "本季度",
-    value: 3.26, unit: "g/箱", decimals: 2,
-    yoy: -3.8, mom: -1.5, goodDirection: "down", grade: "优秀",
-  },
-  {
-    key: "cod", label: "污水排放COD", period: "本季度",
+    key: "cod", label: "污水COD", period: "本季度",
     value: 42, unit: "mg/L", decimals: 0,
     goodDirection: "down", grade: "良好",
   },
 ];
 
-// 碳排放分类卡（按月展示一 / 二 / 三类碳排放）
+// 碳排放分类卡（按月展示一 / 二 / 三 / 四类碳排放）
 export const carbonBreakdown = {
   period: "本月",
   unit: "tCO₂e",
@@ -441,11 +462,14 @@ export const carbonBreakdown = {
     { label: "第一类碳排放", value: 385.6 },
     { label: "第二类碳排放", value: 1248.3 },
     { label: "第三类碳排放", value: 96.5 },
+    { label: "第四类碳排放", value: 42.8 },
   ],
 };
 
-// ===== 部门电耗对比（当日，kWh；实际 vs 历史均值）=====
+// ===== 区域电耗对比（当日，kWh；实际 vs 历史均值）=====
 export const DEPT_POWER = [
+  { name: "制丝车间", actual: 52300, avg: 50800 },
+  { name: "卷包车间", actual: 48600, avg: 47200 },
   { name: "动力车间", actual: 38600, avg: 37200 },
   { name: "机房", actual: 12400, avg: 13100 },
   { name: "办公区域", actual: 4800, avg: 4600 },

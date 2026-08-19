@@ -25,7 +25,6 @@ export const BASE_UNITS: Record<CoeffEnergyType, string[]> = {
   "电": ["kWh"],
   "蒸汽": ["t", "GJ"],
   "天然气": ["m³"],
-  "水": ["m³"],
 };
 
 // 结果单位选项（按系数类型约束）
@@ -34,7 +33,7 @@ export const RESULT_UNITS: Record<CoeffType, string[]> = {
   "能源碳排放因子": ["kgCO₂e", "tCO₂e"],
 };
 
-export const ENERGY_TYPES: CoeffEnergyType[] = ["电", "蒸汽", "水", "天然气"];
+export const ENERGY_TYPES: CoeffEnergyType[] = ["电", "蒸汽", "天然气"];
 export const COEFF_TYPES: CoeffType[] = ["折标准煤系数", "能源碳排放因子"];
 
 // 预置系数版本（值与网格监测/预测模块 ENERGY_COEFFICIENT 保持一致）
@@ -211,25 +210,6 @@ let coefficients: CoefficientVersion[] = [
     createdAt: "2026-08-11 15:30",
     createdBy: "王五",
     remark: "自产蒸汽折标量仅用于车间分摊，厂级汇总不重复计入（避免重复计算）",
-  },
-  // ===== 水 · 折标准煤系数 =====
-  {
-    id: "ec-010",
-    version: "V1",
-    energyType: "水",
-    coeffType: "折标准煤系数",
-    energySource: "外购",
-    baseAmount: 1,
-    baseUnit: "m³",
-    value: 0.0857,
-    resultUnit: "kgce",
-    effectiveStart: "2026-01-01",
-    effectiveEnd: "2026-12-31",
-    enabled: true,
-    status: "生效中",
-    basis: "《综合能耗计算通则》GB/T 2589-2020（新水折标）",
-    createdAt: "2026-01-05 14:30",
-    createdBy: "王五",
   },
   // ===== 蒸汽 · 能源碳排放因子（含手动停用示例，规则 5） =====
   {

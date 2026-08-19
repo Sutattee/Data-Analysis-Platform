@@ -8,6 +8,7 @@ import { useApp } from "@/lib/store/AppContext";
 import { dataModels } from "@/lib/mock-data/data-assets";
 import { mockKnowledgeDocs, mockAiSkills } from "@/lib/mock-data/settings";
 import { MessageBubble } from "./MessageBubble";
+import { QA_TOOLBAR_ICONS } from "@/components/layout/NavIcon";
 import { AnalystAvatar } from "./AnalystAvatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
@@ -315,7 +316,7 @@ export function ChatPanel({
             : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
         }`}
       >
-        📊 {modelLabel} ▾
+        {QA_TOOLBAR_ICONS.model} {modelLabel} ▾
       </button>
       <button
         onClick={() => setShowKbModal(true)}
@@ -325,7 +326,7 @@ export function ChatPanel({
             : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
         }`}
       >
-        📚 {kbLabel} ▾
+        {QA_TOOLBAR_ICONS.knowledge} {kbLabel} ▾
       </button>
     </div>
   );
@@ -341,13 +342,13 @@ export function ChatPanel({
             : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
         }`}
       >
-        🎯 {selectedSkillTag ? "技能" : "选择技能"}
+        {QA_TOOLBAR_ICONS.skill} {selectedSkillTag ? "技能" : "选择技能"}
       </button>
       <button
         onClick={() => setShowModelSwitch(true)}
         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
       >
-        🤖 {currentModelName} ▾
+        {QA_TOOLBAR_ICONS.modelSwitch} {currentModelName} ▾
       </button>
     </div>
   );
@@ -379,7 +380,7 @@ export function ChatPanel({
           {/* 技能标签放在输入框内部左上角（与首行文字对齐） */}
           {selectedSkillTag && (
             <div className="absolute left-2 top-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full">
-              🎯 {selectedSkillTag.name}
+              {QA_TOOLBAR_ICONS.skill} {selectedSkillTag.name}
               <button
                 onClick={() => setSelectedSkillTag(null)}
                 className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"

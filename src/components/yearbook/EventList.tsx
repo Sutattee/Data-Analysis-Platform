@@ -10,8 +10,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
+import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { useApp } from "@/lib/store/AppContext";
-import { EVENT_TYPES, listEvents, setEventStatus } from "@/lib/mock-data/major-events";
+import { listEvents, setEventStatus } from "@/lib/mock-data/major-events";
 import { EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
 import { EventDetailDrawer } from "./EventDetailDrawer";
 import { EventFormDrawer } from "./EventFormDrawer";
@@ -26,7 +27,6 @@ interface EventListFilter {
   year: string;
   dateFrom: string;
   dateTo: string;
-  type: string;
   formation: string;
   status: string;
 }
@@ -36,7 +36,6 @@ const EMPTY_FILTER: EventListFilter = {
   year: "",
   dateFrom: "",
   dateTo: "",
-  type: "",
   formation: "",
   status: "",
 };
@@ -129,7 +128,6 @@ export function EventList() {
     const filtered = events.filter((e) => {
       if (!matchKeyword(e, applied.keyword)) return false;
       if (applied.year && e.startTime.slice(0, 4) !== applied.year) return false;
-      if (applied.type && e.type !== applied.type) return false;
       if (applied.formation && e.formation !== applied.formation) return false;
       if (applied.status && e.status !== applied.status) return false;
       const day = e.startTime.slice(0, 10);
@@ -249,15 +247,6 @@ export function EventList() {
             <span className="text-gray-400 text-xs">至</span>
             <input type="date" className={selectCls} value={filter.dateTo} onChange={(e) => setFilter({ ...filter, dateTo: e.target.value })} />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">事件类型</span>
-            <select className={selectCls} value={applied.type} onChange={(e) => applyFilter({ type: e.target.value })}>
-              <option value="">全部</option>
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
           <OrgCascaderFilter value={orgFilter} onChange={(v) => { setOrgFilter(v); setPage(1); }} />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">形成方式</span>
@@ -265,15 +254,6 @@ export function EventList() {
               <option value="">全部</option>
               {FORMATIONS.map((f) => (
                 <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">确认状态</span>
-            <select className={selectCls} value={applied.status} onChange={(e) => applyFilter({ status: e.target.value })}>
-              <option value="">全部</option>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
@@ -303,11 +283,15 @@ export function EventList() {
                 <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
                   <th className={`${th} sticky left-0 bg-gray-50 z-10`}>事件编号</th>
                   <th className={th}>事件标题</th>
-                  <th className={th}>事件类型</th>
                   <th className={th}>影响对象</th>
                   <th className={th}>影响指标</th>
                   <th className={th}>发生时间</th>
-                  <th className={th}>确认状态</th>
+                  <th className={th}>
+                    <span className="inline-flex items-center gap-0.5">
+                      确认状态
+                      <ColumnFilter options={[...STATUSES]} value={applied.status} onChange={(v) => applyFilter({ status: v })} />
+                    </span>
+                  </th>
                   <th className={`${th} text-right sticky right-0 bg-gray-50 z-10`}>操作</th>
                 </tr>
               </thead>
@@ -325,7 +309,6 @@ export function EventList() {
                     <td className="px-4 py-3 max-w-[220px]">
                       <div className="text-gray-900 truncate" title={e.title}>{e.title}</div>
                     </td>
-                    <td className="px-4 py-3 text-gray-900">{e.type}</td>
                     <td className="px-4 py-3 text-gray-900 max-w-[160px] truncate" title={e.objects.join("／")}>
                       {e.objects.join("／")}
                     </td>

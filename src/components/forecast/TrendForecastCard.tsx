@@ -44,9 +44,6 @@ export function TrendForecastCard({ metric }: { metric: TrendMetric }) {
   const [peakDetail, setPeakDetail] = useState<string | null>(null);
 
   const isSteam = metric === "steam";
-  const footer = isSteam
-    ? peakDetail ?? "橙色菱形为预测峰值：46.5 t · 预计 8月13日出现（点击峰值标记查看区间详情）"
-    : "蓝色实线为实际值、蓝色虚线为预测值、灰色虚线为同工况历史均值；数据每日更新。";
 
   return (
     <Card
@@ -63,6 +60,9 @@ export function TrendForecastCard({ metric }: { metric: TrendMetric }) {
         />
       }
     >
+      {isSteam && peakDetail && (
+        <p className="mb-2 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-gray-700">{peakDetail}</p>
+      )}
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={series.points} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -102,7 +102,6 @@ export function TrendForecastCard({ metric }: { metric: TrendMetric }) {
           )}
         </ComposedChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-gray-400">{footer}</p>
     </Card>
   );
 }

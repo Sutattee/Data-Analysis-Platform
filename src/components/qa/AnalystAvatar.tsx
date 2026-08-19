@@ -1,4 +1,4 @@
-// 插画风格「大数据分析专家」卡通形象：蓝渐变圆球 + 年轻分析师（寸头、长脸、长方形框眼镜、西装领带）+ 迷你柱状图徽章
+// 漫画风格「大数据分析专家」：寸头、深邃眼眸、西装领带、细方框眼镜、长脸高鼻梁
 export function AnalystAvatar() {
   return (
     <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden>
@@ -34,6 +34,8 @@ export function AnalystAvatar() {
           d="M23 23 C23 17 26.8 13.8 32 13.8 C37.2 13.8 41 17 41 23 C41 30.3 39 37.6 35.5 40.4 C34.2 41.6 33.1 42.1 32 42.1 C30.9 42.1 29.8 41.6 28.5 40.4 C25 37.6 23 30.3 23 23 Z"
           fill="#ffdcb8"
         />
+        {/* 高鼻梁 */}
+        <path d="M31.5 28 L32 33 L32.5 28" stroke="#d4a574" strokeWidth="0.8" strokeLinecap="round" fill="none" />
         {/* 寸头（圆平头）：紧贴头皮的短茬，均匀一条发际线，无分缝 */}
         <path
           d="M22.4 22.5 C21.4 16.2 25.8 12.6 32 12.6 C38.2 12.6 42.6 16.2 41.6 22.5 C41.4 21.4 41.1 20.5 40.7 19.7 C40.2 20.4 39.6 20.8 39 21 C36.7 21.6 27.3 21.6 25 21 C24.4 20.8 23.8 20.4 23.3 19.7 C22.9 20.5 22.6 21.4 22.4 22.5 Z"
@@ -52,19 +54,26 @@ export function AnalystAvatar() {
         {/* 两侧与后颈推剪渐变（发际线收窄） */}
         <path d="M22.4 22.5 C22.6 21.4 22.9 20.5 23.3 19.7 L25 21 C24.2 21.6 23.2 22.1 22.4 22.5 Z" fill="#3d3746" />
         <path d="M41.6 22.5 C41.4 21.4 41.1 20.5 40.7 19.7 L39 21 C39.8 21.6 40.8 22.1 41.6 22.5 Z" fill="#3d3746" />
-        {/* 眉毛 */}
-        <path d="M25.6 24 Q28.4 22.8 31 23.9" stroke="#2f2a38" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-        <path d="M33 23.9 Q35.6 22.8 38.4 24" stroke="#2f2a38" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-        {/* 长方形框眼镜（细框，透明镜片） */}
-        <rect x="24.6" y="25.9" width="6.4" height="4.4" rx="1.1" fill="#ffffff" fillOpacity="0.35" stroke="#31415e" strokeWidth="1.2" />
-        <rect x="33" y="25.9" width="6.4" height="4.4" rx="1.1" fill="#ffffff" fillOpacity="0.35" stroke="#31415e" strokeWidth="1.2" />
-        <line x1="31" y1="28.1" x2="33" y2="28.1" stroke="#31415e" strokeWidth="1.2" />
-        <line x1="24.6" y1="27.6" x2="23.2" y2="27.2" stroke="#31415e" strokeWidth="1" />
-        <line x1="39.4" y1="27.6" x2="40.8" y2="27.2" stroke="#31415e" strokeWidth="1" />
-        {/* 眼睛（对准镜片中心） */}
-        <circle cx="27.8" cy="28.1" r="1.15" fill="#1f2733" />
-        <circle cx="36.2" cy="28.1" r="1.15" fill="#1f2733" />
-        {/* 自信浅笑 */}
+        {/* 眉毛：更有型 */}
+        <path d="M25.4 24 Q28.4 22.5 31 23.9" stroke="#1a1a2e" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+        <path d="M33 23.9 Q35.6 22.5 38.6 24" stroke="#1a1a2e" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+        {/* 细方框眼镜（透明镜片） */}
+        <rect x="24.4" y="25.8" width="6.6" height="4.6" rx="1" fill="#ffffff" fillOpacity="0.3" stroke="#2a3f5f" strokeWidth="1.1" />
+        <rect x="33" y="25.8" width="6.6" height="4.6" rx="1" fill="#ffffff" fillOpacity="0.3" stroke="#2a3f5f" strokeWidth="1.1" />
+        <line x1="31" y1="28.1" x2="33" y2="28.1" stroke="#2a3f5f" strokeWidth="1.1" />
+        <line x1="24.4" y1="27.6" x2="23" y2="27.2" stroke="#2a3f5f" strokeWidth="0.9" />
+        <line x1="39.6" y1="27.6" x2="41" y2="27.2" stroke="#2a3f5f" strokeWidth="0.9" />
+        {/* 深邃眼眸：多层渐变，更有神 */}
+        <circle cx="27.7" cy="28.1" r="1.6" fill="#ffffff" />
+        <circle cx="36.3" cy="28.1" r="1.6" fill="#ffffff" />
+        <circle cx="27.7" cy="28.1" r="1.3" fill="#1a2942" />
+        <circle cx="36.3" cy="28.1" r="1.3" fill="#1a2942" />
+        <circle cx="27.7" cy="28.1" r="0.9" fill="#0d1520" />
+        <circle cx="36.3" cy="28.1" r="0.9" fill="#0d1520" />
+        {/* 眼神光 */}
+        <circle cx="28.2" cy="27.6" r="0.5" fill="#ffffff" opacity="0.8" />
+        <circle cx="36.8" cy="27.6" r="0.5" fill="#ffffff" opacity="0.8" />
+        {/* 自信微笑 */}
         <path d="M29.4 35 Q32 37.2 34.6 35" stroke="#c2784a" strokeWidth="1.4" strokeLinecap="round" fill="none" />
         {/* 数据点缀 */}
         <circle cx="11.5" cy="16" r="1.6" fill="#dbeafe" />

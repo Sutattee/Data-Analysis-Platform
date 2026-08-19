@@ -148,7 +148,6 @@ export function EventFormDrawer({
     const newStart = form.startTime.replace("T", " ");
     const newEnd = form.ongoing ? null : form.endTime.replace("T", " ");
     if (a.title !== form.title.trim()) names.push("事件标题");
-    if (a.type !== form.type) names.push("事件类型");
     if (a.startTime !== newStart || (a.endTime ?? null) !== newEnd) names.push("事件时间");
     if (a.objects.join("｜") !== form.objects.join("｜")) names.push("影响对象");
     if (a.metrics.join("｜") !== form.metrics.join("｜")) names.push("影响指标");
@@ -254,20 +253,6 @@ export function EventFormDrawer({
             error={errors.title}
           />
           <p className="mt-1 text-right text-xs text-gray-400">{form.title.length}/100</p>
-        </div>
-
-        {/* 事件类型 */}
-        <div>
-          <label className={labelCls}>
-            事件类型 <span className="text-red-500">*</span>
-          </label>
-          <select className={inputCls} value={form.type} onChange={(e) => set("type", e.target.value as MajorEventType)}>
-            {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
         </div>
 
         {/* 事件时间 */}

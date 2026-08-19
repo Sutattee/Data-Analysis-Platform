@@ -77,9 +77,23 @@ export function TabbedSeriesChart({
             ))}
         </LineChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-gray-400">
-        {hint ?? "蓝色实线为实际值、蓝色虚线为历史均值；黄 / 橙 / 红异常点（一般 / 预警 / 危险）可点击查看详情。展示近 90 天。"}
-      </p>
+      <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 bg-blue-500" /> 实际值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-blue-500" /> 历史均值
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-yellow-400" /> 关注
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-orange-500" /> 告警
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500" /> 危险
+        </span>
+      </div>
     </Card>
   );
 }

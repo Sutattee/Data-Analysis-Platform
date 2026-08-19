@@ -5,6 +5,8 @@ import { QaMessage, DISLIKE_REASONS } from "@/types";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
 import { ResultTable } from "./ResultTable";
+import { CalculationProcess } from "./CalculationProcess";
+import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 
 // 图表类型 → emoji
 const CHART_ICONS: Record<string, string> = {
@@ -58,6 +60,17 @@ export function MessageBubble({
 
   // 思考过程展开
   const [showThinking, setShowThinking] = useState(false);
+
+  // 计算过程弹窗（指标溯源：拓扑图 + 详细解释）
+  const [calcOpen, setCalcOpen] = useState(false);
+  // 用于匹配涉及指标的回答文本（结构化回答时并入查询结果与解读）
+  const calcText = [
+    message.content,
+    message.smartAnswer?.queryResult,
+    message.smartAnswer?.interpretation,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // 点踩弹窗
   const [showDislikeModal, setShowDislikeModal] = useState(false);
@@ -140,7 +153,7 @@ export function MessageBubble({
                   onClick={() => setShowThinking(!showThinking)}
                   className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
                 >
-                  <span className="text-gray-700">💭 已完成思考</span>
+                  <span className="text-gray-700 flex items-center gap-1">{QA_BUBBLE_ICONS.thinking} 已完成思考</span>
                   <span
                     className={`text-gray-400 transition-transform text-xs ${
                       showThinking ? "rotate-180" : ""
@@ -222,7 +235,7 @@ export function MessageBubble({
             {/* 知识来源（知识问答类） */}
             {message.answerType === "knowledge" && message.knowledgeSources && (
               <div className="border border-blue-100 bg-blue-50/50 rounded-lg px-3 py-2.5">
-                <p className="text-xs font-medium text-blue-700 mb-1.5">📚 知识来源</p>
+                <p className="text-xs font-medium text-blue-700 mb-1.5 flex items-center gap-1">{QA_BUBBLE_ICONS.knowledge} 知识来源</p>
                 <div className="space-y-1">
                   {message.knowledgeSources.map((src, i) => (
                     <div key={i} className="text-xs text-blue-600 flex items-start gap-1.5">
@@ -240,17 +253,29 @@ export function MessageBubble({
 
             {/* 评价 + 收藏 */}
             <div className="flex items-center gap-3">
+              {/* 计算过程（指标溯源） */}
+              <button
+                onClick={() => setCalcOpen(true)}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
+                title="查看指标计算过程（溯源链路与详细解释）"
+              >
+                {QA_BUBBLE_ICONS.calculation} 计算过程
+              </button>
+
+              <span className="text-gray-200">|</span>
+
               {/* 收藏 */}
               <button
                 onClick={onToggleFavorite}
-                className={`text-xs ${
+                className={`flex items-center gap-1 text-xs ${
                   isFavorited
                     ? "text-yellow-500"
                     : "text-gray-400 hover:text-yellow-500 active:scale-90"
                 } transition-all duration-200`}
                 title={isFavorited ? "取消收藏" : "收藏"}
               >
-                {isFavorited ? "⭐ 已收藏" : "☆ 收藏"}
+                {isFavorited ? QA_BUBBLE_ICONS.favorite : QA_BUBBLE_ICONS.unfavorite}
+                {isFavorited ? "已收藏" : "收藏"}
               </button>
 
               <span className="text-gray-200">|</span>
@@ -337,7 +362,7 @@ export function MessageBubble({
             {/* 推荐追问 */}
             {message.followUpQuestions && message.followUpQuestions.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs text-gray-400">💡 您还可以继续探索：</p>
+                <p className="text-xs text-gray-400 flex items-center gap-1">{QA_BUBBLE_ICONS.followUp} 您还可以继续探索：</p>
                 <div className="flex flex-wrap gap-1.5">
                   {message.followUpQuestions.map((q, i) => (
                     <button
@@ -367,6 +392,11 @@ export function MessageBubble({
             <div className="whitespace-pre-wrap">{message.content}</div>
           </div>
         )}
+
+        {/* 计算过程弹窗（指标溯源：拓扑图 + 详细解释） */}
+        {!isUser && !isWelcome && (
+          <CalculationProcess open={calcOpen} onClose={() => setCalcOpen(false)} text={calcText} />
+        )}
       </div>
     </div>
   );
@@ -374,7 +404,7 @@ export function MessageBubble({
 
 // ========== 智能问数 4 段结构化回答视图 ==========
 
-function Section({ icon, title, children }: { icon: string; title: string; children: ReactNode }) {
+function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
@@ -399,18 +429,18 @@ function SmartAnswerView({
   return (
     <div className="bg-gray-100 text-gray-800 px-4 py-3.5 rounded-lg rounded-bl-sm space-y-4 min-w-0 overflow-hidden">
       {/* 1. 查询结果 */}
-      <Section icon="🔢" title="查询结果">
+      <Section icon={QA_BUBBLE_ICONS.queryResult} title="查询结果">
         <ResultTable markdown={sa.queryResult} />
       </Section>
 
       {/* 2. 基础数据解读 */}
-      <Section icon="📊" title="基础数据解读">
+      <Section icon={QA_BUBBLE_ICONS.dataInterpret} title="基础数据解读">
         <p className="text-sm text-gray-700 leading-relaxed">{sa.interpretation}</p>
       </Section>
 
       {/* 3. 推荐图表 */}
       {message.chartMeta && chartType && (
-        <Section icon="📈" title="推荐图表">
+        <Section icon={QA_BUBBLE_ICONS.chartRecommend} title="推荐图表">
           {sa.chartReason && (
             <p className="text-xs text-gray-500 leading-relaxed">{sa.chartReason}</p>
           )}

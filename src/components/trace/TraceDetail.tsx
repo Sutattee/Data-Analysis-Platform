@@ -53,17 +53,17 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
             {/* 指标概览 */}
             <Grid
               items={[
-                { label: "业务域", value: metric.domain },
+                // 统计对象：指标列表（定义溯源）展示全部，历史记录/计算过程展示当次
+                { label: "统计对象", value: d.statObjects ?? d.statObject },
                 { label: "当次结果", value: d.overview?.result },
                 // 标准指标列表（定义溯源，showValues===false）不展示统计周期、数据截至时间
                 ...(showValues !== false
                   ? [{ label: "统计周期", value: d.overview?.period }]
                   : []),
-                { label: "统计范围", value: d.overview?.scope },
+                { label: "更新频率", value: d.updateFreq },
                 ...(showValues !== false
                   ? [{ label: "数据截至时间", value: d.overview?.dataAsOf }]
                   : []),
-                { label: "评价周期", value: d.overview?.evalCycle },
               ]}
             />
 
@@ -139,9 +139,9 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
               <Grid
                 items={[
                   { label: "指标编码", value: metric.code },
-                  { label: "评价周期", value: d.overview?.evalCycle ?? d.period },
-                  { label: "支持组织维度", value: "企业、工厂、车间" },
-                  { label: "统计范围", value: "当前用户有权访问的企业组织范围" },
+                  // 统计对象：指标列表（定义溯源）展示全部
+                  { label: "统计对象", value: d.statObjects ?? d.statObject },
+                  { label: "更新频率", value: d.updateFreq },
                 ]}
               />
             ) : (
@@ -150,7 +150,9 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
                   { label: "当次结果", value: d.value ? `${d.value}${d.unit ?? ""}` : undefined },
                   { label: "指标编码", value: metric.code },
                   { label: "时间范围", value: d.context?.timeRange },
-                  { label: "统计范围", value: d.context?.orgScope },
+                  // 统计对象：历史记录/计算过程展示当次统计对象
+                  { label: "统计对象", value: d.statObject ?? d.statObjects },
+                  { label: "更新频率", value: d.updateFreq },
                   { label: "数据截至时间", value: d.context?.dataAsOf },
                   { label: "计算时间", value: d.context?.calcTime },
                 ]}

@@ -15,7 +15,7 @@ interface ReplayInit {
   metricKey?: string;
 }
 
-// 情景预测：条件配置 → 模型测算 → 核心结果与图表 → 三段式结构化结论
+// 模拟测算：条件配置 → 模型测算 → 核心结果与图表 → 三段式结构化结论
 export default function ScenarioForecastPage() {
   const toast = useToast();
   const [running, setRunning] = useState(false);
@@ -43,7 +43,6 @@ export default function ScenarioForecastPage() {
     try {
       const r = await runForecast(input);
       setResult(r);
-      toast("预测完成", "success");
     } catch {
       toast("预测失败，请稍后重试", "danger");
     } finally {
@@ -54,7 +53,7 @@ export default function ScenarioForecastPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">情景预测</h1>
+        <h1 className="text-xl font-bold text-gray-900">模拟测算</h1>
       </div>
 
       <ConditionForm key={formKey} onRun={handleRun} running={running} initial={replay} onInvalidate={() => setResult(null)} />

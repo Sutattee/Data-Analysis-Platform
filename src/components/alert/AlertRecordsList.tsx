@@ -6,14 +6,11 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { Spinner } from "@/components/ui/Spinner";
-import { AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
-import { AlertStatusModal } from "@/components/alert/AlertStatusModal";
+import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
-import { useApp } from "@/lib/store/AppContext";
 import {
   ALERT_RECORDS,
   ALERT_LEVELS,
-  ALERT_STATUSES,
   sortAlerts,
   orgPathOf,
   EMPTY_ORG_FILTER,
@@ -28,7 +25,6 @@ interface AlertFilter {
   type: string;
   level: string;
   domain: string;
-  status: string;
   dateFrom: string;
   dateTo: string;
 }
@@ -37,48 +33,32 @@ const EMPTY_FILTER: AlertFilter = {
   keyword: "",
   type: "",
   level: "",
-  domain: "能耗管理",
-  status: "",
+  domain: "能源消耗",
   dateFrom: "",
   dateTo: "",
 };
 
 // 业务域筛选选项
-const BIZ_DOMAINS = ["能耗管理", "碳排放与环保合规"];
+const BIZ_DOMAINS = ["生产管理", "工艺质量", "能源消耗"];
 
 const selectCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
 const dateCls = selectCls;
 
-function formatNow(): string {
-  const d = new Date();
-  const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 type Phase = "loading" | "success" | "error";
 type SortMode = "default" | "time_desc" | "time_asc";
-type ModalState = { mode: "mark" | "unmark"; id: string } | null;
 
 export function AlertRecordsList() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { state } = useApp();
-  const currentUser = state.user?.nickname || state.user?.username || "当前用户";
 
-  // 仅展示能源消耗管理（能耗管理）方向的告警记录：每个等级各取 2 条（共 10 条，覆盖全部等级），按等级+时间排序
-  const [records, setRecords] = useState<AlertRecord[]>(() => {
-    const current = ALERT_RECORDS.filter((r) => r.type === "当前异常");
-    const picked = ALERT_LEVELS.flatMap((lv) =>
-      current.filter((r) => r.level === lv).slice(0, 2).map((r) => ({ ...r }))
-    );
-    return sortAlerts(picked);
-  });
+  // 全量告警记录（当前异常 + 预测风险均展示），业务域/等级等筛选在 sorted 中进行
+  const [records, setRecords] = useState<AlertRecord[]>(() => ALERT_RECORDS.map((r) => ({ ...r })));
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/domain/date）
-  // 支持 URL ?domain= 预筛选业务域（carbon-eval 异常「查看告警记录」跳转用）
+  // 支持 URL ?domain= 预筛选业务域（网格监测「告警记录」跳转用）；非法值回退默认
   const [applied, setApplied] = useState<AlertFilter>(() => {
     const d = searchParams.get("domain");
-    return d ? { ...EMPTY_FILTER, domain: d } : EMPTY_FILTER;
+    return d ? { ...EMPTY_FILTER, domain: BIZ_DOMAINS.includes(d) ? d : EMPTY_FILTER.domain } : EMPTY_FILTER;
   });
   // 支持 URL ?object= 预筛选（仪表盘异常点击跳转），映射为组织级联筛选
   const [orgFilter, setOrgFilter] = useState<OrgFilter>(() => {
@@ -94,7 +74,6 @@ export function AlertRecordsList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortMode, setSortMode] = useState<SortMode>("default");
-  const [modal, setModal] = useState<ModalState>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function runLoad() {
@@ -145,14 +124,17 @@ export function AlertRecordsList() {
         matchKeyword(r, applied.keyword) &&
         (!applied.level || r.level === applied.level) &&
         (!applied.domain || r.domain === applied.domain) &&
-        (!applied.status || r.status === applied.status) &&
         matchDate(r, applied.dateFrom, applied.dateTo) &&
         matchOrgName(r.objectName)
     );
-    if (sortMode === "time_desc") return [...filtered].sort((a, b) => b.triggerTime.localeCompare(a.triggerTime));
-    if (sortMode === "time_asc") return [...filtered].sort((a, b) => a.triggerTime.localeCompare(b.triggerTime));
+    // 未选等级时每个等级最多取 2 条：默认恰好 10 条且覆盖全部 5 个等级（切换业务域亦然）
+    const capped = applied.level
+      ? filtered
+      : ALERT_LEVELS.flatMap((lv) => filtered.filter((r) => r.level === lv).slice(0, 2));
+    if (sortMode === "time_desc") return [...capped].sort((a, b) => b.triggerTime.localeCompare(a.triggerTime));
+    if (sortMode === "time_asc") return [...capped].sort((a, b) => a.triggerTime.localeCompare(b.triggerTime));
     // 默认：按等级（高→低）+ 告警时间（新→旧）排序
-    return sortAlerts(filtered);
+    return sortAlerts(capped);
   }, [records, applied, sortMode, orgFilter]);
 
   const total = sorted.length;
@@ -185,28 +167,13 @@ export function AlertRecordsList() {
   }
 
   // 表头筛选：即时应用
-  function applyColumnFilter(key: "level" | "status", v: string) {
+  function applyColumnFilter(key: "level", v: string) {
     setApplied((prev) => ({ ...prev, [key]: v }));
     setPage(1);
   }
 
   function toggleTimeSort() {
     setSortMode((m) => (m === "default" ? "time_desc" : m === "time_desc" ? "time_asc" : "default"));
-  }
-
-  function handleConfirm(note?: string) {
-    if (!modal) return;
-    const id = modal.id;
-    setRecords((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        if (modal.mode === "mark") {
-          return { ...r, status: "已处理", handleNote: note || undefined, handledAt: formatNow(), handledBy: currentUser };
-        }
-        return { ...r, status: "未处理", handleNote: undefined, handledAt: undefined, handledBy: undefined };
-      })
-    );
-    setModal(null);
   }
 
   return (
@@ -297,12 +264,6 @@ export function AlertRecordsList() {
                       <span className="text-gray-400">{sortMode === "time_desc" ? "↓" : sortMode === "time_asc" ? "↑" : "↕"}</span>
                     </span>
                   </th>
-                  <th className="text-left px-4 py-3">
-                    <span className="inline-flex items-center gap-0.5">
-                      处理状态
-                      <ColumnFilter options={ALERT_STATUSES} value={applied.status} onChange={(v) => applyColumnFilter("status", v)} />
-                    </span>
-                  </th>
                   <th className="text-right px-4 py-3 sticky right-0 bg-gray-50 z-10">操作</th>
                 </tr>
               </thead>
@@ -315,22 +276,10 @@ export function AlertRecordsList() {
                     <td className="px-4 py-3 text-gray-600">{r.objectName}</td>
                     <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>
-                    <td className="px-4 py-3"><AlertStatusText status={r.status} /></td>
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`/alert/records/${r.id}`)}>
-                          查看
-                        </Button>
-                        {r.status === "未处理" ? (
-                          <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setModal({ mode: "mark", id: r.id })}>
-                            已处理
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100" onClick={() => setModal({ mode: "unmark", id: r.id })}>
-                            误处理
-                          </Button>
-                        )}
-                      </div>
+                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`/alert/records/${r.id}`)}>
+                        查看
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -358,13 +307,6 @@ export function AlertRecordsList() {
           <Button onClick={() => router.back()}>返回</Button>
         </div>
       )}
-
-      <AlertStatusModal
-        open={modal !== null}
-        mode={modal?.mode ?? "mark"}
-        onClose={() => setModal(null)}
-        onConfirm={handleConfirm}
-      />
     </div>
   );
 }
