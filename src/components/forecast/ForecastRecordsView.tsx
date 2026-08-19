@@ -37,7 +37,9 @@ export function ForecastRecordsView() {
   const toast = useToast();
   const opts = useMemo(() => recordFilterOptions(), []);
   const [fType, setFType] = useState("");
-  const [fMetric, setFMetric] = useState("");
+  // 预测指标：关键词搜索（输入框草稿值 + 点击「查询」后生效的关键词）
+  const [metricInput, setMetricInput] = useState("");
+  const [fMetricKw, setFMetricKw] = useState("");
   const [fObject, setFObject] = useState("");
   const [detail, setDetail] = useState<ForecastRecord | null>(null);
   const [page, setPage] = useState(1);
@@ -56,10 +58,10 @@ export function ForecastRecordsView() {
     return FORECAST_RECORDS.filter(
       (r) =>
         (!fType || r.type === fType) &&
-        (!fMetric || r.metricName === fMetric) &&
+        (!fMetricKw || r.metricName.includes(fMetricKw)) &&
         (!fObject || r.object === fObject)
     );
-  }, [fType, fMetric, fObject]);
+  }, [fType, fMetricKw, fObject]);
 
   const totalPages = Math.max(1, Math.ceil(records.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -68,6 +70,17 @@ export function ForecastRecordsView() {
   function applyFilter(setter: (v: string) => void, v: string) {
     setter(v);
     setPage(1);
+  }
+
+  // 查询：按输入关键词筛选预测指标（回车同样触发）
+  function searchMetric() {
+    applyFilter(setFMetricKw, metricInput.trim());
+  }
+
+  // 重置：清空输入框与已生效的指标关键词
+  function resetMetric() {
+    setMetricInput("");
+    applyFilter(setFMetricKw, "");
   }
 
   // 按原条件再次预测：恢复类型与指标，跳转模拟测算（重挂载 ConditionForm）
@@ -98,12 +111,19 @@ export function ForecastRecordsView() {
               <option key={t}>{t}</option>
             ))}
           </select>
-          <select className={selectCls} value={fMetric} onChange={(e) => applyFilter(setFMetric, e.target.value)}>
-            <option value="">全部预测指标</option>
-            {opts.metrics.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
+          {/* 预测指标：关键词搜索框 + 查询 / 重置按钮 */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              className={`${selectCls} w-56`}
+              placeholder="搜索预测指标"
+              value={metricInput}
+              onChange={(e) => setMetricInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchMetric()}
+            />
+            <Button size="sm" onClick={searchMetric}>查询</Button>
+            <Button variant="secondary" size="sm" onClick={resetMetric}>重置</Button>
+          </div>
           <select className={selectCls} value={fObject} onChange={(e) => applyFilter(setFObject, e.target.value)}>
             <option value="">全部预测对象</option>
             {opts.objects.map((o) => (

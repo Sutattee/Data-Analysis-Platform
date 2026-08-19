@@ -19,7 +19,7 @@ export interface HistPoint {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const round = (v: number, decimals: number) => {
+export const round = (v: number, decimals: number) => {
   const f = Math.pow(10, decimals);
   return Math.round(v * f) / f;
 };
@@ -104,7 +104,7 @@ export type SeriesKey =
   | "electricity" // 单箱电耗（月 + 日）
   | "carbon" // 单位产值碳排放（月）
   | "silkPower" // 制丝车间每公斤电耗（日）
-  | "packPower" // 卷包车间单箱（万只）电耗（日）
+  | "packPower" // 卷包车间单箱电耗（日，支持万支口径切换）
   | "steamTotal" // 蒸汽耗总量（日）
   | "steamSilk" // 制丝车间单位产量蒸汽耗（日）
   | "steamHvac" // 空调系统每日蒸汽耗（日）
@@ -274,7 +274,7 @@ export const SERIES_META: Record<SeriesKey, SeriesMeta> = {
     suggestion: "按批次联动启停除尘与纯水系统，评估风机变频改造与运行联锁策略。",
   },
   packPower: {
-    label: "卷包车间单箱（万只）电耗", unit: "kWh/箱", dept: "卷包车间",
+    label: "卷包车间单箱电耗", unit: "kWh/箱", dept: "卷包车间",
     summary: "排产减少和设备空转",
     reasons: [
       "卷包排产减少2个班次，机台固定待机能耗未同步下降，影响程度高、可信度高",
@@ -345,9 +345,13 @@ export const SERIES_META: Record<SeriesKey, SeriesMeta> = {
   },
 };
 
-// 图表异常点 → 抽屉详情
-export function buildOverviewAnomaly(key: SeriesKey, pt: HistPoint): AnomalyDetail {
-  const meta = SERIES_META[key];
+// 图表异常点 → 抽屉详情（metaOverride：覆盖标题/单位口径，如卷包电耗切换「万支」展示）
+export function buildOverviewAnomaly(
+  key: SeriesKey,
+  pt: HistPoint,
+  metaOverride?: Partial<Pick<SeriesMeta, "label" | "unit">>
+): AnomalyDetail {
+  const meta = { ...SERIES_META[key], ...metaOverride };
   const grade = pt.anomaly ?? "一般";
   const baseVal = pt.target ?? pt.avg ?? pt.actual;
   const value = `${pt.actual} ${meta.unit}`;

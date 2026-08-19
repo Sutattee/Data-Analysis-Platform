@@ -61,7 +61,7 @@ const EMPTY: FormData = {
   level: "预警",
   detectCycle: "每小时",
   notifyTemplate: defaultNotifyTemplate(),
-  notifyMethods: [],
+  notifyMethods: [...NOTIFY_METHOD_OPTIONS], // 通知方式默认选中（当前可选项：邮件）
   receivers: [],
   repeatAlert: false,
   repeatCount: 3,

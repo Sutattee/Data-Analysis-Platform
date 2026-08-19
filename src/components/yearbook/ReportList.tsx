@@ -31,7 +31,9 @@ export function ReportList() {
   const [reports, setReports] = useState<YearbookReport[]>(() => listReports());
   const [view, setView] = useState<ViewMode>("list");
   const [year, setYear] = useState("");
+  // 报告名称：搜索框草稿值 + 点击「查询」后生效的关键词
   const [keyword, setKeyword] = useState("");
+  const [keywordApplied, setKeywordApplied] = useState("");
   const [phase, setPhase] = useState<Phase>("loading");
   const [reportOpen, setReportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<YearbookReport | null>(null);
@@ -52,7 +54,7 @@ export function ReportList() {
 
   // 年度倒序 + 更新时间（无则生成时间）倒序
   const sorted = useMemo(() => {
-    const k = keyword.trim().toLowerCase();
+    const k = keywordApplied.trim().toLowerCase();
     return reports
       .filter((r) => (!year || String(r.year) === year) && (!k || r.name.toLowerCase().includes(k)))
       .sort(
@@ -60,7 +62,18 @@ export function ReportList() {
           b.year - a.year ||
           (b.updatedAt ?? b.generatedAt).localeCompare(a.updatedAt ?? a.generatedAt)
       );
-  }, [reports, year, keyword]);
+  }, [reports, year, keywordApplied]);
+
+  // 查询：按输入关键词筛选报告名称（回车同样触发）
+  function searchReport() {
+    setKeywordApplied(keyword.trim());
+  }
+
+  // 重置：清空输入框与已生效的关键词
+  function resetSearch() {
+    setKeyword("");
+    setKeywordApplied("");
+  }
 
   const yearOptions = useMemo(
     () => Array.from(new Set(reports.map((r) => r.year))).sort((a, b) => b - a),
@@ -97,14 +110,18 @@ export function ReportList() {
                 ))}
               </select>
             </div>
+            {/* 报告名称：关键词搜索框 + 查询 / 重置按钮 */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-500">报告名称</span>
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchReport()}
                 placeholder="搜索报告名称"
                 className="w-56 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
               />
+              <Button size="sm" onClick={searchReport}>查询</Button>
+              <Button size="sm" variant="secondary" onClick={resetSearch}>重置</Button>
             </div>
           </div>
 
@@ -143,9 +160,9 @@ export function ReportList() {
       {phase === "success" && sorted.length === 0 && (
         <Card padding={false}>
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-            <span className="text-4xl mb-3">{keyword || year ? "🔍" : "📚"}</span>
-            <p className="text-sm text-gray-500">{keyword || year ? "无筛选结果" : "暂无年度报告"}</p>
-            {isAdmin && !keyword && !year && (
+            <span className="text-4xl mb-3">{keywordApplied || year ? "🔍" : "📚"}</span>
+            <p className="text-sm text-gray-500">{keywordApplied || year ? "无筛选结果" : "暂无年度报告"}</p>
+            {isAdmin && !keywordApplied && !year && (
               <Button className="mt-3" onClick={() => setReportOpen(true)}>生成年度报告</Button>
             )}
           </div>

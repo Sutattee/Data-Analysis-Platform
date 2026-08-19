@@ -83,10 +83,10 @@ export function ChatPanel({
   const [selectedSkillTag, setSelectedSkillTag] = useState<{ id: string; name: string } | null>(null);
   const [selectedModel, setSelectedModel] = useState("deepseek");
 
-  // ----- 弹窗 -----
-  const [showModelModal, setShowModelModal] = useState(false);
-  const [showKbModal, setShowKbModal] = useState(false);
-  const [showSkillModal, setShowSkillModal] = useState(false);
+  // ----- 弹窗 / 下拉菜单 -----
+  // 选择器下拉菜单（无遮罩层）：null 关闭；"model" 数据范围；"kb" 知识库；"skill" 技能
+  const [openMenu, setOpenMenu] = useState<"model" | "kb" | "skill" | null>(null);
+  const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [showModelSwitch, setShowModelSwitch] = useState(false);
 
   // ----- Toast -----
@@ -106,6 +106,17 @@ export function ChatPanel({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // ----- 下拉菜单：点击按钮与菜单以外的区域时关闭 -----
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const el = menuRefs.current[openMenu];
+      if (el && !el.contains(e.target as Node)) setOpenMenu(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [openMenu]);
 
   // ----- 拖拽事件 -----
   useEffect(() => {
@@ -242,33 +253,17 @@ export function ChatPanel({
         : `已选 ${selectedKbs.length} 个`;
   const currentModelName = MODELS.find((m) => m.id === selectedModel)?.name || "DeepSeek-V4";
 
-  // ----- 技能搜索 -----
-  const [skillSearch, setSkillSearch] = useState("");
-  const filteredSkills = skillSearch
-    ? skillList.filter(
-        (s) =>
-          s.name.toLowerCase().includes(skillSearch.toLowerCase()) ||
-          s.description.toLowerCase().includes(skillSearch.toLowerCase())
-      )
-    : skillList;
 
-  // ========== 选择弹窗渲染 ==========
-  const renderCheckboxModal = (
-    open: boolean,
-    onClose: () => void,
-    title: string,
+  // ========== 下拉菜单内容渲染（多选列表：全部 + 各选项） ==========
+  const renderCheckboxList = (
     items: { id: string; name: string; subtitle?: string }[],
     selected: string[],
-    setSelected: (ids: string[]) => void,
-    selectAllLabel = "全部"
+    setSelected: (ids: string[]) => void
   ) => {
     const allSelected = selected.length === items.length;
     return (
-    <Modal open={open} onClose={onClose} title={title}>
-      <div className="space-y-2 max-h-80 overflow-auto">
-        <label
-          className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-        >
+      <>
+        <label className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer">
           <input
             type="checkbox"
             checked={allSelected}
@@ -294,56 +289,131 @@ export function ChatPanel({
               }}
               className="w-4 h-4 text-primary-600 rounded"
             />
-            <div>
+            <div className="min-w-0">
               <div className="text-sm text-gray-800">{item.name}</div>
               {item.subtitle && <div className="text-xs text-gray-400">{item.subtitle}</div>}
             </div>
           </label>
         ))}
-      </div>
-    </Modal>
+      </>
     );
   };
 
-  // ========== 选择器条 ==========
+  // 数据范围菜单选项（含案例数据预设项）与勾选联动逻辑
+  const modelMenuItems = [
+    { id: "__demo_preset__", name: "卷烟厂案例数据", subtitle: "Demo 案例数据（含卷接工单/包装工单/制丝批次3张表）" },
+    ...allTables.map((t) => ({ id: t.id, name: t.name, subtitle: t.domain })),
+  ];
+  const modelMenuSelected = demoTables.every((d) => selectedModels.includes(d))
+    ? [...selectedModels, "__demo_preset__"]
+    : selectedModels;
+  const handleModelMenuChange = (ids: string[]) => {
+    // 处理案例数据预设：勾选则连带勾选3张 demo 表，取消则连带取消
+    const hasDemo = ids.includes("__demo_preset__");
+    let next = ids.filter((id) => id !== "__demo_preset__");
+    if (hasDemo) {
+      const missing = demoTables.filter((d) => !next.includes(d));
+      next = [...next, ...missing];
+    } else {
+      next = next.filter((id) => !demoTables.includes(id));
+    }
+    setSelectedModels(next);
+  };
+
+  // ========== 选择器条（数据范围 / 知识库：下拉菜单在按钮上方弹出，无遮罩层） ==========
   const SelectorBar = () => (
     <div className="flex items-center gap-2 flex-wrap">
-      <button
-        onClick={() => setShowModelModal(true)}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
-          selectedModels.length > 0
-            ? "bg-primary-50 text-primary-600 border-primary-200"
-            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
-        }`}
-      >
-        {QA_TOOLBAR_ICONS.model} {modelLabel} ▾
-      </button>
-      <button
-        onClick={() => setShowKbModal(true)}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
-          selectedKbs.length > 0
-            ? "bg-blue-50 text-blue-600 border-blue-200"
-            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
-        }`}
-      >
-        {QA_TOOLBAR_ICONS.knowledge} {kbLabel} ▾
-      </button>
+      {/* 选择数据范围 */}
+      <div className="relative" ref={(el) => { menuRefs.current.model = el; }}>
+        <button
+          onClick={() => setOpenMenu(openMenu === "model" ? null : "model")}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            selectedModels.length > 0
+              ? "bg-primary-50 text-primary-600 border-primary-200"
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
+          }`}
+        >
+          {QA_TOOLBAR_ICONS.model} {modelLabel} ▾
+        </button>
+        {openMenu === "model" && (
+          <div className="absolute bottom-full left-0 z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+            <div className="border-b border-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">选择数据范围</div>
+            <div className="mt-1 max-h-64 space-y-0.5 overflow-auto">
+              {renderCheckboxList(modelMenuItems, modelMenuSelected, handleModelMenuChange)}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* 选择知识库 */}
+      <div className="relative" ref={(el) => { menuRefs.current.kb = el; }}>
+        <button
+          onClick={() => setOpenMenu(openMenu === "kb" ? null : "kb")}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            selectedKbs.length > 0
+              ? "bg-blue-50 text-blue-600 border-blue-200"
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
+          }`}
+        >
+          {QA_TOOLBAR_ICONS.knowledge} {kbLabel} ▾
+        </button>
+        {openMenu === "kb" && (
+          <div className="absolute bottom-full left-0 z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+            <div className="border-b border-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">选择业务知识库</div>
+            <div className="mt-1 max-h-64 space-y-0.5 overflow-auto">
+              {renderCheckboxList(
+                knowledgeBases.map((k) => ({ id: k.id, name: k.name, subtitle: k.category })),
+                selectedKbs,
+                setSelectedKbs
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 
-  // ========== 底部工具条：技能 + 模型 ==========
+  // ========== 底部工具条：技能（下拉菜单在按钮下方弹出，无遮罩层） + 模型 ==========
   const ToolBar = () => (
     <div className="flex items-center gap-2 flex-wrap">
-      <button
-        onClick={() => { setShowSkillModal(true); setSkillSearch(""); }}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
-          selectedSkillTag
-            ? "bg-green-50 text-green-600 border-green-200"
-            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
-        }`}
-      >
-        {QA_TOOLBAR_ICONS.skill} {selectedSkillTag ? "技能" : "选择技能"}
-      </button>
+      <div className="relative" ref={(el) => { menuRefs.current.skill = el; }}>
+        <button
+          onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+            selectedSkillTag
+              ? "bg-green-50 text-green-600 border-green-200"
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
+          }`}
+        >
+          {QA_TOOLBAR_ICONS.skill} {selectedSkillTag ? "技能" : "选择技能"}
+        </button>
+        {openMenu === "skill" && (
+          <div className="absolute left-0 top-full z-30 mt-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+            <div className="max-h-64 space-y-1 overflow-auto">
+              {skillList.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">暂无可用技能</p>
+              ) : (
+                skillList.map((skill) => (
+                  <button
+                    key={skill.id}
+                    onClick={() => {
+                      setSelectedSkillTag({ id: skill.id, name: skill.name });
+                      setOpenMenu(null);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                      selectedSkillTag?.id === skill.id
+                        ? "border-green-400 bg-green-50"
+                        : "border-gray-100 hover:border-gray-300 active:scale-[0.99]"
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-800">{skill.name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{skill.description}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       <button
         onClick={() => setShowModelSwitch(true)}
         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
@@ -423,77 +493,6 @@ export function ChatPanel({
           {toast}
         </div>
       )}
-
-      {/* 弹窗 */}
-      {renderCheckboxModal(
-        showModelModal,
-        () => setShowModelModal(false),
-        "选择数据范围",
-        [
-          { id: "__demo_preset__", name: "卷烟厂案例数据", subtitle: "Demo 案例数据（含卷接工单/包装工单/制丝批次3张表）" },
-          ...allTables.map((t) => ({ id: t.id, name: t.name, subtitle: t.domain })),
-        ],
-        [...selectedModels, ...(selectedModels.some((m) => demoTables.every((d) => selectedModels.includes(d))) ? ["__demo_preset__"] : [])],
-        (ids) => {
-          // 处理案例数据预设：勾选则连带勾选3张 demo 表，取消则连带取消
-          const hasDemo = ids.includes("__demo_preset__");
-          let next = ids.filter((id) => id !== "__demo_preset__");
-          if (hasDemo) {
-            const missing = demoTables.filter((d) => !next.includes(d));
-            next = [...next, ...missing];
-          } else {
-            next = next.filter((id) => !demoTables.includes(id));
-          }
-          setSelectedModels(next);
-        },
-        "全部"
-      )}
-      {renderCheckboxModal(
-        showKbModal,
-        () => setShowKbModal(false),
-        "选择业务知识库",
-        knowledgeBases.map((k) => ({ id: k.id, name: k.name, subtitle: k.category })),
-        selectedKbs,
-        setSelectedKbs,
-        "全部"
-      )}
-
-      {/* 技能弹窗：单选 + 搜索 */}
-      <Modal open={showSkillModal} onClose={() => setShowSkillModal(false)} title="选择AI技能" size="md">
-        <div className="space-y-3">
-          {/* 搜索 */}
-          <input
-            type="text"
-            value={skillSearch}
-            onChange={(e) => setSkillSearch(e.target.value)}
-            placeholder="搜索技能关键词..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <div className="space-y-1 max-h-72 overflow-auto">
-            {filteredSkills.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">无匹配技能</p>
-            ) : (
-              filteredSkills.map((skill) => (
-                <button
-                  key={skill.id}
-                  onClick={() => {
-                    setSelectedSkillTag({ id: skill.id, name: skill.name });
-                    setShowSkillModal(false);
-                  }}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                    selectedSkillTag?.id === skill.id
-                      ? "border-green-400 bg-green-50"
-                      : "border-gray-100 hover:border-gray-300 active:scale-[0.99]"
-                  }`}
-                >
-                  <div className="text-sm font-medium text-gray-800">{skill.name}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{skill.description}</div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </Modal>
 
       {/* 模型切换弹窗 */}
       <Modal

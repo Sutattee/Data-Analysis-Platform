@@ -3,7 +3,7 @@
 import { TabbedSeriesChart } from "./TabbedSeriesChart";
 import type { AnomalyDetail } from "@/lib/mock-data/grid-forecast";
 
-// 车间单位电耗趋势：制丝每公斤电耗 / 卷包单箱（万只）电耗，按天展示
+// 车间单位电耗趋势：制丝每公斤电耗 / 卷包单箱电耗（支持万支口径切换），按天展示
 export function WorkshopElectricityChart({ onAnomaly }: { onAnomaly: (d: AnomalyDetail) => void }) {
   return (
     <TabbedSeriesChart

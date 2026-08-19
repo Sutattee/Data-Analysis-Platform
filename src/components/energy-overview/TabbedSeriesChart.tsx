@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from "@/components/ui/Card";
 import { SegmentedControl } from "./SegmentedControl";
 import { GRADE_STYLE, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
-import { DAILY_SERIES, SERIES_META, buildOverviewAnomaly, lastDays, type SeriesKey } from "@/lib/mock-data/energy-overview";
+import { DAILY_SERIES, SERIES_META, buildOverviewAnomaly, lastDays, round, type SeriesKey } from "@/lib/mock-data/energy-overview";
 
 type DailyKey = Exclude<SeriesKey, "comprehensive" | "electricity" | "carbon">;
 
@@ -24,14 +24,33 @@ export function TabbedSeriesChart({
   hint?: string;
 }) {
   const [active, setActive] = useState<DailyKey>(tabs[0].key);
+  // 卷包电耗单位口径：箱（默认） / 万支（1箱 = 5万支，kWh/万支 = kWh/箱 × 0.2）
+  const [packUnit, setPackUnit] = useState<"箱" | "万支">("箱");
   const meta = SERIES_META[active];
+  const isPack = active === "packPower";
+  const wanZhi = isPack && packUnit === "万支";
+  const displayLabel = isPack ? (wanZhi ? "卷包车间万支电耗" : "卷包车间单箱电耗") : meta.label;
+  const displayUnit = wanZhi ? "kWh/万支" : meta.unit;
 
-  const data = useMemo(() => lastDays(DAILY_SERIES[active], 90), [active]);
+  const data = useMemo(() => {
+    const pts = lastDays(DAILY_SERIES[active], 90);
+    if (!wanZhi) return pts;
+    // 万支口径：实际 / 均值 / 目标同步换算
+    return pts.map((p) => ({
+      ...p,
+      actual: round(p.actual * 0.2, 2),
+      avg: p.avg !== undefined ? round(p.avg * 0.2, 2) : undefined,
+      target: p.target !== undefined ? round(p.target * 0.2, 2) : undefined,
+    }));
+  }, [active, wanZhi]);
 
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    if (pt?.anomaly) onAnomaly(buildOverviewAnomaly(active, pt));
+    if (pt?.anomaly) {
+      // 卷包电耗按当前单位口径生成异常详情（标题 / 单位 / 数值一致）
+      onAnomaly(buildOverviewAnomaly(active, pt, isPack ? { label: displayLabel, unit: displayUnit } : undefined));
+    }
   }
 
   return (
@@ -45,9 +64,33 @@ export function TabbedSeriesChart({
         />
       }
     >
-      <div className="mb-1 text-xs text-gray-500">
-        <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: "#3b82f6" }} />
-        {meta.label}（{meta.unit}）
+      <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-500">
+        <span>
+          <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: "#3b82f6" }} />
+          {displayLabel}（{displayUnit}）
+        </span>
+        {/* 卷包电耗：万支｜箱单位切换（选中项蓝色高亮） */}
+        {isPack && (
+          <span className="flex shrink-0 items-center text-[11px] leading-none">
+            <button
+              type="button"
+              title="按万支展示"
+              onClick={() => setPackUnit("万支")}
+              className={wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+            >
+              万支
+            </button>
+            <span className="mx-0.5 text-gray-300">｜</span>
+            <button
+              type="button"
+              title="按箱展示"
+              onClick={() => setPackUnit("箱")}
+              className={!wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+            >
+              箱
+            </button>
+          </span>
+        )}
       </div>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
