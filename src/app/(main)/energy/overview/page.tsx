@@ -60,7 +60,7 @@ export default function EnergyOverviewPage() {
           <GasConsumptionChart onAnomaly={onAnomaly} />
         </div>
 
-        {/* 单位产值碳排放趋势 */}
+        {/* 单位产量碳排放趋势 */}
         <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
 
         {/* 异常详情抽屉 */}

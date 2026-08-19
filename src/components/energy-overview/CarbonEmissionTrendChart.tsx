@@ -11,10 +11,11 @@ const NAME_MAP: Record<string, string> = { actual: "实际值", target: "目标�
 // 单位产量碳排放趋势：按月展示实际值与目标值，支持箱/万支单位切换
 export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: AnomalyDetail) => void }) {
   const [unitMode, setUnitMode] = useState<"万支" | "箱">("万支");
-  const convertFactor = unitMode === "万支" ? 1000 : 1000 * 0.2; // tCO₂e → kg CO₂，箱=万支×0.2
+  // 序列基准口径即 kg CO₂/万支，箱 = 万支 × 5（1箱 = 5万支）
+  const convertFactor = unitMode === "万支" ? 1 : 5;
   const unitLabel = unitMode === "万支" ? "kg CO₂/万支" : "kg CO₂/箱";
 
-  // 转换数据：tCO₂e → kg CO₂
+  // 转换数据：万支 → 箱 换算
   const data = useMemo(() => {
     return CARBON_MONTHLY.map((d) => ({
       ...d,
@@ -26,7 +27,8 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    if (pt?.anomaly) onAnomaly(buildOverviewAnomaly("carbon", CARBON_MONTHLY.find((d) => d.date === e.activeLabel)!));
+    // 按当前单位口径（万支 / 箱）生成异常详情，数值与单位保持一致
+    if (pt?.anomaly) onAnomaly(buildOverviewAnomaly("carbon", pt, { unit: unitLabel }));
   }
 
   return (
@@ -59,7 +61,7 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
           <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={60} domain={["auto", "auto"]} unit={unitLabel} />
           <Tooltip
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
-            formatter={(v: any, n: any) => [`${Number(v).toFixed(2)} ${unitLabel}`, NAME_MAP[n as string] ?? n]}
+            formatter={(v: any, n: any) => [`${Number(v).toFixed(3)} ${unitLabel}`, NAME_MAP[n as string] ?? n]}
           />
           <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
           <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />

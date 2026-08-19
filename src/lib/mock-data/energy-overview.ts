@@ -1,5 +1,5 @@
 // 能源总览 — 模拟数据（确定性生成：固定锚点，无 Date.now / Math.random）
-// 数据从 2024-01 起至当前；单位：单箱综合能耗 kgce/箱、电耗 kWh/箱、蒸汽 t、天然气 Nm³、碳排放 tCO₂e
+// 数据从 2024-01 起至当前；单位：单箱综合能耗 kgce/箱、电耗 kWh/箱、蒸汽 t、天然气 Nm³、碳排放 kg CO₂（口径 kg CO₂/万支）
 import { GRADE_TO_LEVEL, pickAlertRecordId, type AnomalyDetail, type EvalGrade } from "./grid-forecast";
 
 // ===== 时间锚点（固定，保证刷新稳定）=====
@@ -139,7 +139,7 @@ export const ELECTRICITY_DAILY = genDaily({
   anomalies: [{ offset: 9, grade: "一般" }, { offset: 33, grade: "预警" }, { offset: 58, grade: "一般" }],
 });
 
-// 单位产值碳排放：月度（实际 + 目标 0.035，无均值线）
+// 单位产量碳排放：月度（口径 kg CO₂/万支；实际 + 目标 0.035，无均值线）
 export const CARBON_MONTHLY = genMonthly({
   base: 0.0338, target: 0.035, seed: 11, decimals: 3,
   drift: 0.002, waveAmp: 0.02,
@@ -254,14 +254,14 @@ export const SERIES_META: Record<SeriesKey, SeriesMeta> = {
     suggestion: "检查空压机加卸载压力带宽与管网泄漏，优化机台投运排布与错峰用电。",
   },
   carbon: {
-    label: "单位产值碳排放量", unit: "tCO₂e/万元", dept: "全厂",
-    summary: "外购电力占比上升和产值波动",
+    label: "单位产量碳排放量", unit: "kg CO₂/万支", dept: "全厂",
+    summary: "外购电力占比上升和产量波动",
     reasons: [
       "外购电力占比上升，电网碳排放因子季节性偏高，间接排放增加，影响程度高、可信度高",
-      "当月产值较基准期下降约4%，单位产值分摊排放上升，影响程度中、可信度高",
+      "当月产量较基准期下降约4%，单位产量分摊排放上升，影响程度中、可信度高",
       "天然气锅炉负荷增加，直接排放小幅上升，影响程度低、可信度中",
     ],
-    suggestion: "优化外购电力的绿电采购结构，复核高碳时段负荷安排，跟踪产值与排放的联动口径。",
+    suggestion: "优化外购电力的绿电采购结构，复核高碳时段负荷安排，跟踪产量与排放的联动口径。",
   },
   silkPower: {
     label: "制丝车间每公斤电耗", unit: "kWh/kg", dept: "制丝车间",
@@ -435,12 +435,12 @@ export const overviewCards: OverviewCard[] = [
   },
   {
     key: "carbon", label: "单位产量碳排放量", period: "本季度",
-    value: 0.032, unit: "tCO₂e/万支", decimals: 3,
-    compare: { label: "目标 ≤0.035", text: "低于目标 0.003 tCO₂e/万支", good: true },
+    value: 0.032, unit: "kg CO₂/万支", decimals: 3,
+    compare: { label: "目标 ≤0.035", text: "低于目标 0.003 kg CO₂/万支", good: true },
     yoy: -5.6, mom: -2.1, goodDirection: "down", grade: "优秀",
     unitToggle: {
-      altUnit: "tCO₂e/箱", convertFactor: 5, altDecimals: 4,
-      altCompare: { label: "目标 ≤0.175", text: "低于目标 0.015 tCO₂e/箱", good: true },
+      altUnit: "kg CO₂/箱", convertFactor: 5, altDecimals: 4,
+      altCompare: { label: "目标 ≤0.175", text: "低于目标 0.015 kg CO₂/箱", good: true },
     },
   },
   {
@@ -461,7 +461,7 @@ export const overviewCards: OverviewCard[] = [
 // 碳排放分类卡（按月展示一 / 二 / 三 / 四类碳排放）
 export const carbonBreakdown = {
   period: "本月",
-  unit: "tCO₂e",
+  unit: "kg CO₂",
   items: [
     { label: "第一类碳排放", value: 385.6 },
     { label: "第二类碳排放", value: 1248.3 },
