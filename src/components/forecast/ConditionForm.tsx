@@ -7,10 +7,14 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SegmentedControl } from "@/components/energy-overview/SegmentedControl";
 import { SearchSelect } from "./SearchSelect";
 import { TypeCards } from "./TypeCards";
+import { CustomRangePicker } from "./CustomRangePicker";
 import {
   FORECAST_METRICS,
   CONDITION_DICT,
   HISTORY_RANGE,
+  CUSTOM_RANGE,
+  FUTURE_RANGE_OPTIONS,
+  SCENARIO_RANGE_OPTIONS,
   effectiveTargetOf,
   formatTargetDir,
   reverseItemsOf,
@@ -76,7 +80,8 @@ export function ConditionForm({
   const [targetInput, setTargetInput] = useState(""); // 单值方向的临时测算值
   const [rangeLowerInput, setRangeLowerInput] = useState(""); // 区间方向的临时下限
   const [rangeUpperInput, setRangeUpperInput] = useState(""); // 区间方向的临时上限
-  const [calcRangeState, setCalcRangeState] = useState("明日");
+  const [calcRangeState, setCalcRangeState] = useState("单日");
+  const [customDays, setCustomDays] = useState<number | null>(null); // 自定义范围的预测天数
   const [conds, setConds] = useState<Record<string, string>>({});
   const [compare, setCompare] = useState(false);
   const [reverseItem, setReverseItem] = useState("");
@@ -94,9 +99,27 @@ export function ConditionForm({
   const model = models.find((m) => m.id === modelId) ?? models[0];
   const object =
     metric.objects.includes(objectKey) && objectKey ? objectKey : metric.objects[0];
-  const ranges = metric.ranges.filter((r) => model?.ranges.includes(r));
-  const range = ranges.includes(rangeState) ? rangeState : ranges[0] ?? "明日";
-  const calcRange = ranges.includes(calcRangeState) ? calcRangeState : ranges[0] ?? "明日";
+  // 时间范围选项由指标统计频率决定（切换指标后旧选项不在列表内时回退到首项）
+  // 「自定义」仅日度指标支持（自定义截止日期）
+  const customAllowed = metric.frequency === "日度";
+  const futureOptions = FUTURE_RANGE_OPTIONS[metric.frequency];
+  const scenarioOptions = SCENARIO_RANGE_OPTIONS[metric.frequency];
+  const range =
+    rangeState === CUSTOM_RANGE
+      ? customAllowed
+        ? CUSTOM_RANGE
+        : futureOptions[0]
+      : futureOptions.includes(rangeState)
+        ? rangeState
+        : futureOptions[0];
+  const calcRange =
+    calcRangeState === CUSTOM_RANGE
+      ? customAllowed
+        ? CUSTOM_RANGE
+        : scenarioOptions[0]
+      : scenarioOptions.includes(calcRangeState)
+        ? calcRangeState
+        : scenarioOptions[0];
   const reverseOptions = reverseItemsOf(metric.name);
 
   // 切换指标时重置与旧指标相关的输入
@@ -107,6 +130,9 @@ export function ConditionForm({
     setRangeUpperInput("");
     setReverseItem(reverseItemsOf(metric.name)[0] ?? "");
     setRemainingPlanInput(metric.targetCtx ? String(metric.targetCtx.remainingPlan) : "");
+    // 考核周期按指标配置自动选中（如单位产量碳排放量 → 本季度，单箱综合能耗 → 本年度）
+    setPeriod(metric.assessmentPeriod ?? "本年度");
+    setCustomDays(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric.key]);
 
@@ -119,7 +145,7 @@ export function ConditionForm({
     }
     onInvalidate?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, metricKey, modelId, rangeState, period, calcRangeState, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
+  }, [type, metricKey, modelId, rangeState, period, calcRangeState, customDays, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
 
   // ----- 校验（即时红字）-----
   const condErrors: Record<string, string> = {};
@@ -158,12 +184,19 @@ export function ConditionForm({
       : Number.isNaN(Number(remainingPlanInput)) || Number(remainingPlanInput) <= 0
         ? "请输入大于 0 的数字"
         : undefined;
+  // 自定义范围：选中「自定义」后须完成截止日期 / 周期长度选择
+  const customErr =
+    ((type === "未来值预测" && range === CUSTOM_RANGE) || (type === "条件测算" && calcRange === CUSTOM_RANGE)) &&
+    customDays === null
+      ? "请选择预测截止时间，完成自定义周期"
+      : undefined;
   const hasError =
     Object.keys(condErrors).length > 0 ||
     targetErr !== undefined ||
     rangeLowerErr !== undefined ||
     rangeUpperErr !== undefined ||
     rangeOrderErr !== undefined ||
+    customErr !== undefined ||
     (type === "达标反推" && planErr !== undefined);
 
   // 临时测算值：单值方向 → targetValue；区间方向 → targetLower / targetUpper
@@ -245,11 +278,12 @@ export function ConditionForm({
       metricKey: metric.key,
       object,
       modelId: model.id,
-      ...(type === "未来值预测" ? { range } : {}),
+      ...(type === "未来值预测" ? { range, ...(range === CUSTOM_RANGE ? { customDays: customDays ?? undefined } : {}) } : {}),
       ...(type === "能否达标预测" ? { period, ...tempTargetFields() } : {}),
       ...(type === "条件测算"
         ? {
             calcRange,
+            ...(calcRange === CUSTOM_RANGE ? { customDays: customDays ?? undefined } : {}),
             conditions: Object.fromEntries(
               Object.entries(conds)
                 .filter(([, v]) => v.trim() !== "")
@@ -312,12 +346,20 @@ export function ConditionForm({
 
         {/* 类型专属条件 */}
         {type === "未来值预测" && (
-          <Field label="预测时间范围" required>
+          <Field label="预测时间范围" required error={customErr}>
             <SegmentedControl
-              options={ranges.map((r) => ({ value: r, label: r }))}
+              options={[
+                ...futureOptions.map((r) => ({ value: r, label: r })),
+                ...(customAllowed ? [{ value: CUSTOM_RANGE, label: CUSTOM_RANGE }] : []),
+              ]}
               value={range}
               onChange={setRangeState}
             />
+            {range === CUSTOM_RANGE && (
+              <div className="mt-2">
+                <CustomRangePicker days={customDays} onDaysChange={setCustomDays} />
+              </div>
+            )}
           </Field>
         )}
 
@@ -363,12 +405,20 @@ export function ConditionForm({
 
         {type === "条件测算" && (
           <div className="space-y-4">
-            <Field label="预测时间范围" required>
+            <Field label="预测时间范围" required error={customErr}>
               <SegmentedControl
-                options={ranges.map((r) => ({ value: r, label: r }))}
+                options={[
+                  ...scenarioOptions.map((r) => ({ value: r, label: r })),
+                  ...(customAllowed ? [{ value: CUSTOM_RANGE, label: CUSTOM_RANGE }] : []),
+                ]}
                 value={calcRange}
                 onChange={setCalcRangeState}
               />
+              {calcRange === CUSTOM_RANGE && (
+                <div className="mt-2">
+                  <CustomRangePicker days={customDays} onDaysChange={setCustomDays} />
+                </div>
+              )}
             </Field>
 
             <div>

@@ -50,22 +50,35 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
         {/* ===== 业务视角 ===== */}
         {viewMode === "business" ? (
           <>
-            {/* 指标概览 */}
-            <Grid
-              items={[
-                // 统计对象：指标列表（定义溯源）展示全部，历史记录/计算过程展示当次
-                { label: "统计对象", value: d.statObjects ?? d.statObject },
-                { label: "当次结果", value: d.overview?.result },
-                // 标准指标列表（定义溯源，showValues===false）不展示统计周期、数据截至时间
-                ...(showValues !== false
-                  ? [{ label: "统计周期", value: d.overview?.period }]
-                  : []),
-                { label: "更新频率", value: d.updateFreq },
-                ...(showValues !== false
-                  ? [{ label: "数据截至时间", value: d.overview?.dataAsOf }]
-                  : []),
-              ]}
-            />
+            {/* 业务视角字段区：定义溯源 vs 计算结果溯源 */}
+            {showValues === false ? (
+              /* 业务视角 · 指标定义溯源 */
+              <Grid
+                items={[
+                  { label: "所属业务域", value: metric.domain },
+                  // 适用对象：指标关联的全部统计对象
+                  { label: "适用对象", value: d.statObjects },
+                  { label: "计量单位", value: d.unit },
+                  { label: "统计粒度", value: d.statGranularity },
+                  { label: "支持维度", value: d.supportDimensions },
+                  { label: "数据更新频率", value: d.updateFreq },
+                ]}
+              />
+            ) : (
+              /* 业务视角 · 指标计算结果溯源 */
+              <Grid
+                items={[
+                  // 统计对象：历史记录/计算过程展示当次统计对象
+                  { label: "统计对象", value: d.statObject ?? d.statObjects },
+                  { label: "当次结果", value: d.overview?.result },
+                  { label: "统计周期", value: d.statPeriod ?? d.overview?.period },
+                  { label: "统计维度", value: d.statDimension },
+                  { label: "筛选条件", value: d.statCondition },
+                  { label: "数据截至时间", value: d.overview?.dataAsOf },
+                  { label: "数据更新频率", value: d.updateFreq },
+                ]}
+              />
+            )}
 
             {d.definition && <Row label="业务定义">{d.definition}</Row>}
             {/* 标准指标列表（定义溯源，showValues===false）不展示统计口径 */}
@@ -135,26 +148,36 @@ export function TraceDetail({ metric, viewMode, showValues }: { metric: TraceMet
           /* ===== 技术视角 ===== */
           <>
             {/* 基础信息（定义溯源）/ 结果上下文（结果溯源） */}
+            {/* 技术视角字段区：定义溯源 vs 计算结果溯源 */}
             {showValues === false ? (
+              /* 技术视角 · 指标定义溯源 */
               <Grid
                 items={[
                   { label: "指标编码", value: metric.code },
-                  // 统计对象：指标列表（定义溯源）展示全部
-                  { label: "统计对象", value: d.statObjects ?? d.statObject },
-                  { label: "更新频率", value: d.updateFreq },
+                  { label: "所属业务域", value: metric.domain },
+                  // 适用对象：指标关联的全部统计对象
+                  { label: "适用对象", value: d.statObjects },
+                  { label: "计量单位", value: d.unit },
+                  { label: "统计粒度", value: d.statGranularity },
+                  { label: "支持维度", value: d.supportDimensions },
+                  { label: "数据更新频率", value: d.updateFreq },
                 ]}
               />
             ) : (
+              /* 技术视角 · 指标计算结果溯源 */
               <Grid
                 items={[
-                  { label: "当次结果", value: d.value ? `${d.value}${d.unit ?? ""}` : undefined },
                   { label: "指标编码", value: metric.code },
-                  { label: "时间范围", value: d.context?.timeRange },
                   // 统计对象：历史记录/计算过程展示当次统计对象
                   { label: "统计对象", value: d.statObject ?? d.statObjects },
-                  { label: "更新频率", value: d.updateFreq },
+                  { label: "当次结果", value: d.value ? `${d.value}${d.unit ?? ""}` : undefined },
+                  // 统计周期：展示周期标签（如「2026年7月」），不展示实际取数范围
+                  { label: "统计周期", value: d.statPeriod ?? d.period },
+                  { label: "统计维度", value: d.statDimension },
+                  { label: "筛选条件", value: d.statCondition },
                   { label: "数据截至时间", value: d.context?.dataAsOf },
-                  { label: "计算时间", value: d.context?.calcTime },
+                  { label: "结果计算时间", value: d.context?.calcTime },
+                  { label: "数据更新频率", value: d.updateFreq },
                 ]}
               />
             )}

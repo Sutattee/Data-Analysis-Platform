@@ -253,17 +253,6 @@ export function MessageBubble({
 
             {/* 评价 + 收藏 */}
             <div className="flex items-center gap-3">
-              {/* 计算过程（指标溯源） */}
-              <button
-                onClick={() => setCalcOpen(true)}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
-                title="查看指标计算过程（溯源链路与详细解释）"
-              >
-                {QA_BUBBLE_ICONS.calculation} 计算过程
-              </button>
-
-              <span className="text-gray-200">|</span>
-
               {/* 收藏 */}
               <button
                 onClick={onToggleFavorite}
@@ -304,6 +293,15 @@ export function MessageBubble({
               >
                 <ThumbsDown size={14} />
                 {message.feedback === "dislike" && "已反馈"}
+              </button>
+
+              {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐 */}
+              <button
+                onClick={() => setCalcOpen(true)}
+                className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
+                title="查看指标计算过程（溯源链路与详细解释）"
+              >
+                {QA_BUBBLE_ICONS.calculation} 计算过程
               </button>
             </div>
 

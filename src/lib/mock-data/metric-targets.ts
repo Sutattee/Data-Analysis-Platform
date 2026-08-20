@@ -85,16 +85,16 @@ let targets: MetricTargetVersion[] = [
     remark: "对标行业先进值，四季度起收紧目标",
     changeNote: "对标行业先进水平，自9月起将年度目标由31.0收紧至30.5",
   },
-  // ===== m1 单位产值碳排放量（吨/万元，4 位小数） =====
+  // ===== m1 单位产量碳排放量（kg CO₂/万支，4 位小数） =====
   {
     id: "tv-m1-1",
     version: "V1",
     metricId: "m1",
-    metricName: "单位产值碳排放量",
-    period: "年度",
+    metricName: "单位产量碳排放量",
+    period: "季度",
     direction: "≤",
     value: 0.04,
-    unit: "吨/万元",
+    unit: "kg CO₂/万支",
     effectiveStart: "2025-01-01",
     effectiveEnd: "2025-12-31",
     enabled: true,
@@ -109,11 +109,11 @@ let targets: MetricTargetVersion[] = [
     id: "tv-m1-2",
     version: "V2",
     metricId: "m1",
-    metricName: "单位产值碳排放量",
-    period: "年度",
+    metricName: "单位产量碳排放量",
+    period: "季度",
     direction: "≤",
     value: 0.035,
-    unit: "吨/万元",
+    unit: "kg CO₂/万支",
     effectiveStart: "2026-01-01",
     effectiveEnd: "2026-12-31",
     enabled: true,
@@ -128,12 +128,12 @@ let targets: MetricTargetVersion[] = [
     id: "tv-m1-3",
     version: "V3",
     metricId: "m1",
-    metricName: "单位产值碳排放量",
-    period: "年度",
+    metricName: "单位产量碳排放量",
+    period: "季度",
     direction: "处于目标区间",
     lower: 0.03,
     upper: 0.035,
-    unit: "吨/万元",
+    unit: "kg CO₂/万支",
     effectiveStart: "2026-09-01",
     effectiveEnd: "2026-12-31",
     enabled: true,
@@ -311,7 +311,7 @@ export function disableTarget(
   );
 }
 
-// 目标标准合并展示：单值「≤31.0 公斤标煤/箱」/ 区间「0.03～0.035 吨/万元」
+// 目标标准合并展示：单值「≤31.0 公斤标煤/箱」/ 区间「0.03～0.035 kg CO₂/万支」
 export function formatTargetStandard(t: MetricTargetVersion, decimals = 2): string {
   if (t.direction === "处于目标区间") {
     const lower = (t.lower ?? 0).toFixed(decimals);

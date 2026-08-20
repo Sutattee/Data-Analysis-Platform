@@ -111,6 +111,12 @@ export function ForecastRecordsView() {
               <option key={t}>{t}</option>
             ))}
           </select>
+          <select className={selectCls} value={fObject} onChange={(e) => applyFilter(setFObject, e.target.value)}>
+            <option value="">全部预测对象</option>
+            {opts.objects.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
           {/* 预测指标：关键词搜索框 + 查询 / 重置按钮 */}
           <div className="flex items-center gap-2">
             <input
@@ -124,12 +130,6 @@ export function ForecastRecordsView() {
             <Button size="sm" onClick={searchMetric}>查询</Button>
             <Button variant="secondary" size="sm" onClick={resetMetric}>重置</Button>
           </div>
-          <select className={selectCls} value={fObject} onChange={(e) => applyFilter(setFObject, e.target.value)}>
-            <option value="">全部预测对象</option>
-            {opts.objects.map((o) => (
-              <option key={o}>{o}</option>
-            ))}
-          </select>
         </div>
       </Card>
 

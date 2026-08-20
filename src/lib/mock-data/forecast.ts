@@ -50,12 +50,50 @@ export const CONDITION_DICT: Record<string, ConditionDef> = {
   boiler_load: { code: "boiler_load", name: "锅炉负荷", unit: "%", type: "number", source: "设备运行计划数据", fetchMode: "自动带入设备运行计划，允许调整", min: 0, max: 100, step: 5 },
 };
 
+// ===== 指标统计频率与预测时间范围 =====
+export type MetricFrequency = "日度" | "周度" | "月度";
+
+// 自定义范围标识与预测起始日（数据截止日次日，系统自动确定，不可修改）
+export const CUSTOM_RANGE = "自定义";
+export const FORECAST_START = "2026-08-10";
+
+// 未来值预测可选时间范围（按指标统计频率；「自定义」仅日度指标，由前端追加）
+export const FUTURE_RANGE_OPTIONS: Record<MetricFrequency, string[]> = {
+  日度: ["明日", "未来7日", "未来15日", "未来30日"],
+  周度: ["下周", "未来2周", "未来4周", "未来6周", "未来8周"],
+  月度: ["下月", "未来2个月", "未来3个月"],
+};
+
+// 条件测算可选时间范围（按指标统计频率；「自定义」仅日度指标，由前端追加）
+export const SCENARIO_RANGE_OPTIONS: Record<MetricFrequency, string[]> = {
+  日度: ["单日", "7日", "15日", "30日"],
+  周度: ["1周", "2周", "4周", "6周", "8周"],
+  月度: ["1个月", "2个月", "3个月"],
+};
+
+// 自定义周期上限（仅日度指标支持自定义，最多 30 日）
+export const CUSTOM_MAX_DAYS = 30;
+
+// 范围标签 → 天数（自定义由 customDays 传入）
+const RANGE_DAYS: Record<string, number> = {
+  明日: 1, 单日: 1,
+  未来7日: 7, "7日": 7, 下周: 7, "1周": 7,
+  未来15日: 15, "15日": 15,
+  未来30日: 30, "30日": 30, 下月: 30, "1个月": 30,
+  未来2周: 14, "2周": 14,
+  未来4周: 28, "4周": 28,
+  未来6周: 42, "6周": 42,
+  未来8周: 56, "8周": 56,
+  未来2个月: 60, "2个月": 60,
+  未来3个月: 90, "3个月": 90,
+};
+
 // ===== 小模型能力声明（注册时提供，前端切换后读取）=====
 export interface ForecastModel {
   id: string;
   name: string;
   types: ForecastType[]; // 支持的预测类型
-  ranges: string[]; // 支持的预测时间范围
+  frequencies: MetricFrequency[]; // 支持的指标统计频率
   requiredInputs: string[]; // 必填参数（条件编码）
   outputs: string[]; // 输出能力
   accuracy: string; // 历史预测误差
@@ -63,18 +101,18 @@ export interface ForecastModel {
 
 const MODEL_TS: ForecastModel = {
   id: "ts-v21", name: "能耗时序预测模型 v2.1",
-  types: ["未来值预测"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+  types: ["未来值预测"], frequencies: ["日度", "周度", "月度"],
   requiredInputs: [], outputs: ["预测值", "预测区间"], accuracy: "±3.2%",
 };
 const MODEL_LSTM: ForecastModel = {
   id: "lstm-mv", name: "LSTM 多变量能耗模型",
-  types: ["未来值预测", "条件测算"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+  types: ["未来值预测", "条件测算"], frequencies: ["日度", "周度", "月度"],
   requiredInputs: ["outdoor_temperature", "production_duration"],
   outputs: ["预测值", "预测区间", "基准值", "变化"], accuracy: "±2.8%",
 };
 const MODEL_TARGET: ForecastModel = {
   id: "target-ga", name: "目标达成分析模型",
-  types: ["未来值预测", "能否达标预测", "达标反推"], ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+  types: ["未来值预测", "能否达标预测", "达标反推"], frequencies: ["日度", "周度", "月度"],
   requiredInputs: ["target_value", "remaining_plan"],
   outputs: ["预测值", "预测区间", "目标差距", "控制值"], accuracy: "±2.1%",
 };
@@ -99,7 +137,8 @@ export interface ForecastMetric {
   seed: number;
   objects: string[]; // 可预测对象（长度 1 = 固定对象自动带入）
   types: ForecastType[];
-  ranges: string[]; // 未来值可选范围
+  frequency: MetricFrequency; // 统计频率（决定预测时间范围选项）
+  assessmentPeriod?: "本月" | "本季度" | "本年度"; // 指标配置的考核周期（能否达标预测自动选中）
   target?: { value: number; direction: "不高于" | "不低于" }; // 兜底目标（旧配置）
   metricId?: string; // 关联指标管理 id（目标值以目标值管理的有效版本为准）
   targetCtx?: { currentAcc: string; doneOutput: string; remainingPlan: number; currentLevel: number }; // 目标达成 / 反推上下文
@@ -112,7 +151,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "steamHvac", name: "空调系统每日蒸汽耗", unit: "t", decimals: 1, agg: "sum",
     base: 27.5, seed: 29, objects: ["空调系统"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "outdoor_temperature", required: true, default: 25, sensitivity: 0.055 },
       { code: "outdoor_humidity", default: 61, sensitivity: 0.002 },
@@ -126,7 +165,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "packPower", name: "卷包车间单箱电耗", unit: "kWh/箱", decimals: 1, agg: "avg",
     base: 20.4, seed: 17, objects: ["卷包车间"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "planned_output", required: true, default: 3200, sensitivity: -0.00003 },
       { code: "equipment_runtime", default: 22, sensitivity: 0.015 },
@@ -138,7 +177,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "silkPower", name: "制丝车间每公斤电耗", unit: "kWh/kg", decimals: 2, agg: "avg",
     base: 0.46, seed: 13, objects: ["制丝车间"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "silk_output", required: true, default: 420000, sensitivity: -0.0000002 },
       { code: "production_duration", required: true, default: 18, sensitivity: 0.012 },
@@ -150,7 +189,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "powerDept", name: "动力车间电耗", unit: "kWh", decimals: 0, agg: "sum",
     base: 38600, seed: 31, objects: ["动力车间"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "production_plan", default: 4200, sensitivity: 0.00004 },
       { code: "equipment_runtime", required: true, default: 24, sensitivity: 0.015 },
@@ -162,7 +201,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "canteenPower", name: "食堂总电耗", unit: "kWh", decimals: 0, agg: "sum",
     base: 3200, seed: 52, objects: ["食堂"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "meal_headcount", required: true, default: 1200, sensitivity: 0.0005 },
       { code: "workday_type", default: "工作日", sensitivityMap: { 工作日: 0, 周末: -0.35, 节假日: -0.5 } },
@@ -174,7 +213,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "warehousePower", name: "原辅料仓库总电耗", unit: "kWh", decimals: 0, agg: "sum",
     base: 2100, seed: 41, objects: ["原辅料仓库"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "outdoor_temperature", default: 25, sensitivity: 0.012 },
       { code: "outdoor_humidity", default: 61, sensitivity: 0.003 },
@@ -187,7 +226,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "gasBoiler", name: "锅炉天然气总能耗", unit: "Nm³", decimals: 0, agg: "sum",
     base: 2650, seed: 37, objects: ["锅炉房"], types: ["未来值预测", "条件测算"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "日度",
     conditions: [
       { code: "steam_demand", required: true, default: 120, sensitivity: 0.009 },
       { code: "boiler_load", default: 76, sensitivity: -0.002 },
@@ -199,7 +238,7 @@ export const FORECAST_METRICS: ForecastMetric[] = [
   {
     key: "comprehensive", name: "单箱综合能耗", unit: "kgce/箱", decimals: 1, agg: "avg",
     base: 29.8, seed: 3, objects: ["全厂"], types: ["未来值预测", "能否达标预测", "达标反推"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "周度", assessmentPeriod: "本年度",
     target: { value: 31.0, direction: "不高于" },
     metricId: "m7", // 目标值以目标值管理有效版本为准（单箱综合能耗）
     targetCtx: { currentAcc: "30.9 kgce/箱（截至 2026-08-09）", doneOutput: "386,000 箱", remainingPlan: 214000, currentLevel: 30.9 },
@@ -211,17 +250,17 @@ export const FORECAST_METRICS: ForecastMetric[] = [
     models: [MODEL_TS, MODEL_TARGET],
   },
   {
-    key: "carbon", name: "单位产值碳排放量", unit: "tCO₂e/万元", decimals: 4, agg: "avg",
+    key: "carbon", name: "单位产量碳排放量", unit: "kg CO₂/万支", decimals: 4, agg: "avg",
     base: 0.0338, seed: 11, objects: ["全厂"], types: ["未来值预测", "能否达标预测", "达标反推"],
-    ranges: ["明日", "未来7日", "未来15日", "未来30日"],
+    frequency: "月度", assessmentPeriod: "本季度",
     target: { value: 0.035, direction: "不高于" },
-    metricId: "m1", // 目标值以目标值管理有效版本为准（单位产值碳排放量）
-    targetCtx: { currentAcc: "0.0342 tCO₂e/万元（截至 2026-08-09）", doneOutput: "386,000 箱（对应产值 38,200 万元）", remainingPlan: 214000, currentLevel: 0.0342 },
+    metricId: "m1", // 目标值以目标值管理有效版本为准（单位产量碳排放量）
+    targetCtx: { currentAcc: "0.0342 kg CO₂/万支（截至 2026-08-09）", doneOutput: "386,000 箱（对应产量 193 亿支）", remainingPlan: 214000, currentLevel: 0.0342 },
     conditions: [
       { code: "planned_output", required: true, default: 4200, sensitivity: -0.00003 },
       { code: "production_duration", default: 20, sensitivity: 0.008 },
     ],
-    influencers: ["外购电力占比与电网碳排放因子是间接排放主因", "产值规模影响单位产值排放摊薄水平"],
+    influencers: ["外购电力占比与电网碳排放因子是间接排放主因", "产量规模影响单位产量排放摊薄水平"],
     models: [MODEL_TS, MODEL_TARGET],
   },
 ];
@@ -274,12 +313,13 @@ export interface ForecastInput {
   metricKey: string;
   object: string;
   modelId: string;
-  range?: string; // 未来值：明日 / 未来7日 / 未来15日
+  range?: string; // 未来值：按指标频率的范围选项，或「自定义」
+  customDays?: number; // 自定义范围时的预测天数（起始日固定为 FORECAST_START）
   period?: string; // 目标达成 / 反推：本月 / 本季度 / 本年度
   targetValue?: number; // 临时测算目标值（单值方向）
   targetLower?: number; // 临时测算目标区间下限（区间方向）
   targetUpper?: number; // 临时测算目标区间上限（区间方向）
-  calcRange?: string; // 条件测算：预测时间范围（明日/未来7日/未来15日/未来30日）
+  calcRange?: string; // 条件测算：预测时间范围（按指标频率的范围选项，或「自定义」）
   conditions?: Record<string, number | string>; // 工况输入
   compareBaseline?: boolean;
   reverseItem?: string; // 反推内容
@@ -329,7 +369,12 @@ export interface ForecastResult {
 const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 const fmt = (v: number, d: number) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const daysOf = (range: string) => (range === "明日" ? 1 : range === "未来7日" ? 7 : range === "未来15日" ? 15 : 30);
+// 范围 → 天数；「自定义」使用表单传入的 customDays
+const daysOf = (range: string, customDays?: number) =>
+  range === CUSTOM_RANGE ? customDays ?? 7 : RANGE_DAYS[range] ?? 7;
+
+// 展示用范围文案：「自定义」按实际天数展示为「未来N日」
+const displayRangeOf = (range: string, days: number) => (range === CUSTOM_RANGE ? `未来${days}日` : range);
 
 // 未来日期标签（自数据截止日次日起，格式 "8/10"）
 function futureLabel(i: number): string {
@@ -354,7 +399,8 @@ export async function runForecast(input: ForecastInput): Promise<ForecastResult>
 // ----- 1. 未来值预测 -----
 function futureForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastResult["meta"]): ForecastResult {
   const model = m.models.find((x) => x.id === input.modelId) ?? m.models[0];
-  const days = daysOf(input.range ?? "未来7日");
+  const days = daysOf(input.range ?? "未来7日", input.customDays);
+  const displayRange = displayRangeOf(input.range ?? "未来7日", days);
   const d = m.decimals;
   // 历史序列（近 30 天）
   const points: ChartPoint[] = [];
@@ -381,8 +427,8 @@ function futureForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
   const hi = (isSingle ? predicts[0] : predicts.reduce((s, v) => s + v * (m.agg === "sum" ? 1 : 1 / days), 0)) * 1.03;
   const histAvg = isSingle ? m.base : m.base * (m.agg === "sum" ? days : 1);
   const diffPct = ((value - histAvg) / histAvg) * 100;
-  const valueLabel = isSingle ? "明日值" : m.agg === "sum" ? `${input.range}累计值` : `${input.range}均值`;
-  const headline = `${input.range}${m.name}预计${valueLabel === "明日值" ? "为" : valueLabel.includes("累计") ? "累计" : "平均"} ${fmt(value, d)} ${m.unit}，预测区间 ${fmt(lo, d)}～${fmt(hi, d)} ${m.unit}，较历史均值${diffPct >= 0 ? "增加" : "下降"} ${fmt(Math.abs(diffPct), 1)}%`;
+  const valueLabel = isSingle ? "明日值" : m.agg === "sum" ? `${displayRange}累计值` : `${displayRange}均值`;
+  const headline = `${displayRange}${m.name}预计${valueLabel === "明日值" ? "为" : valueLabel.includes("累计") ? "累计" : "平均"} ${fmt(value, d)} ${m.unit}，预测区间 ${fmt(lo, d)}～${fmt(hi, d)} ${m.unit}，较历史均值${diffPct >= 0 ? "增加" : "下降"} ${fmt(Math.abs(diffPct), 1)}%`;
 
   return {
     headline,
@@ -394,7 +440,7 @@ function futureForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
     ],
     chart: { kind: "trend", points },
     conclusions: buildConclusions(m, model, [
-      `预测周期：${input.range}；口径：${valueLabel}。`,
+      `预测周期：${displayRange}；口径：${valueLabel}。`,
       `关键输入：最新实际数据、剩余周期生产计划、天气预报与当前运行工况（系统自动获取）。`,
     ], [
       `结合排产安排评估预测水平是否可接受；若预测值接近告警阈值，建议提前调整运行策略。`,
@@ -541,7 +587,7 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
     : `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}`;
 
   // 图表：多日 → 双折线；单日 → 对比柱状图
-  const days = input.calcRange === "明日" ? 1 : input.calcRange === "未来7日" ? 7 : input.calcRange === "未来15日" ? 15 : 30;
+  const days = daysOf(input.calcRange ?? "单日", input.customDays);
   let chart: ForecastResult["chart"];
   if (days > 1) {
     const points: ChartPoint[] = [];
@@ -604,7 +650,7 @@ function reverseForecast(m: ForecastMetric, input: ForecastInput, meta: Forecast
   const controlTotal = Math.round(remainingPlan * controlAvg);
 
   const headline = isTotal
-    ? `按目标${dir}${fmt(target, d)} ${m.unit}测算，剩余周期允许${m.name.replace("单箱", "").replace("单位产值", "")}总量 ${controlTotal.toLocaleString()}（按剩余计划 ${remainingPlan.toLocaleString()} 箱）`
+    ? `按目标${dir}${fmt(target, d)} ${m.unit}测算，剩余周期允许${m.name.replace("单箱", "").replace("单位产量", "")}总量 ${controlTotal.toLocaleString()}（按剩余计划 ${remainingPlan.toLocaleString()} 箱）`
     : `剩余周期平均${m.name}需控制在 ${fmt(controlAvg, d)} ${m.unit} 以内，需较当前值 ${fmt(current, d)} ${delta >= 0 ? "降低" : "提高"} ${fmt(Math.abs(delta), d)} ${m.unit}`;
 
   const currentTotal = Math.round(remainingPlan * current);

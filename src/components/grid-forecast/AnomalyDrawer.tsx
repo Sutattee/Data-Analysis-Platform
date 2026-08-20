@@ -185,7 +185,12 @@ export function AnomalyDrawer({
 
           {/* 异常原因（AI 综合分析，可补充 / 修正） */}
           <div>
-            <h4 className="mb-2 text-xs font-semibold text-gray-500">异常原因</h4>
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-gray-500">异常原因</h4>
+              {hasCause && !editing && (
+                <Button size="sm" onClick={startEdit}>修正</Button>
+              )}
+            </div>
             {hasCause && !editing ? (
               <div className="space-y-2">
                 <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{effectiveCause}</p>
@@ -195,9 +200,6 @@ export function AnomalyDrawer({
                     补录人：{savedMeta.by}｜补录时间：{savedMeta.time}
                   </p>
                 )}
-                <div>
-                  <Button size="sm" variant="secondary" onClick={startEdit}>修正</Button>
-                </div>
               </div>
             ) : (
               <div className="space-y-2">

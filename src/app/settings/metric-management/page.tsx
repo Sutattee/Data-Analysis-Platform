@@ -2,7 +2,7 @@
 
 // 指标管理列表：搜索 + 导入 + 列表（操作：查看 / 目标值管理 / 达标反推设置）
 // 「目标值管理」进入独立页面（指标管理/目标值管理）；「达标反推设置」右侧滑出窗口配置。
-// 仅 单箱综合能耗（m7）/ 单位产值碳排放量（m1）支持上述两项，且固定排在前两项。
+// 仅 单箱综合能耗（m7）/ 单位产量碳排放量（m1）支持上述两项，且固定排在前两项。
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -26,7 +26,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
-// 指标排序：单箱综合能耗（m7）/ 单位产值碳排放量（m1）固定前两项，其余保持原序
+// 指标排序：单箱综合能耗（m7）/ 单位产量碳排放量（m1）固定前两项，其余保持原序
 function sortMetrics(list: MetricManage[]): MetricManage[] {
   const order = ["m7", "m1"];
   return [...list].sort((a, b) => {
@@ -169,7 +169,7 @@ export default function MetricManagementPage() {
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="inline-flex gap-1">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
-                      {/* 仅 单箱综合能耗 / 单位产值碳排放量 支持目标值管理与达标反推设置 */}
+                      {/* 仅 单箱综合能耗 / 单位产量碳排放量 支持目标值管理与达标反推设置 */}
                       {isTargetSupported(m.id) && (
                         <>
                           <Button

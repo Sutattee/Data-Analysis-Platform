@@ -1,5 +1,5 @@
 // 预测总览 — 模拟数据（确定性生成：固定锚点 2026-08-09 + sin 扰动，无 Date.now / Math.random）
-// 顶部 4 张指标卡 + 4 张核心图表（目标达成 / 单箱电耗 / 蒸汽耗总量 / 天然气单耗）
+// 顶部 4 张指标卡 + 4 张核心图表（目标达成 / 单箱电耗 / 蒸汽耗总量 / 单箱天然气耗）
 import { DATA_END } from "./forecast";
 
 export { DATA_END };
@@ -7,13 +7,28 @@ export { DATA_END };
 // ===== 指标卡 =====
 export type CardTone = "good" | "warn" | "danger" | "muted";
 
+export interface CardRow {
+  label: string;
+  value: string;
+  tone?: "orange" | "green" | "danger" | "muted";
+}
+
+// 万支口径展示变体（1 箱 = 5 万支，数值 = 箱口径 × 0.2）；存在即表示该卡支持「万支｜箱」切换
+export interface WanZhiVariant {
+  title: string;
+  main: { label: string; value: string };
+  rows: CardRow[];
+  sparkPoints?: number[]; // 微型图换算后的数值（与箱口径 spark 点一一对应）
+}
+
 export interface OverviewCardData {
   key: string;
   title: string;
   main: { label: string; value: string }; // 突出显示的预测主值
   tag?: { text: string; tone: CardTone }; // 预测判断标签（仅判断，非预警等级）
-  rows: { label: string; value: string; tone?: "orange" | "green" | "danger" | "muted" }[];
+  rows: CardRow[];
   spark?: { kind: "line" | "bar"; points: { date: string; value: number; peak?: boolean }[] };
+  wanZhi?: WanZhiVariant;
 }
 
 const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
@@ -35,21 +50,29 @@ const isWeekend = (y: number, m: number, d: number) => {
 export function getOverviewCards(): OverviewCardData[] {
   // 单箱电耗：7 日预测序列（均值 24.9，历史基准 25.0）
   const power7 = Array.from({ length: 7 }, (_, j) => round(24.9 + Math.sin(17 + j * 0.8) * 0.35, 1));
-  // 天然气单耗：7 日预测序列（均值 8.6，缓升）
+  // 单箱天然气耗：7 日预测序列（均值 8.6，缓升）
   const gas7 = Array.from({ length: 7 }, (_, j) => round(8.4 + j * 0.06 + Math.sin(9 + j * 0.7) * 0.08, 1));
 
   return [
     {
       key: "comprehensive",
       title: "单箱综合能耗",
-      main: { label: "本年度预测", value: "31.6 kgce/箱" },
+      main: { label: "本月预测", value: "31.6 kgce/箱" },
       tag: { text: "预计超标", tone: "danger" },
       rows: [
-        { label: "本年累计实际值", value: "30.9 kgce/箱", tone: "muted" },
         { label: "年度目标值", value: "≤ 31.0 kgce/箱", tone: "orange" },
         { label: "预计差距", value: "高于目标 0.6 kgce/箱（1.9%）", tone: "danger" },
-        { label: "预测区间", value: "31.0 ～ 32.2 kgce/箱", tone: "muted" },
+        { label: "预测区间", value: "30.9 ～ 32.3 kgce/箱", tone: "muted" },
       ],
+      wanZhi: {
+        title: "万支综合能耗",
+        main: { label: "本月预测", value: "6.32 kgce/万支" },
+        rows: [
+          { label: "年度目标值", value: "≤ 6.2 kgce/万支", tone: "orange" },
+          { label: "预计差距", value: "高于目标 0.12 kgce/万支（1.9%）", tone: "danger" },
+          { label: "预测区间", value: "6.18 ～ 6.46 kgce/万支", tone: "muted" },
+        ],
+      },
     },
     {
       key: "packPower",
@@ -63,6 +86,17 @@ export function getOverviewCards(): OverviewCardData[] {
         { label: "预测区间", value: "24.2 ～ 25.6 kWh/箱", tone: "muted" },
       ],
       spark: { kind: "line", points: power7.map((v, j) => ({ date: futureLabel(j + 1), value: v })) },
+      wanZhi: {
+        title: "万支电耗",
+        main: { label: "未来7日预测均值", value: "4.98 kWh/万支" },
+        rows: [
+          { label: "最新实际值", value: "4.92 kWh/万支", tone: "muted" },
+          { label: "同工况历史均值", value: "5.00 kWh/万支", tone: "muted" },
+          { label: "预计差异", value: "低于基准 0.02 kWh/万支（0.4%）", tone: "green" },
+          { label: "预测区间", value: "4.84 ～ 5.12 kWh/万支", tone: "muted" },
+        ],
+        sparkPoints: power7.map((v) => round(v * 0.2, 2)),
+      },
     },
     {
       key: "steam",
@@ -82,7 +116,7 @@ export function getOverviewCards(): OverviewCardData[] {
     },
     {
       key: "gas",
-      title: "天然气单耗",
+      title: "单箱天然气耗",
       main: { label: "未来7日预测均值", value: "8.6 Nm³/箱" },
       tag: { text: "预计有所上升", tone: "warn" },
       rows: [
@@ -92,11 +126,22 @@ export function getOverviewCards(): OverviewCardData[] {
         { label: "预测区间", value: "8.1 ～ 9.0 Nm³/箱", tone: "muted" },
       ],
       spark: { kind: "line", points: gas7.map((v, j) => ({ date: futureLabel(j + 1), value: v })) },
+      wanZhi: {
+        title: "万支天然气耗",
+        main: { label: "未来7日预测均值", value: "1.72 Nm³/万支" },
+        rows: [
+          { label: "最新实际值", value: "1.68 Nm³/万支", tone: "muted" },
+          { label: "同工况历史均值", value: "1.64 Nm³/万支", tone: "muted" },
+          { label: "预计差异", value: "高于基准 0.08 Nm³/万支（4.9%）", tone: "orange" },
+          { label: "预测区间", value: "1.62 ～ 1.80 Nm³/万支", tone: "muted" },
+        ],
+        sparkPoints: gas7.map((v) => round(v * 0.2, 2)),
+      },
     },
   ];
 }
 
-// ===== 趋势预测图表（单箱电耗 / 蒸汽耗总量 / 天然气单耗）=====
+// ===== 趋势预测图表（单箱电耗 / 蒸汽耗总量 / 单箱天然气耗）=====
 export interface TrendPoint {
   date: string;
   actual?: number;
@@ -119,7 +164,7 @@ export interface TrendSeries {
 const TREND_PROFILES = {
   packPower: { title: "单箱电耗趋势预测", unit: "kWh/箱", decimals: 1, base: 24.6, histAvg: 25.0, predBase: 24.9, band: 0.02, seed: 17 },
   steam: { title: "蒸汽耗总量趋势预测", unit: "t", decimals: 1, base: 40.6, histAvg: 39.9, predBase: 40.9, band: 0.05, seed: 23 },
-  gas: { title: "天然气单耗趋势预测", unit: "Nm³/箱", decimals: 1, base: 8.3, histAvg: 8.2, predBase: 8.55, band: 0.045, seed: 9 },
+  gas: { title: "单箱天然气耗趋势预测", unit: "Nm³/箱", decimals: 1, base: 8.3, histAvg: 8.2, predBase: 8.55, band: 0.045, seed: 9 },
 } as const;
 
 export type TrendMetric = keyof typeof TREND_PROFILES;

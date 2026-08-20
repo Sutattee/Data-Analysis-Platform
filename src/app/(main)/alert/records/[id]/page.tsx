@@ -198,12 +198,7 @@ export default function AlertDetailPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-gray-400">异常原因</span>
                 {!causeEditing && (
-                  <button
-                    onClick={startCauseEdit}
-                    className="text-xs text-primary-600 hover:text-primary-700"
-                  >
-                    ✏️ 修正
-                  </button>
+                  <Button size="sm" onClick={startCauseEdit}>修正</Button>
                 )}
               </div>
               {causeEditing ? (
@@ -236,12 +231,7 @@ export default function AlertDetailPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-gray-400">处置建议</span>
                 {!suggestionEditing && (
-                  <button
-                    onClick={startSuggestionEdit}
-                    className="text-xs text-primary-600 hover:text-primary-700"
-                  >
-                    ✏️ 修正
-                  </button>
+                  <Button size="sm" onClick={startSuggestionEdit}>修正</Button>
                 )}
               </div>
               {suggestionEditing ? (

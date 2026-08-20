@@ -58,10 +58,20 @@ export interface TraceDetail {
   upstream?: string;
   updateFreq?: string;
   calcScope?: string;
-  // 统计对象：statObjects 为指标关联的全部统计对象（指标列表/定义溯源自展示）；
-  // statObject 为当次统计对象（历史记录/计算过程展示）
+  // 统计对象：statObjects 为指标关联的全部统计对象（定义溯源「适用对象」展示）；
+  // statObject 为当次统计对象（结果溯源展示）
   statObjects?: string;
   statObject?: string;
+  // 筛选条件（结果溯源展示：聚合维度/指标字段）
+  statCondition?: string;
+  // 统计粒度（定义溯源展示：时间粒度 · 对象粒度）
+  statGranularity?: string;
+  // 统计周期（结果溯源展示，如「2026年7月」，不展示实际取数范围）
+  statPeriod?: string;
+  // 统计维度（结果溯源展示：当次计算采用的聚合维度）
+  statDimension?: string;
+  // 支持维度（定义溯源展示：指标可分析的全部维度）
+  supportDimensions?: string;
 }
 
 export interface TraceMetric {
@@ -205,6 +215,9 @@ const TEMPLATES: Record<MetricCategory, {
   factors: () => string[];
   app: () => string;
   rules: () => string[];
+  granularity: string; // 统计粒度（时间粒度 · 对象粒度）
+  dimensions: string; // 支持维度（定义溯源展示）
+  statDimension: string; // 统计维度（结果溯源展示：当次聚合维度）
 }> = {
   efficiency: {
     steps: () => ["采集设备实际运行时间与计划运行时间数据；", "按工序、设备归集运行时长；", "计算实际运行时间 ÷ 计划时间，得到运行效率。"],
@@ -212,6 +225,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["设备故障停机时长", "换牌/调试时间", "设备运行节拍", "生产排程合理性"],
     app: () => "用于评估设备利用水平，识别效率损失环节，指导设备维护与生产优化。",
     rules: () => ["分子分母使用相同统计周期与组织范围；", "计划时间需剔除计划停机时段；", "结果按配置小数位展示。"],
+    granularity: "日 · 设备机台",
+    dimensions: "组织 / 产线 / 设备机台 / 班次",
+    statDimension: "设备机台",
   },
   consumption: {
     steps: () => ["采集统计周期内物料消耗量；", "采集同期合格产量（箱）；", "消耗量 ÷ 产量，得到单箱消耗。"],
@@ -219,6 +235,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["物料损耗率", "设备运行稳定性", "工艺参数控制", "产品规格结构"],
     app: () => "用于物料消耗监控、成本核算与降耗改进。",
     rules: () => ["消耗量与产量必须同周期同口径；", "产量以合格入库箱数为准；", "单位换算在计算前完成。"],
+    granularity: "日 · 物料类型",
+    dimensions: "组织 / 车间 / 产线 / 物料类型",
+    statDimension: "物料类型、产线",
   },
   cost: {
     steps: () => ["归集可控费用各项目；", "汇总可控费用总额；", "采集同期产量；", "费用总额 ÷ 产量，得到单箱可控费用。"],
@@ -226,6 +245,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["费用预算执行", "产量规模", "辅料价格波动", "人工效率"],
     app: () => "用于费用管控、成本分析与定价参考。",
     rules: () => ["费用与产量同周期；", "仅统计可控费用项目；", "产量为0时返回无法计算。"],
+    granularity: "月度 · 成本项目",
+    dimensions: "组织 / 部门 / 成本项目",
+    statDimension: "成本项目",
   },
   turnover: {
     steps: () => ["采集统计周期内物料消耗金额；", "计算平均库存金额；", "消耗金额 ÷ 平均库存金额，得到周转率。"],
@@ -233,6 +255,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["库存结构", "采购到货及时性", "消耗节奏", "安全库存设置"],
     app: () => "用于库存效率分析、资金占用评估与采购优化。",
     rules: () => ["消耗量与库存量同口径同周期；", "平均库存按日均库存计算；", "结果保留一位小数。"],
+    granularity: "月度 · 物料类别",
+    dimensions: "组织 / 仓库 / 物料类别",
+    statDimension: "物料类别",
   },
   productivity: {
     steps: () => ["采集统计周期内企业产值；", "采集同期在岗职工平均人数；", "产值 ÷ 人数，得到全员劳动生产率。"],
@@ -240,6 +265,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["产值规模", "人员配置", "自动化水平", "工时利用"],
     app: () => "用于人力资源效率评估与产能配置决策。",
     rules: () => ["产值与人数同周期；", "人数取在岗平均人数；", "兼职借调人员按规则折算。"],
+    granularity: "月度 · 人员类别",
+    dimensions: "组织 / 部门 / 人员类别",
+    statDimension: "人员类别",
   },
   productionEfficiency: {
     steps: () => ["采集实际完成产量；", "采集计划产量；", "实际产量 ÷ 计划产量，得到生产效率。"],
@@ -247,6 +275,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["设备产能", "原料供应", "排程合理性", "突发事件"],
     app: () => "用于评估生产执行情况、告警交付风险。",
     rules: () => ["实际与计划同口径；", "计划产量取已下达订单；", "结果按小数位展示。"],
+    granularity: "日 · 产线",
+    dimensions: "组织 / 产线 / 产品牌号",
+    statDimension: "产线",
   },
   operationCost: {
     steps: () => ["归集统计周期内各项运营成本；", "按成本项汇总，得到运营总成本。"],
@@ -254,6 +285,9 @@ const TEMPLATES: Record<MetricCategory, {
     factors: () => ["原料价格", "能源消耗", "人工成本", "制造费用"],
     app: () => "用于运营成本分析、预算执行监控与降本决策。",
     rules: () => ["按权责发生制归集；", "仅统计运营范畴成本；", "历史结果绑定当时成本版本。"],
+    granularity: "月度 · 成本项目",
+    dimensions: "组织 / 部门 / 成本项目",
+    statDimension: "成本项目",
   },
 };
 
@@ -261,6 +295,8 @@ const TEMPLATES: Record<MetricCategory, {
 function generateMetric(m: MetricMeta): TraceMetric {
   const hasDen = !!m.denominator;
   const tpl = TEMPLATES[m.category];
+  // 统计周期展示值（数据截止 2026-07-31：日度取当日，月度取 2026年7月）
+  const statPeriod = m.period === "月度" ? "2026年7月" : "2026年7月31日";
   // 统计对象：全部（定义溯源展示）与当次（结果溯源展示，取首项）
   const statList = METRIC_STAT_OBJECTS[m.id] ?? [m.object];
   const statObjects = statList.join("、");
@@ -336,6 +372,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
     application: tpl.app(),
     updateFreq: updateFreqOf(m.period),
     statObjects,
+    statGranularity: tpl.granularity,
+    supportDimensions: tpl.dimensions,
   };
   const technicalDetailDefine: TraceDetail = {
     name: m.name, unit: m.unit, period: m.period,
@@ -349,6 +387,8 @@ function generateMetric(m: MetricMeta): TraceMetric {
     dataFlow: [`${m.sources} → ${m.table}（${m.model}）→ ${m.name} 计算`],
     updateFreq: updateFreqOf(m.period), calcScope: `按${m.object}维度聚合`,
     statObjects,
+    statGranularity: tpl.granularity,
+    supportDimensions: tpl.dimensions,
   };
 
   return {
@@ -370,6 +410,9 @@ function generateMetric(m: MetricMeta): TraceMetric {
       application: tpl.app(),
       updateFreq: updateFreqOf(m.period),
       statObject,
+      statCondition: `聚合维度：${m.object}`,
+      statPeriod,
+      statDimension: tpl.statDimension,
     },
     technicalDetail: {
       name: m.name, value: m.value, unit: m.unit, period: m.period,
@@ -388,6 +431,9 @@ function generateMetric(m: MetricMeta): TraceMetric {
       dataFlow: [`${m.sources} → ${m.table}（${m.model}）→ ${m.name} 计算`],
       updateFreq: updateFreqOf(m.period), calcScope: `按${m.object}维度聚合`,
       statObject,
+      statCondition: `指标字段：${m.field}`,
+      statPeriod,
+      statDimension: tpl.statDimension,
     },
   };
 }
@@ -627,6 +673,9 @@ const carbonMetric: TraceMetric = {
     application: "该指标可用于评价企业碳排放强度，开展不同月份、季度或组织之间的绿色生产水平对比，为节能降碳管理提供数据依据。",
     updateFreq: "月",
     statObject: "制丝车间",
+    statCondition: "聚合维度：能源类型",
+    statPeriod: "2026年7月",
+    statDimension: "车间、能源类型",
   },
   technicalDetail: {
     name: "单位产值碳排放量", value: "0.1444", unit: "吨/万元", period: "2026年7月",
@@ -653,6 +702,9 @@ const carbonMetric: TraceMetric = {
     dataFlow: ["能源管理系统 → energy_consumption_fact", "财务系统 → output_value_fact", "碳排放因子表 → emission_factor", "指标计算引擎 → 单位产值碳排放量"],
     updateFreq: "月", calcScope: "按统计周期、组织范围聚合计算。",
     statObject: "制丝车间",
+    statCondition: "指标字段：energy_consumption / emission_factor / output_value",
+    statPeriod: "2026年7月",
+    statDimension: "车间、能源类型",
   },
   // 指标定义溯源（不展示具体数值）
   businessTreeDefine: {
@@ -703,6 +755,8 @@ const carbonMetric: TraceMetric = {
     application: "用于评价企业碳排放强度，开展绿色生产水平对比，为节能降碳管理提供数据依据。",
     updateFreq: "月",
     statObjects: "制丝车间、卷包车间、物资管理科",
+    statGranularity: "月度 · 能源类型",
+    supportDimensions: "组织 / 车间 / 能源类型",
   },
   technicalDetailDefine: {
     name: "单位产值碳排放量", unit: "吨/万元", period: "月度/季度",
@@ -716,6 +770,8 @@ const carbonMetric: TraceMetric = {
     dataFlow: ["能源管理系统 → energy_consumption_fact", "财务系统 → output_value_fact", "碳排放因子表 → emission_factor", "指标计算引擎 → 单位产值碳排放量"],
     updateFreq: "月", calcScope: "按统计周期、组织范围聚合计算。",
     statObjects: "制丝车间、卷包车间、物资管理科",
+    statGranularity: "月度 · 能源类型",
+    supportDimensions: "组织 / 车间 / 能源类型",
   },
 };
 

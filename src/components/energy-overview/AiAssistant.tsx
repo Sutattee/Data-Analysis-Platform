@@ -83,12 +83,12 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
         </button>
       )}
 
-      {/* ===== 右侧对话面板：sticky 固定视口高度，无遮罩，左侧可继续操作 ===== */}
+      {/* ===== 右侧对话面板：sticky 撑满内容区高度，无遮罩无卡片，仅以左侧分界线（带左投影）分割，左侧可继续操作 ===== */}
       {everOpened && (
         <aside
           aria-label="智能问数助手"
-          className={`sticky top-4 mr-4 w-[26rem] shrink-0 flex-col rounded-xl border border-gray-100 bg-white shadow-xl md:top-6 md:mr-6 ${
-            open ? "flex h-[calc(100vh-5.5rem)] md:h-[calc(100vh-6.5rem)]" : "hidden"
+          className={`sticky top-0 -mt-4 w-[26rem] shrink-0 flex-col border-l border-gray-200 bg-white shadow-[-8px_0_16px_-8px_rgba(0,0,0,0.08)] md:-mt-6 ${
+            open ? "flex h-[calc(100vh-3.5rem)]" : "hidden"
           }`}
         >
           {/* 标题栏：标题 + 历史记录/收藏/新建会话 + 收起 */}
@@ -142,7 +142,7 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
 
             {/* 历史问数记录（面板内视图，点击提问可继续对话） */}
             {historyOpen && (
-              <div className="absolute inset-0 flex flex-col rounded-b-xl bg-white">
+              <div className="absolute inset-0 flex flex-col bg-white">
                 <div className="flex-1 overflow-auto p-4">
                   {historyQuestions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -171,7 +171,7 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
 
             {/* 我的收藏（面板内视图：问答对卡片，可展开/取消收藏） */}
             {favoritesOpen && (
-              <div className="absolute inset-0 flex flex-col rounded-b-xl bg-white">
+              <div className="absolute inset-0 flex flex-col bg-white">
                 <div className="flex-1 overflow-auto p-4">
                   {favorites.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-gray-400">

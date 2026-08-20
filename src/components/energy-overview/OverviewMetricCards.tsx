@@ -56,11 +56,13 @@ export function OverviewMetricCards() {
         const toggleable = hasUnitToggle(c);
         // 当前选中的单位口径：默认单位为「箱」时切换态 = 万支；默认「万支」时切换态 = 箱
         const wanZhiActive = toggleable && (c.unit.endsWith("/万支") ? !isAlt : isAlt);
+        // 万支口径下名称同步变化：单箱卷烟综合能耗 → 万支卷烟综合能耗 等
+        const displayLabel = wanZhiActive ? c.label.replace("单箱", "万支") : c.label;
 
         return (
           <CardShell key={c.key} color="#3b82f6">
             <div className="mb-1 flex items-center justify-between gap-1">
-              <span className="truncate text-xs text-gray-500">{c.label}</span>
+              <span className="truncate text-xs text-gray-500">{displayLabel}</span>
               {toggleable && (
                 <span className="flex shrink-0 items-center text-[11px] leading-none">
                   <button
