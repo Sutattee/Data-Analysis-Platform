@@ -10,8 +10,9 @@ export function DeptPowerCompareChart() {
   const data = useMemo(() => [...DEPT_POWER].sort((a, b) => b.actual - a.actual), []);
 
   return (
-    <Card title="🏢 区域电耗对比（更新时间：2026-08-19  12:00，kWh）">
-      <ResponsiveContainer width="100%" height={280}>
+    <Card title="🏢 区域电耗对比（kWh）">
+      <p className="mb-1 text-right text-xs text-gray-400">更新时间：2026-08-19 12:00</p>
+      <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} layout="vertical" margin={{ top: 8, right: 24, left: 12, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 10 }} stroke="#9ca3af" />

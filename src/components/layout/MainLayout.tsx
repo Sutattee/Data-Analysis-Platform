@@ -31,6 +31,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   // 头像下拉菜单 & 退出登录二次确认
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // 左侧二级导航折叠态（折叠后仅展示图标）
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // 点击菜单外部时关闭下拉
@@ -139,8 +141,22 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       {/* 主体：可选左侧二级导航 + 右侧内容 */}
       <div className="flex flex-1 overflow-hidden">
         {showSubNav && (
-          <aside className="hidden w-56 flex-shrink-0 flex-col border-r border-slate-200 bg-slate-100 lg:flex">
-            <Sidebar items={subNavItems!} />
+          <aside
+            className={`hidden flex-shrink-0 flex-col border-r border-slate-200 bg-slate-100 transition-all duration-200 lg:flex ${
+              navCollapsed ? "w-14" : "w-[204px]"
+            }`}
+          >
+            <Sidebar items={subNavItems!} collapsed={navCollapsed} onExpand={() => setNavCollapsed(false)} />
+            {/* 折叠 / 展开开关（底部左下角） */}
+            <div className={`flex shrink-0 px-1.5 py-2 ${navCollapsed ? "justify-center" : "justify-start"}`}>
+              <button
+                onClick={() => setNavCollapsed((v) => !v)}
+                title={navCollapsed ? "展开导航" : "折叠导航"}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-gray-400 transition-colors hover:bg-slate-200 hover:text-gray-600"
+              >
+                {navCollapsed ? "»" : "«"}
+              </button>
+            </div>
           </aside>
         )}
         <main className="flex-1 overflow-auto">

@@ -14,6 +14,8 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
   // 序列基准口径即 kg CO₂/万支，箱 = 万支 × 5（1箱 = 5万支）
   const convertFactor = unitMode === "万支" ? 1 : 5;
   const unitLabel = unitMode === "万支" ? "kg CO₂/万支" : "kg CO₂/箱";
+  // 标题中的单位缩写（如 CO₂/箱、CO₂/万支）
+  const unitShort = unitMode === "万支" ? "CO₂/万支" : "CO₂/箱";
 
   // 转换数据：万支 → 箱 换算
   const data = useMemo(() => {
@@ -33,7 +35,7 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
 
   return (
     <Card
-      title="🌱 单位产量碳排放趋势（按月）"
+      title={`🌱 单位产量碳排放趋势（按月 ${unitShort}）`}
       headerRight={
         <span className="flex items-center text-xs leading-none">
           <button
@@ -58,7 +60,7 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={2} />
-          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={60} domain={["auto", "auto"]} unit={unitLabel} />
+          <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={44} domain={["auto", "auto"]} />
           <Tooltip
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
             formatter={(v: any, n: any) => [`${Number(v).toFixed(3)} ${unitLabel}`, NAME_MAP[n as string] ?? n]}

@@ -17,11 +17,15 @@ export function TabbedSeriesChart({
   tabs,
   onAnomaly,
   hint,
+  hideTabs = false, // 单指标图表：隐藏指标页签按钮
+  hideLabel = false, // 隐藏「● 指标（单位）」小标题行
 }: {
   title: string;
   tabs: { key: DailyKey; label: string }[];
   onAnomaly: (d: AnomalyDetail) => void;
   hint?: string;
+  hideTabs?: boolean;
+  hideLabel?: boolean;
 }) {
   const [active, setActive] = useState<DailyKey>(tabs[0].key);
   // 卷包电耗单位口径：箱（默认） / 万支（1箱 = 5万支，kWh/万支 = kWh/箱 × 0.2）
@@ -57,41 +61,45 @@ export function TabbedSeriesChart({
     <Card
       title={title}
       headerRight={
-        <SegmentedControl
-          options={tabs.map((t) => ({ value: t.key, label: t.label }))}
-          value={active}
-          onChange={setActive}
-        />
+        hideTabs ? undefined : (
+          <SegmentedControl
+            options={tabs.map((t) => ({ value: t.key, label: t.label }))}
+            value={active}
+            onChange={setActive}
+          />
+        )
       }
     >
-      <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-500">
-        <span>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: "#3b82f6" }} />
-          {displayLabel}（{displayUnit}）
-        </span>
-        {/* 卷包电耗：万支｜箱单位切换（选中项蓝色高亮） */}
-        {isPack && (
-          <span className="flex shrink-0 items-center text-[11px] leading-none">
-            <button
-              type="button"
-              title="按万支展示"
-              onClick={() => setPackUnit("万支")}
-              className={wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
-            >
-              万支
-            </button>
-            <span className="mx-0.5 text-gray-300">｜</span>
-            <button
-              type="button"
-              title="按箱展示"
-              onClick={() => setPackUnit("箱")}
-              className={!wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
-            >
-              箱
-            </button>
+      {!hideLabel && (
+        <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-500">
+          <span>
+            <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: "#3b82f6" }} />
+            {displayLabel}（{displayUnit}）
           </span>
-        )}
-      </div>
+          {/* 卷包电耗：万支｜箱单位切换（选中项蓝色高亮） */}
+          {isPack && (
+            <span className="flex shrink-0 items-center text-[11px] leading-none">
+              <button
+                type="button"
+                title="按万支展示"
+                onClick={() => setPackUnit("万支")}
+                className={wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+              >
+                万支
+              </button>
+              <span className="mx-0.5 text-gray-300">｜</span>
+              <button
+                type="button"
+                title="按箱展示"
+                onClick={() => setPackUnit("箱")}
+                className={!wanZhi ? "font-medium text-primary-600" : "text-gray-400 hover:text-gray-600"}
+              >
+                箱
+              </button>
+            </span>
+          )}
+        </div>
+      )}
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />

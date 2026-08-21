@@ -8,6 +8,8 @@ import { NavIcon } from "./NavIcon";
 
 interface SidebarProps {
   items: NavItem[];
+  collapsed?: boolean; // 折叠态：仅展示图标（文字以 title 提示）
+  onExpand?: () => void; // 折叠态点击分组图标时展开侧边栏
 }
 
 // 判断某路由是否处于激活态（当前页或其子路径）
@@ -16,7 +18,7 @@ function isItemActive(pathname: string, href: string): boolean {
 }
 
 // 通用纵向二级导航：由父级传入 items（如能源消耗组的二级菜单）
-export function Sidebar({ items }: SidebarProps) {
+export function Sidebar({ items, collapsed = false, onExpand }: SidebarProps) {
   const pathname = usePathname();
   // 折叠组状态：默认全部折叠
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -51,14 +53,16 @@ export function Sidebar({ items }: SidebarProps) {
       {items.map((item) => {
         const hasChildren = item.children && item.children.length > 0;
 
-        // 无子菜单：平铺链接
+        // 无子菜单：平铺链接（折叠态仅图标）
         if (!hasChildren) {
           const isActive = isItemActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg text-sm transition-all duration-200 active:scale-[0.97]
+                ${collapsed ? "justify-center px-0" : ""}
                 ${
                   isActive
                     ? "bg-primary-50 text-primary-700 font-medium shadow-sm"
@@ -66,7 +70,7 @@ export function Sidebar({ items }: SidebarProps) {
                 }`}
             >
               <span className="flex-shrink-0"><NavIcon icon={item.icon} /></span>
-              <span className="whitespace-nowrap">{item.label}</span>
+              {!collapsed && <span className="whitespace-nowrap">{item.label}</span>}
             </Link>
           );
         }
@@ -79,8 +83,14 @@ export function Sidebar({ items }: SidebarProps) {
         return (
           <div key={item.label} className="mb-1">
             <button
-              onClick={() => toggle(item.label)}
+              onClick={() => {
+                // 折叠态：先展开侧边栏，再打开该分组
+                if (collapsed) onExpand?.();
+                toggle(item.label);
+              }}
+              title={collapsed ? item.label : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 active:scale-[0.97]
+                ${collapsed ? "justify-center px-0" : ""}
                 ${
                   isActive
                     ? "bg-primary-50 text-primary-700 font-medium shadow-sm"
@@ -88,18 +98,20 @@ export function Sidebar({ items }: SidebarProps) {
                 }`}
             >
               <span className="flex-shrink-0"><NavIcon icon={item.icon} /></span>
-              <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
-              <span
-                className={`text-[10px] text-gray-400 inline-block transition-transform ${
-                  isOpen ? "rotate-90" : ""
-                }`}
-              >
-                ▶
-              </span>
+              {!collapsed && <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>}
+              {!collapsed && (
+                <span
+                  className={`text-[10px] text-gray-400 inline-block transition-transform ${
+                    isOpen ? "rotate-90" : ""
+                  }`}
+                >
+                  ▶
+                </span>
+              )}
             </button>
 
-            {/* 二级菜单 */}
-            {isOpen && (
+            {/* 二级菜单（折叠态不展示） */}
+            {!collapsed && isOpen && (
               <div className="mt-0.5 ml-4 border-l border-gray-100 pl-2 space-y-0.5">
                 {item.children!.map((child) => {
                   const active = isItemActive(pathname, child.href);

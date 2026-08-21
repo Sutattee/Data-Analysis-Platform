@@ -41,20 +41,16 @@ export default function EnergyOverviewPage() {
         {/* 顶部 9 张指标卡 */}
         <OverviewMetricCards />
 
-        {/* 单箱综合能耗趋势 + 电耗趋势（三指标页签：全厂 / 制丝 / 卷包，日/月切换） */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* 第一行：单箱综合能耗趋势 + 电耗趋势（三指标页签：全厂 / 制丝 / 卷包，日/月切换）+ 区域电耗对比 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <ComprehensiveEnergyChart onAnomaly={onAnomaly} />
           <ElectricityCombinedChart onAnomaly={onAnomaly} />
-        </div>
-
-        {/* 蒸汽消耗分析 + 区域电耗对比 */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SteamConsumptionChart onAnomaly={onAnomaly} />
           <DeptPowerCompareChart />
         </div>
 
-        {/* 天然气消耗分析 + 单位产量碳排放趋势（按月） */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* 第二行：蒸汽消耗分析 + 天然气单耗分析 + 单位产量碳排放趋势（按月） */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <SteamConsumptionChart onAnomaly={onAnomaly} />
           <GasConsumptionChart onAnomaly={onAnomaly} />
           <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
         </div>
