@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { OverviewMetricCards } from "@/components/energy-overview/OverviewMetricCards";
 import { ComprehensiveEnergyChart } from "@/components/energy-overview/ComprehensiveEnergyChart";
-import { ElectricityTrendChart } from "@/components/energy-overview/ElectricityTrendChart";
-import { WorkshopElectricityChart } from "@/components/energy-overview/WorkshopElectricityChart";
+import { ElectricityCombinedChart } from "@/components/energy-overview/ElectricityCombinedChart";
 import { DeptPowerCompareChart } from "@/components/energy-overview/DeptPowerCompareChart";
 import { SteamConsumptionChart } from "@/components/energy-overview/SteamConsumptionChart";
 import { GasConsumptionChart } from "@/components/energy-overview/GasConsumptionChart";
@@ -42,26 +41,23 @@ export default function EnergyOverviewPage() {
         {/* 顶部 9 张指标卡 */}
         <OverviewMetricCards />
 
-        {/* 单箱综合能耗趋势（周 / 月 / 年） */}
-        <ComprehensiveEnergyChart onAnomaly={onAnomaly} />
-
-        {/* 单箱电耗趋势（日 / 月） */}
-        <ElectricityTrendChart onAnomaly={onAnomaly} />
-
-        {/* 车间单位电耗 + 部门电耗对比 */}
+        {/* 单箱综合能耗趋势 + 电耗趋势（三指标页签：全厂 / 制丝 / 卷包，日/月切换） */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <WorkshopElectricityChart onAnomaly={onAnomaly} />
+          <ComprehensiveEnergyChart onAnomaly={onAnomaly} />
+          <ElectricityCombinedChart onAnomaly={onAnomaly} />
+        </div>
+
+        {/* 蒸汽消耗分析 + 区域电耗对比 */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SteamConsumptionChart onAnomaly={onAnomaly} />
           <DeptPowerCompareChart />
         </div>
 
-        {/* 蒸汽 + 天然气消耗分析 */}
+        {/* 天然气消耗分析 + 单位产量碳排放趋势（按月） */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SteamConsumptionChart onAnomaly={onAnomaly} />
           <GasConsumptionChart onAnomaly={onAnomaly} />
+          <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
         </div>
-
-        {/* 单位产量碳排放趋势 */}
-        <CarbonEmissionTrendChart onAnomaly={onAnomaly} />
 
         {/* 异常详情抽屉 */}
         <AnomalyDrawer open={drawer !== null} onClose={() => setDrawer(null)} detail={drawer} />

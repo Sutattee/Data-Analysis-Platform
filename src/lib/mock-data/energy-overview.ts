@@ -146,9 +146,12 @@ export const CARBON_MONTHLY = genMonthly({
   anomalies: [{ offset: 5, grade: "一般" }, { offset: 20, grade: "预警" }],
 });
 
-// 车间单位电耗（日）
+// 车间单位电耗（日 + 月）
 const SILK_POWER_DAILY = genDaily({ base: 0.46, avgBase: 0.47, seed: 13, decimals: 2, anomalies: [{ offset: 12, grade: "预警" }, { offset: 42, grade: "一般" }] });
 const PACK_POWER_DAILY = genDaily({ base: 20.4, avgBase: 20.8, seed: 17, decimals: 1, anomalies: [{ offset: 21, grade: "一般" }, { offset: 50, grade: "危险" }] });
+// 月度序列（供「电耗趋势」月档：制丝车间每公斤电耗 / 卷包车间单位电耗）
+export const SILK_POWER_MONTHLY = genMonthly({ base: 0.462, avgBase: 0.47, seed: 13, decimals: 2, anomalies: [{ offset: 6, grade: "预警" }, { offset: 17, grade: "一般" }] });
+export const PACK_POWER_MONTHLY = genMonthly({ base: 20.5, avgBase: 20.8, seed: 17, decimals: 1, anomalies: [{ offset: 9, grade: "一般" }, { offset: 20, grade: "危险" }] });
 
 // 蒸汽（日）
 const STEAM_TOTAL_DAILY = genDaily({ base: 126, avgBase: 129, seed: 19, decimals: 0, waveAmp: 0.06, anomalies: [{ offset: 11, grade: "危险" }, { offset: 37, grade: "预警" }, { offset: 63, grade: "一般" }] });

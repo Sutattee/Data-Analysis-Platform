@@ -114,23 +114,21 @@ export function OverviewMetricCards() {
         );
       })}
 
-      {/* 碳排放分类卡（按月展示一 / 二 / 三 / 四类碳排放，跨两列） */}
-      <div className="col-span-2">
-        <CardShell color="#8b5cf6">
-          <div className="mb-1.5 text-xs text-gray-500">碳排放（{carbonBreakdown.period}）</div>
-          <div className="space-y-1.5">
-            {carbonBreakdown.items.map((it) => (
-              <div key={it.label} className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{it.label}</span>
-                <span className="text-sm font-medium text-gray-800">
-                  {it.value.toLocaleString()}{" "}
-                  <span className="text-xs font-normal text-gray-400">{carbonBreakdown.unit}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardShell>
-      </div>
+      {/* 碳排放分类卡（按月展示一 / 二 / 三 / 四类碳排放，单列宽） */}
+      <CardShell color="#8b5cf6">
+        <div className="mb-1.5 text-xs text-gray-500">碳排放（{carbonBreakdown.period}）</div>
+        <div className="space-y-1.5">
+          {carbonBreakdown.items.map((it) => (
+            <div key={it.label} className="flex items-center justify-between">
+              <span className="text-xs text-gray-500">{it.label}</span>
+              <span className="text-sm font-medium text-gray-800">
+                {it.value.toLocaleString()}{" "}
+                <span className="text-xs font-normal text-gray-400">{carbonBreakdown.unit}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardShell>
     </div>
   );
 }

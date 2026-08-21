@@ -48,7 +48,7 @@ export function ComprehensiveEnergyChart({ onAnomaly }: { onAnomaly: (d: Anomaly
         />
       }
     >
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={range === "月" ? 2 : 0} />
