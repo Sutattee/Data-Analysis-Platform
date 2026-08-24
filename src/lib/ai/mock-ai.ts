@@ -1,7 +1,17 @@
 import { QaMessage, ExecutionNode, KnowledgeSource } from "@/types";
 import { qaPresets, welcomeMessage } from "@/lib/mock-data/qa";
+import { matchStandardQa } from "@/lib/mock-data/standard-qa";
 import { matchSmartQuery, SmartQueryCase } from "@/lib/mock-data/smart-query";
 import { generateId, delay } from "@/lib/utils";
+
+// 统一命中答案的包装格式：已结构化内容保持原样，表格内容包装为结构化回答
+function finalizeMatchedAnswer(answer: string): string {
+  if (answer.includes("## 📊") || answer.includes("## 🔍")) return answer;
+  if (answer.includes("|")) {
+    return `## 📊 分析概述\n\n根据您的查询，系统已完成对相关业务数据的分析与汇总。\n\n## 🔍 主要发现\n\n${answer}\n\n## 💡 总结与建议\n\n建议持续关注关键指标变化趋势，如有异常请及时排查。`;
+  }
+  return answer;
+}
 
 // ========== 工具函数 ==========
 
@@ -321,6 +331,25 @@ export async function mockAiResponse(userMessage: string): Promise<QaMessage> {
     return handleChartModification(userMessage);
   }
 
+  // FAQ 标准问答匹配：优先于智能问数/知识问答流程；
+  // 达到匹配阈值直接返回标准答案，未达到则继续进入原有处理流程
+  const faqHit = matchStandardQa(userMessage);
+  if (faqHit) {
+    const faqAnswer = finalizeMatchedAnswer(faqHit.answer);
+    const { nodes, totalMs } = generateThinkingProcess("analysis");
+    return {
+      id: generateId(),
+      role: "assistant",
+      content: faqAnswer,
+      timestamp: Date.now(),
+      followUpQuestions: generateFollowUps(userMessage, "analysis"),
+      executionNodes: nodes,
+      thinkingTime: Math.round(totalMs / 100) / 10,
+      answerType: "analysis",
+      chartMeta: getChartMeta(faqAnswer),
+    };
+  }
+
   // 智能问数（4 段结构化回答）优先匹配
   const smartCase = matchSmartQuery(userMessage);
   if (smartCase) {
@@ -344,17 +373,8 @@ export async function mockAiResponse(userMessage: string): Promise<QaMessage> {
     answerType = "knowledge";
     knowledgeSources = generateKnowledgeSources();
   } else {
-    // 数据分析类——如果匹配内容已有结构则直接用，否则包装
-    if (matchedAnswer && (matchedAnswer.includes("## 📊") || matchedAnswer.includes("## 🔍"))) {
-      finalContent = matchedAnswer;
-    } else if (matchedAnswer && matchedAnswer.includes("|")) {
-      // 有表格的旧格式，包装成新结构
-      finalContent = `## 📊 分析概述\n\n根据您的查询，系统已完成对相关业务数据的分析与汇总。\n\n## 🔍 主要发现\n\n${matchedAnswer}\n\n## 💡 总结与建议\n\n建议持续关注关键指标变化趋势，如有异常请及时排查。`;
-    } else if (matchedAnswer) {
-      finalContent = matchedAnswer;
-    } else {
-      finalContent = matchedAnswer || "抱歉，服务暂时不可用。";
-    }
+    // 数据分析类——统一包装格式（已结构化内容保持原样）
+    finalContent = matchedAnswer ? finalizeMatchedAnswer(matchedAnswer) : "抱歉，服务暂时不可用。";
     answerType = "analysis";
   }
 
