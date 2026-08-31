@@ -182,11 +182,10 @@ export function ForecastRecordsView() {
                         <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetail(r)}>
                           查看详情
                         </Button>
-                        {!isFail && (
-                          <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => replay(r)}>
-                            再次预测
-                          </Button>
-                        )}
+                        {/* 所有记录（含预测失败）均支持按原条件再次预测 */}
+                        <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => replay(r)}>
+                          再次预测
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -247,7 +246,6 @@ export function ForecastRecordsView() {
             <Field label="预测对象" value={detail.object} />
             <Field label="预测问题" value={detail.question} />
             <Field label="执行时间" value={detail.executedAt} />
-            <Field label="模型版本" value={detail.modelVersion} />
             <Field label="记录编号" value={<code className="text-xs">{detail.id}</code>} />
 
             {/* 二、预测条件 */}
@@ -273,7 +271,15 @@ export function ForecastRecordsView() {
               </div>
             </div>
 
-            {/* 三、预测结果 */}
+            {/* 三、模型信息（本次预测执行时使用的模型快照） */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <div className="mb-2 text-sm font-semibold text-gray-800">模型信息</div>
+              <Field label="模型名称" value={detail.modelName} />
+              <Field label="模型版本" value={detail.modelVersion} />
+              <Field label="来源" value={detail.modelSource} />
+            </div>
+
+            {/* 四、预测结果 */}
             <div className="mt-4 border-t border-gray-100 pt-4">
               <div className="mb-2 text-sm font-semibold text-gray-800">预测结果</div>
               {detail.status === "预测失败" ? (

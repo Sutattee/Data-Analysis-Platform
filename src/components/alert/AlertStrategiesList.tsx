@@ -8,7 +8,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { Spinner } from "@/components/ui/Spinner";
 import { Drawer } from "@/components/ui/Drawer";
 import { Modal } from "@/components/ui/Modal";
-import { AlertLevelBadge, AlertStatusText } from "@/components/alert/alertBadges";
+import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { useApp } from "@/lib/store/AppContext";
 import { useToast } from "@/components/ui/Toast";
@@ -25,16 +25,9 @@ import type { AlertStrategy } from "@/types";
 interface StratFilter {
   keyword: string;
   type: string;
-  domain: string;
   enabled: string;
 }
-const EMPTY_FILTER: StratFilter = { keyword: "", type: "", domain: "能源消耗", enabled: "" };
-
-// 业务域筛选选项
-const BIZ_DOMAINS = ["生产管理", "工艺质量", "能源消耗"];
-
-const selectCls =
-  "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
+const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "" };
 
 // 启用前校验配置完整性
 function validateStrategy(s: AlertStrategy): { ok: boolean; msg: string } {
@@ -58,9 +51,9 @@ export function AlertStrategiesList() {
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
 
-  // 默认展示能源消耗方向的告警策略
+  // 默认展示「当前异常」类型的告警策略
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
-    getAlertStrategies().filter((s) => s.domain === "能源消耗" && s.type === "当前异常")
+    getAlertStrategies().filter((s) => s.type === "当前异常")
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<StratFilter>(EMPTY_FILTER);
@@ -106,7 +99,6 @@ export function AlertStrategiesList() {
     const filtered = strategies.filter(
       (s) =>
         (!applied.keyword.trim() || s.name.toLowerCase().includes(applied.keyword.trim().toLowerCase())) &&
-        (!applied.domain || s.domain === applied.domain) &&
         (!applied.enabled || (applied.enabled === "启用" ? s.enabled : !s.enabled)) &&
         matchStrategyOrg(s)
     );
@@ -122,7 +114,7 @@ export function AlertStrategiesList() {
     orgFilter.workshop !== "" || orgFilter.grid !== "" || orgFilter.equipment !== "";
 
   function handleSearch() {
-    setApplied((prev) => ({ ...prev, keyword: filter.keyword, domain: filter.domain }));
+    setApplied((prev) => ({ ...prev, keyword: filter.keyword }));
     setPage(1);
     runLoad();
   }
@@ -193,26 +185,6 @@ export function AlertStrategiesList() {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">业务域</span>
-            <select
-              className={selectCls}
-              value={applied.domain}
-              onChange={(e) => {
-                const newDomain = e.target.value;
-                setApplied((prev) => ({ ...prev, domain: newDomain }));
-                // 切换业务域时重新加载对应域的策略
-                setStrategies(
-                  getAlertStrategies().filter((s) => s.domain === newDomain && s.type === "当前异常")
-                );
-                setPage(1);
-              }}
-            >
-              {BIZ_DOMAINS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
           <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
         </div>
       </Card>
@@ -381,12 +353,9 @@ export function AlertStrategiesList() {
               <div className="space-y-2">
                 {recordsOf(recordsTarget).map((r) => (
                   <div key={r.id} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2">
-                        <AlertLevelBadge level={r.level} />
-                        <span className="text-sm font-medium text-gray-800">{r.title}</span>
-                      </div>
-                      <AlertStatusText status={r.status} />
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertLevelBadge level={r.level} />
+                      <span className="text-sm font-medium text-gray-800">{r.title}</span>
                     </div>
                     <div className="text-xs text-gray-400">{r.id} · {r.objectName} · {r.triggerTime}</div>
                   </div>

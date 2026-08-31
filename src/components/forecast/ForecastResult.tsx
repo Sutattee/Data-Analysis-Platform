@@ -96,6 +96,7 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
               <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#9ca3af" />
               <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={64} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="value" name={`预测值(${chart.unit})`} radius={[4, 4, 0, 0]} barSize={64}>
                 {chart.bars.map((b, i) => (
                   <Cell key={i} fill={b.tone === "actual" ? "#3b82f6" : "#93c5fd"} />
@@ -112,6 +113,7 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
               <XAxis type="number" tick={{ fontSize: 10 }} stroke="#9ca3af" />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="#9ca3af" width={180} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="value" name={chart.unit} radius={[0, 4, 4, 0]} barSize={20}>
                 {chart.bars.map((b, i) => (
                   <Cell key={i} fill={b.tone === "target" ? "#f97316" : "#3b82f6"} />
@@ -120,10 +122,6 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
             </BarChart>
           </ResponsiveContainer>
         )}
-
-        <p className="mt-2 text-xs text-gray-400">
-          蓝色实线为实际值、蓝色虚线为预测值、浅蓝色区域为预测区间；橙色线为目标值。预测区间仅在选择的小模型支持时展示。
-        </p>
       </div>
     </div>
   );

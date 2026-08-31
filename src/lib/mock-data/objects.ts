@@ -1,10 +1,9 @@
-import type { ObjectMetricRef, ObjectRelation } from "@/types";
-import { metricList } from "./metric-management";
+import type { ObjectRelation } from "@/types";
 
 /**
- * 对象管理 —— 模拟数据 + 会话级 store（刷新还原）。
- * 统一维护企业内的对象结构及"对象-指标"关联关系。
+ * 对象数据 —— 模拟数据 + 会话级 store（刷新还原）。
  * 对象来源以能源组织树（alerts.ts ENERGY_ORG_TREE）与重点网格监测（grid-monitor.ts）的设备/仪表为基础。
+ * 供告警策略表单（告警对象候选）与重大事件年鉴（涉及对象选项）使用。
  */
 
 // 预置对象：覆盖主要车间与系统的代表对象（含多指标关联演示）
@@ -215,65 +214,9 @@ let objects: ObjectRelation[] = [
   },
 ];
 
-// 新建 id 序列（确定性递增）
-let nextSeq = 100;
-function nextObjectId(): string {
-  nextSeq += 1;
-  return `obj-${String(nextSeq).padStart(3, "0")}`;
-}
-
 // 对象列表（创建时间倒序，新增在前）
 export function listObjects(): ObjectRelation[] {
   return [...objects].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-}
-
-export function getObject(id: string): ObjectRelation | undefined {
-  return objects.find((o) => o.id === id);
-}
-
-// 更新对象（含对象-指标关联关系）
-export function updateObject(
-  id: string,
-  patch: Partial<Omit<ObjectRelation, "id">>,
-  ctx?: { user: string; now: string }
-): ObjectRelation | undefined {
-  const idx = objects.findIndex((o) => o.id === id);
-  if (idx === -1) return undefined;
-  objects[idx] = {
-    ...objects[idx],
-    ...patch,
-    ...(ctx ? { updatedAt: ctx.now, updatedBy: ctx.user } : {}),
-  };
-  return objects[idx];
-}
-
-// 新增对象（批量导入 / 手动新增公用；仪表号冲突返回 null）
-export function addObject(
-  input: Omit<ObjectRelation, "id" | "createdAt" | "createdBy" | "updatedAt" | "updatedBy">,
-  ctx: { user: string; now: string }
-): ObjectRelation | null {
-  if (objects.some((o) => o.meterNo === input.meterNo)) return null;
-  const created: ObjectRelation = {
-    id: nextObjectId(),
-    ...input,
-    createdAt: ctx.now,
-    createdBy: ctx.user,
-  };
-  objects = [created, ...objects];
-  return created;
-}
-
-// 对象名 / 指标中文名称 / 指标编码 关键字过滤（页面搜索用）
-export function searchObjects(keyword: string): ObjectRelation[] {
-  const kw = keyword.trim().toLowerCase();
-  if (!kw) return listObjects();
-  return listObjects().filter(
-    (o) =>
-      o.name.toLowerCase().includes(kw) ||
-      o.metrics.some(
-        (m) => m.nameCn.toLowerCase().includes(kw) || m.code.toLowerCase().includes(kw)
-      )
-  );
 }
 
 // 告警对象候选：按指标自动筛选已关联的对象（对象名称 + 所属组织/部门/系统聚合），供数据告警「告警对象」多选
@@ -288,16 +231,4 @@ export function objectsForMetric(metricName: string): string[] {
     }
   }
   return Array.from(names);
-}
-
-// 指标分组选项：按业务域分类（指标中文名称 + 编码），供关联指标滑出窗使用
-export function metricOptionsGrouped(): { domain: string; options: { value: string; label: string; hint: string }[] }[] {
-  const groups: Record<string, typeof metricList> = {};
-  for (const m of metricList) {
-    (groups[m.domain] ??= []).push(m);
-  }
-  return Object.entries(groups).map(([domain, list]) => ({
-    domain,
-    options: list.map((m) => ({ value: m.id, label: m.nameCn, hint: m.code })),
-  }));
 }

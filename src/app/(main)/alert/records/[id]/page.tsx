@@ -163,8 +163,6 @@ export default function AlertDetailPage() {
             <Field label="告警值" value={record.valueLabel} />
             <Field label="基准 / 阈值" value={record.baselineLabel} />
             <Field label="偏离程度" value={record.deviation} />
-            <Field label="发生时间" value={record.triggerTime} />
-            <Field label="持续时间" value={record.duration} />
           </div>
         </Card>
 
@@ -281,7 +279,6 @@ export default function AlertDetailPage() {
                 </span>
               }
             />
-            <Field label="处置说明" value={record.handleNote || "—"} />
           </div>
         </Card>
       </div>

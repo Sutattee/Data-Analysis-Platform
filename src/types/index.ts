@@ -348,9 +348,6 @@ export type AlertLevel = "提示" | "关注" | "预警" | "告警" | "危险";
 // 告警类型：当前异常（已发生）/ 预测风险（未来可能越界）
 export type AlertType = "当前异常" | "预测风险";
 
-// 处理状态
-export type AlertStatus = "未处理" | "已处理";
-
 // 业务领域
 export type AlertDomain = "生产管理" | "工艺质量" | "能源消耗";
 
@@ -365,7 +362,6 @@ export interface AlertRecord {
   objectName: string;         // 告警对象名称
   metricName: string;         // 指标中文名称
   triggerTime: string;        // 告警触发时间 YYYY-MM-DD HH:mm
-  status: AlertStatus;        // 处理状态
   // —— 核心告警数据 ——
   valueLabel: string;         // 告警值（当前异常=当前值 / 预测风险=预测值）
   baselineLabel: string;      // 基准 / 阈值
@@ -441,12 +437,21 @@ export interface MetricManage {
   decimals: number;        // 小数位数
   unit: string;            // 度量单位
   synonyms?: string;       // 同义词（选填）
-  dimensions: string;      // 维度
+  dimensions: string;      // 支持维度
+  statObject: string;      // 统计对象
+  statGranularity: string; // 统计粒度
+  updateFrequency: string; // 数据更新频率
   description?: string;    // 描述（选填）
   owner: string;           // 负责人
   createdAt: string;       // 创建时间
   updatedAt?: string;      // 更新时间
   calcFormula?: string;    // 计算公式
+  sourceDb?: string;       // 来源数据库
+  sourceTable?: string;    // 来源表
+  sourceFieldCn?: string;  // 来源字段中文名称
+  sourceFieldEn?: string;  // 来源字段英文名称
+  sourceSql?: string;      // SQL
+  fieldMeaning?: string;   // 涉及字段含义
   target?: { value: number; direction: "不高于" | "不低于" }; // 目标值（目标值管理）
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }

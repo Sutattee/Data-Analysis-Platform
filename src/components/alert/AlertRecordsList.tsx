@@ -24,7 +24,6 @@ interface AlertFilter {
   keyword: string;
   type: string;
   level: string;
-  domain: string;
   dateFrom: string;
   dateTo: string;
 }
@@ -33,13 +32,9 @@ const EMPTY_FILTER: AlertFilter = {
   keyword: "",
   type: "",
   level: "",
-  domain: "能源消耗",
   dateFrom: "",
   dateTo: "",
 };
-
-// 业务域筛选选项
-const BIZ_DOMAINS = ["生产管理", "工艺质量", "能源消耗"];
 
 const selectCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
@@ -52,14 +47,10 @@ export function AlertRecordsList() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 全量告警记录（当前异常 + 预测风险均展示），业务域/等级等筛选在 sorted 中进行
+  // 全量告警记录（当前异常 + 预测风险均展示），等级等筛选在 sorted 中进行
   const [records, setRecords] = useState<AlertRecord[]>(() => ALERT_RECORDS.map((r) => ({ ...r })));
-  const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/domain/date）
-  // 支持 URL ?domain= 预筛选业务域（网格监测「告警记录」跳转用）；非法值回退默认
-  const [applied, setApplied] = useState<AlertFilter>(() => {
-    const d = searchParams.get("domain");
-    return d ? { ...EMPTY_FILTER, domain: BIZ_DOMAINS.includes(d) ? d : EMPTY_FILTER.domain } : EMPTY_FILTER;
-  });
+  const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/date）
+  const [applied, setApplied] = useState<AlertFilter>(EMPTY_FILTER);
   // 支持 URL ?object= 预筛选（仪表盘异常点击跳转），映射为组织级联筛选
   const [orgFilter, setOrgFilter] = useState<OrgFilter>(() => {
     const name = searchParams.get("object");
@@ -123,11 +114,10 @@ export function AlertRecordsList() {
       (r) =>
         matchKeyword(r, applied.keyword) &&
         (!applied.level || r.level === applied.level) &&
-        (!applied.domain || r.domain === applied.domain) &&
         matchDate(r, applied.dateFrom, applied.dateTo) &&
         matchOrgName(r.objectName)
     );
-    // 未选等级时每个等级最多取 2 条：默认恰好 10 条且覆盖全部 5 个等级（切换业务域亦然）
+    // 未选等级时每个等级最多取 2 条：默认恰好 10 条且覆盖全部 5 个等级
     const capped = applied.level
       ? filtered
       : ALERT_LEVELS.flatMap((lv) => filtered.filter((r) => r.level === lv).slice(0, 2));
@@ -145,7 +135,7 @@ export function AlertRecordsList() {
     (Object.keys(applied) as (keyof AlertFilter)[]).some((k) => applied[k].trim() !== "") ||
     orgFilter.workshop !== "" || orgFilter.grid !== "" || orgFilter.equipment !== "";
 
-  // 查询：同步输入态（keyword/domain/date），保留表头筛选（type/level/status）
+  // 查询：同步输入态（keyword/date），保留表头筛选（level）
   function handleSearch() {
     setApplied((prev) => ({
       ...prev,
@@ -178,7 +168,7 @@ export function AlertRecordsList() {
 
   return (
     <div className="space-y-4">
-      {/* 搜索 + 筛选区（类型/等级/状态已移至表头） */}
+      {/* 搜索 + 筛选区（等级筛选已移至表头） */}
       <Card padding>
         <div className="flex gap-2 flex-wrap">
           <input
@@ -193,23 +183,6 @@ export function AlertRecordsList() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">业务域</span>
-            <select
-              className={selectCls}
-              value={applied.domain}
-              onChange={(e) => {
-                setApplied((prev) => ({ ...prev, domain: e.target.value }));
-                setPage(1);
-              }}
-            >
-              {BIZ_DOMAINS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
           <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">时间范围</span>

@@ -2,7 +2,7 @@
 
 import type { ConclusionSection } from "@/lib/mock-data/forecast";
 
-// 结构化分析结论：三段式（核心预测结论 / 预测逻辑与可信度评估 / 策略建议与后续行动）
+// 结构化分析结论：三段式（预测结论 / 预测逻辑 / 策略建议）
 export function ConclusionPanel({ sections }: { sections: ConclusionSection[] }) {
   return (
     <div className="space-y-4 rounded-lg bg-gray-50 p-4">

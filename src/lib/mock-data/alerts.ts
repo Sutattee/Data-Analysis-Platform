@@ -3,14 +3,12 @@ import type {
   AlertLevel,
   AlertType,
   AlertDomain,
-  AlertStatus,
 } from "@/types";
 
 // ========== 筛选项枚举 ==========
 export const ALERT_LEVELS: AlertLevel[] = ["提示", "关注", "预警", "告警", "危险"];
 export const ALERT_TYPES: AlertType[] = ["当前异常", "预测风险"];
 export const ALERT_DOMAINS: AlertDomain[] = ["生产管理", "工艺质量", "能源消耗"];
-export const ALERT_STATUSES: AlertStatus[] = ["未处理", "已处理"];
 
 // ========== 等级优先级（数值越大越严重，用于默认排序） ==========
 export const LEVEL_PRIORITY: Record<AlertLevel, number> = {
@@ -74,8 +72,6 @@ export const ALERT_USERS = [
 ];
 
 const NOTIFY_COMBOS: string[][] = [
-  ["站内消息"],
-  ["站内消息", "邮件"],
   ["邮件"],
 ];
 const HANDLE_NOTES = [
@@ -170,7 +166,6 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) =>
     objectName: obj.name,
     metricName: obj.metric,
     triggerTime,
-    status: handled ? "已处理" : "未处理",
     // 核心告警数据
     valueLabel,
     baselineLabel,

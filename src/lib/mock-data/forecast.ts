@@ -699,16 +699,16 @@ function buildConclusions(
   actions: string[]
 ): ConclusionSection[] {
   return [
-    { icon: "", title: "核心预测结论", lines: coreFacts },
+    { icon: "", title: "预测结论", lines: coreFacts },
     {
       icon: "",
-      title: "预测逻辑与可信度评估",
+      title: "预测逻辑",
       lines: [
         `预测模型：${model.name}；历史预测误差 ${model.accuracy}（近 90 天回测）。`,
         `主要影响因素：${m.influencers[0]}；${m.influencers[1]}。`,
         `适用限制：模型基于近 30 天运行数据训练，遇重大工艺变更或设备改造需重新训练；预测区间为 90% 置信水平。`,
       ],
     },
-    { icon: "", title: "策略建议与后续行动", lines: actions },
+    { icon: "", title: "策略建议", lines: actions },
   ];
 }

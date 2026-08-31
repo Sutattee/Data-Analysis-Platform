@@ -69,7 +69,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
     </svg>
   ),
 
-  // ===== 智能应用板块 =====
+  // ===== 原智能应用模块（现归属能源消耗板块） =====
   "⚠️": (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
       <rect x="2" y="2" width="16" height="16" rx="3" fill="#F59E0B" />

@@ -12,8 +12,6 @@ import {
   DOMAIN_LABEL_MAP,
   ATTRIBUTION_RELATIONS,
   ATTRIBUTION_MAPPINGS,
-  DATA_FETCH_MODES,
-  FETCH_MODE_CALIBER_HINT,
   type AttributionDomainKey,
   type AttributionRelation,
   type AttributionMapping,
@@ -51,14 +49,27 @@ export default function AttributionPage({ params }: { params: { domain: string }
   const [importOpen, setImportOpen] = useState(false);
   // 查看详情目标（归因关系 / 数据映射 共用，按当前 tab 渲染对应字段）
   const [detailTarget, setDetailTarget] = useState<AttributionRelation | AttributionMapping | null>(null);
+  // 删除：二次确认目标 + 会话级已删除 id（两类数据 id 全局唯一，共用一份）
+  const [deleteTarget, setDeleteTarget] = useState<AttributionRelation | AttributionMapping | null>(null);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
 
-  // 当前 tab 的数据（按归因模板名称/指标中文名称/指标编码搜索）
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeletedIds((prev) => [...prev, deleteTarget.id]);
+    toast("已删除", "success");
+    setDeleteTarget(null);
+  }
+
+  // 当前 tab 的数据（按指标中文名称/指标编码搜索，排除已删除项）
   const source = useMemo(() => {
     const all = tab === "relation" ? ATTRIBUTION_RELATIONS[domain] : ATTRIBUTION_MAPPINGS[domain];
     const kw = applied.trim().toLowerCase();
-    if (!kw) return all;
-    return all.filter((r) => (r.templateName + r.metricCn + r.metricCode).toLowerCase().includes(kw));
-  }, [tab, domain, applied]);
+    return all.filter(
+      (r) =>
+        !deletedIds.includes(r.id) &&
+        (!kw || (r.metricCn + r.metricCode).toLowerCase().includes(kw))
+    );
+  }, [tab, domain, applied, deletedIds]);
 
   const total = source.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -104,7 +115,7 @@ export default function AttributionPage({ params }: { params: { domain: string }
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="搜索归因模板名称/指标中文名称/指标编码"
+            placeholder="搜索指标中文名称/指标编码"
             className="flex-1 min-w-[260px] max-w-[420px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
           <Button onClick={handleSearch}>查询</Button>
@@ -121,7 +132,6 @@ export default function AttributionPage({ params }: { params: { domain: string }
               <tr className="border-b border-gray-100 bg-gray-50">
                 {tab === "relation" ? (
                   <>
-                    <th className={th}>归因模板名称</th>
                     <th className={th}>指标中文名称</th>
                     <th className={th}>指标编码</th>
                     <th className={th}>候选因素</th>
@@ -136,10 +146,9 @@ export default function AttributionPage({ params }: { params: { domain: string }
                     <th className={th}>指标中文名称</th>
                     <th className={th}>指标编码</th>
                     <th className={th}>候选因素</th>
-                    <th className={th}>取数方式</th>
                     <th className={th}>关联数据资产</th>
-                    <th className={th}>取值口径</th>
-                    <th className={th}>适用对象</th>
+                    <th className={th}>来源数据库</th>
+                    <th className={th}>来源表</th>
                     <th className={`${th} text-right`}>操作</th>
                   </>
                 )}
@@ -148,13 +157,12 @@ export default function AttributionPage({ params }: { params: { domain: string }
             <tbody className="divide-y divide-gray-50">
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={tab === "relation" ? 9 : 8} className="py-16 text-center text-sm text-gray-400">暂无数据</td>
+                  <td colSpan={tab === "relation" ? 8 : 7} className="py-16 text-center text-sm text-gray-400">暂无数据</td>
                 </tr>
               ) : tab === "relation" ? (
                 (paged as AttributionRelation[]).map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{r.templateName}</td>
-                    <td className="px-4 py-3 text-gray-700">{r.metricCn}</td>
+                    <td className="px-4 py-3 font-medium text-gray-800">{r.metricCn}</td>
                     <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.metricCode}</td>
                     <td className="px-4 py-3 text-gray-700">{r.factor}</td>
                     <td className="px-4 py-3 text-gray-600">{r.influenceDir}</td>
@@ -167,6 +175,7 @@ export default function AttributionPage({ params }: { params: { domain: string }
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(r)}>查看</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(r)}>删除</Button>
                     </td>
                   </tr>
                 ))
@@ -176,14 +185,12 @@ export default function AttributionPage({ params }: { params: { domain: string }
                     <td className="px-4 py-3 font-medium text-gray-800">{r.metricCn}</td>
                     <td className="px-4 py-3 text-gray-500 font-mono text-xs">{r.metricCode}</td>
                     <td className="px-4 py-3 text-gray-700">{r.factor}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.fetchMode}</td>
                     <td className="px-4 py-3 text-gray-600">{r.dataAsset}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[240px]">
-                      <div className="truncate" title={r.caliber}>{r.caliber}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{r.scope || "—"}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{r.sourceDb}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{r.sourceTable}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(r)}>查看</Button>
+                      <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteTarget(r)}>删除</Button>
                     </td>
                   </tr>
                 ))
@@ -211,6 +218,22 @@ export default function AttributionPage({ params }: { params: { domain: string }
         />
       )}
 
+      {/* 删除二次确认（归因关系 / 数据映射 共用） */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={tab === "relation" ? "删除归因关系" : "删除数据映射"}
+        size="sm"
+      >
+        <p className="text-sm text-gray-600">
+          确定要删除「{deleteTarget?.metricCn}｜{deleteTarget?.factor}」这条{tab === "relation" ? "归因关系" : "数据映射"}吗？删除后不可恢复。
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteTarget(null)}>取消</Button>
+          <Button variant="danger" onClick={confirmDelete}>确认删除</Button>
+        </div>
+      </Modal>
+
       {/* 查看详情抽屉 */}
       <Drawer
         open={detailTarget !== null}
@@ -225,7 +248,6 @@ export default function AttributionPage({ params }: { params: { domain: string }
       >
         {detailTarget && tab === "relation" ? (
           <div className="space-y-4">
-            <Field label="归因模板名称" value={detailTarget.templateName} />
             <Field label="指标中文名称" value={detailTarget.metricCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.metricCode}</code>} />
             <Field label="候选因素" value={detailTarget.factor} />
@@ -236,14 +258,15 @@ export default function AttributionPage({ params }: { params: { domain: string }
           </div>
         ) : detailTarget ? (
           <div className="space-y-4">
-            <Field label="归因模板名称" value={detailTarget.templateName} />
             <Field label="指标中文名称" value={detailTarget.metricCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.metricCode}</code>} />
             <Field label="候选因素" value={detailTarget.factor} />
-            <Field label="取数方式" value={(detailTarget as AttributionMapping).fetchMode} />
             <Field label="关联数据资产" value={(detailTarget as AttributionMapping).dataAsset} />
+            <Field label="来源数据库" value={(detailTarget as AttributionMapping).sourceDb} />
+            <Field label="来源表" value={(detailTarget as AttributionMapping).sourceTable} />
+            <Field label="来源字段中文名称" value={(detailTarget as AttributionMapping).sourceFieldCn} />
+            <Field label="来源字段英文名称" value={<code className="text-xs">{(detailTarget as AttributionMapping).sourceFieldEn}</code>} />
             <Field label="取值口径" value={(detailTarget as AttributionMapping).caliber} />
-            <Field label="适用对象" value={(detailTarget as AttributionMapping).scope} />
           </div>
         ) : null}
       </Drawer>
@@ -270,12 +293,12 @@ function ImportModal({
   function downloadTemplate() {
     let header: string; let sample: string; let filename: string;
     if (kind === "relation") {
-      header = "归因模板名称,指标中文名称,指标编码,候选因素,影响方向,影响机制,因素属性,特殊说明(选填)\n";
-      sample = "生产单位电耗归因模板,制丝车间每公斤电耗,I_ING_001,制丝车间产量,负向,产量下降时固定负荷占比上升单位电耗升高,正常业务驱动,对应制丝除尘纯水系统等重点网格\n";
+      header = "指标中文名称,指标编码,候选因素,影响方向,影响机制,因素属性,特殊说明(选填)\n";
+      sample = "制丝车间每公斤电耗,I_ING_001,制丝车间产量,负向,产量下降时固定负荷占比上升单位电耗升高,正常业务驱动,对应制丝除尘纯水系统等重点网格\n";
       filename = "归因关系模板.xlsx";
     } else {
-      header = "归因模板名称,指标中文名称,指标编码,候选因素,取数方式,关联数据资产,取值口径,适用对象(选填)\n";
-      sample = "生产单位电耗归因模板,制丝车间每公斤电耗,I_ING_001,制丝车间产量,引用已有日汇总字段,能耗计量表,按制丝工序一日一值汇总取当日产量与电耗,制丝车间\n";
+      header = "指标中文名称,指标编码,候选因素,关联数据资产,来源数据库,来源表,来源字段中文名称,来源字段英文名称,取值口径\n";
+      sample = "制丝车间每公斤电耗,I_ING_001,制丝车间产量,能耗计量表,ods_energy,t_meter_daily,制丝车间产量,silk_workshop_output,按制丝工序一日一值汇总取当日产量与电耗\n";
       filename = "数据映射模板.xlsx";
     }
     const blob = new Blob(["﻿" + header + sample], { type: "text/csv;charset=utf-8;" });
@@ -312,15 +335,6 @@ function ImportModal({
           <div className="mt-1.5">
             <button onClick={downloadTemplate} className="text-sm text-primary-600 hover:text-primary-700">{tmplBtnLabel}</button>
           </div>
-          {/* 数据映射：取数方式与取值口径说明（5 种填写规范） */}
-          {kind === "mapping" && (
-            <div className="mt-2 text-xs text-gray-400 leading-relaxed">
-              <div className="mb-0.5">取数方式与取值口径说明：</div>
-              {DATA_FETCH_MODES.map((m, i) => (
-                <div key={m}>{i + 1}.{m}：{FETCH_MODE_CALIBER_HINT[m]}</div>
-              ))}
-            </div>
-          )}
           {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
         </div>
 

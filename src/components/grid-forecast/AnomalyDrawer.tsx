@@ -88,14 +88,10 @@ export function AnomalyDrawer({
   const hasCause = !!effectiveCause?.trim();
   // 原因类型：本次会话保存后展示补录信息；否则取页面构造的 causeType / 告警记录的 causeType
   const causeTypeLabel = savedMeta
-    ? `（${savedMeta.type}）`
-    : detail?.causeType
-      ? `（${detail.causeType}）`
-      : detail?.cause
-        ? "（AI生成）"
-        : rec?.causeType
-          ? `（${rec.causeType}）`
-          : undefined;
+    ? savedMeta.type
+    : detail?.causeType ??
+      (detail?.cause ? "AI生成" : rec?.causeType) ??
+      undefined;
 
   function formatNow(): string {
     const d = new Date();
@@ -194,7 +190,7 @@ export function AnomalyDrawer({
             {hasCause && !editing ? (
               <div className="space-y-2">
                 <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">{effectiveCause}</p>
-                {causeTypeLabel && <p className="text-xs text-gray-400">（原因类型）：{causeTypeLabel}</p>}
+                {causeTypeLabel && <p className="text-xs text-gray-400">原因类型：{causeTypeLabel}</p>}
                 {savedMeta && (
                   <p className="text-xs text-gray-400">
                     补录人：{savedMeta.by}｜补录时间：{savedMeta.time}

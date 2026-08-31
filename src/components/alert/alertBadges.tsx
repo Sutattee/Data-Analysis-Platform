@@ -1,4 +1,4 @@
-import type { AlertLevel, AlertType, AlertStatus } from "@/types";
+import type { AlertLevel, AlertType } from "@/types";
 import type { MonitorStatus } from "@/lib/mock-data/grid-monitor";
 
 const TAG_BASE = "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap";
@@ -33,13 +33,4 @@ export function MonitorStatusBadge({ status }: { status: MonitorStatus }) {
 // 告警类型标签：常规黑色普通标签（不使用醒目颜色）
 export function AlertTypeBadge({ type }: { type: AlertType }) {
   return <span className={`${TAG_BASE} bg-gray-100 text-gray-700`}>{type}</span>;
-}
-
-// 处理状态：已处理绿色字体 / 未处理灰色字体（纯文字，无背景）
-export function AlertStatusText({ status }: { status: AlertStatus }) {
-  return (
-    <span className={`text-xs font-medium ${status === "已处理" ? "text-green-600" : "text-gray-400"}`}>
-      {status}
-    </span>
-  );
 }

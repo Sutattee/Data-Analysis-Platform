@@ -25,7 +25,7 @@ export type MonitorStatus = "正常" | AlertLevel;
 export interface DeviceRow {
   code: string; // 设备编码（仪表号）
   name: string; // 设备名称
-  reading: number | null; // 当前读数 kWh（离线为 null）
+  reading: number | null; // 当日读数 kWh（离线为 null）
   avg: number; // 历史均值 kWh
   deviation: number | null; // 偏差率（4 位小数，离线为 null）
   status: MonitorStatus;

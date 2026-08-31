@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TraceMetric, TraceHistoryRecord, TRACE_THEMES } from "@/lib/mock-data/metric-trace";
+import { TraceMetric, TraceHistoryRecord } from "@/lib/mock-data/metric-trace";
 
 interface Props {
   tab: "metrics" | "history";
@@ -18,20 +18,10 @@ export function TraceSidebar({
   tab, onTabChange, metrics, history, activeMetricId, activeHistoryId, onSelectMetric, onSelectHistory,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set([TRACE_THEMES[0]]));
 
   const kw = search.trim().toLowerCase();
   const filteredMetrics = metrics.filter((m) => !kw || m.name.toLowerCase().includes(kw));
   const filteredHistory = history.filter((h) => !kw || h.question.toLowerCase().includes(kw));
-
-  function toggleGroup(theme: string) {
-    setExpanded((prev) => {
-      const n = new Set(prev);
-      if (n.has(theme)) n.delete(theme);
-      else n.add(theme);
-      return n;
-    });
-  }
 
   return (
     <aside className="w-64 flex-shrink-0 flex flex-col bg-white overflow-hidden">
@@ -55,7 +45,7 @@ export function TraceSidebar({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={tab === "metrics" ? "搜索指标" : "搜索问题"}
+          placeholder="搜索"
           className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
       </div>
@@ -63,38 +53,23 @@ export function TraceSidebar({
       {/* 列表 */}
       <div className="flex-1 overflow-auto px-2 py-2 min-h-0">
         {tab === "metrics" ? (
-          TRACE_THEMES.map((theme) => {
-            const items = filteredMetrics.filter((m) => m.theme === theme);
-            if (items.length === 0) return null;
-            const isOpen = expanded.has(theme);
-            return (
-              <div key={theme} className="mb-1">
+          filteredMetrics.length === 0 ? (
+            <div className="py-10 text-center text-xs text-gray-400">暂无指标</div>
+          ) : (
+            <div className="space-y-0.5">
+              {filteredMetrics.map((m) => (
                 <button
-                  onClick={() => toggleGroup(theme)}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-gray-50 text-xs font-medium text-gray-700"
+                  key={m.id}
+                  onClick={() => onSelectMetric(m.id)}
+                  className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
+                    activeMetricId === m.id ? "bg-primary-50 text-primary-700 font-medium" : "text-gray-600 hover:bg-gray-50"
+                  }`}
                 >
-                  <span className={`text-[10px] text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}>▶</span>
-                  <span>{theme}</span>
-                  <span className="text-gray-400">({items.length})</span>
+                  <span className="truncate">{m.name}</span>
                 </button>
-                {isOpen && (
-                  <div className="ml-3 border-l border-gray-100 pl-2 space-y-0.5 mt-0.5">
-                    {items.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => onSelectMetric(m.id)}
-                        className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
-                          activeMetricId === m.id ? "bg-primary-50 text-primary-700 font-medium" : "text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        <span className="truncate">{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })
+              ))}
+            </div>
+          )
         ) : filteredHistory.length === 0 ? (
           <div className="py-10 text-center text-xs text-gray-400">暂无记录</div>
         ) : (

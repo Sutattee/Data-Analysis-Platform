@@ -48,7 +48,7 @@ export default function GridMonitorPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">重点网格监测</h1>
-            <p className="mt-0.5 text-sm text-gray-500">数据更新频率：每日｜最新统计日期：{LATEST_ISO}</p>
+            <p className="mt-0.5 text-sm text-gray-500">数据更新频率：每小时｜最新统计日期：{LATEST_ISO} 12:00</p>
           </div>
           <label className="flex items-center gap-2 text-sm text-gray-500">
             统计日期

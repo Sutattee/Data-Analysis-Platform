@@ -1,6 +1,6 @@
 import { NavItem } from "@/types";
 
-// 能源消耗 - 二级导航（左侧纵向）
+// 能源消耗 - 二级导航（左侧纵向，含原智能应用板块全部模块）
 const ENERGY_NAV: NavItem[] = [
   { label: "能源总览",       href: "/energy/overview",     icon: "📊" },
   { label: "网格监控",       href: "/energy/grid-monitor", icon: "🖥️" },
@@ -13,10 +13,6 @@ const ENERGY_NAV: NavItem[] = [
     { label: "事件列表", href: "/energy/yearbook/events",  icon: "📋" },
     { label: "年鉴报告", href: "/energy/yearbook/reports", icon: "📚" },
   ]},
-];
-
-// 智能应用 - 二级导航（左侧纵向）
-const SMART_APP_NAV: NavItem[] = [
   { label: "告警中心",     href: "/alert", icon: "⚠️", children: [
     { label: "告警记录", href: "/alert/records",    icon: "📋" },
     { label: "告警管理", href: "/alert/management", icon: "🛠️" },
@@ -37,14 +33,7 @@ export const PRIMARY_NAV: NavItem[] = [
     href: "/energy",
     icon: "⚡",
     children: ENERGY_NAV,
-    matchPrefixes: ["/energy", "/dashboard/energy"],
-  },
-  {
-    label: "智能应用",
-    href: "/alert",
-    icon: "🤖",
-    children: SMART_APP_NAV,
-    matchPrefixes: ["/alert", "/qa", "/metric-trace", "/reports"],
+    matchPrefixes: ["/energy", "/dashboard/energy", "/alert", "/qa", "/metric-trace", "/reports"],
   },
   { label: "大模型平台", href: "/llm-platform", icon: "🧠" },
 ];
@@ -62,7 +51,6 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "数据源",     href: "/settings/data-source" },
       { label: "元数据管理", href: "/settings/metadata" },
       { label: "指标管理",   href: "/settings/metric-management" },
-      { label: "对象管理",   href: "/settings/object-management" },
       { label: "业务术语",   href: "/settings/biz-term" },
       { label: "业务逻辑",   href: "/settings/biz-logic" },
       { label: "折标系数",   href: "/settings/energy-coefficient" },

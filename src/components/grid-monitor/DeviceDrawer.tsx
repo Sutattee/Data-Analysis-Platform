@@ -69,7 +69,7 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
             <tr className="border-b border-gray-100 bg-gray-50 text-[11px] font-medium text-gray-500">
               <th className="px-3 py-2.5 text-left">设备编码</th>
               <th className="px-3 py-2.5 text-left">设备名称</th>
-              <th className="px-3 py-2.5 text-right">当前读数(kWh)</th>
+              <th className="px-3 py-2.5 text-right">当日读数(kWh)</th>
               <th className="px-3 py-2.5 text-right">历史均值(kWh)</th>
               <th className="px-3 py-2.5 text-right">偏差率</th>
               <th className="px-3 py-2.5 text-left">监测状态</th>

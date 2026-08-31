@@ -98,6 +98,7 @@ export default function StandardQaPage() {
   // 批量导入
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [dupMode, setDupMode] = useState<"skip" | "overwrite">("skip");
   const [importStep, setImportStep] = useState<"upload" | "result">("upload");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
@@ -253,6 +254,7 @@ export default function StandardQaPage() {
     setImportFile(null);
     setFileError("");
     setImportResult(null);
+    setDupMode("skip");
     setImportOpen(true);
   }
 
@@ -343,11 +345,6 @@ export default function StandardQaPage() {
         else if (!answer) reason = "标准答案不能为空";
         else if (!QA_DOMAINS.includes(domain))
           reason = `所属业务域无效（可选：${QA_DOMAINS.join("、")}）`;
-        else if (
-          items.some((o) => o.domain === domain && o.question === question) ||
-          accepted.some((o) => o.domain === domain && o.question === question)
-        )
-          reason = "同一业务域内已存在相同的标准问题";
 
         if (reason) {
           fails.push({
@@ -358,24 +355,51 @@ export default function StandardQaPage() {
             domain,
             reason,
           });
-        } else {
-          nextNum += 1;
-          accepted.push({
-            id: `qa-${String(nextNum).padStart(2, "0")}`,
+          return;
+        }
+
+        // 重名处理：跳过同名问题（记为失败）/ 覆盖已有同名问题（保留原 id，更新内容与更新时间）
+        const existing = items.find((o) => o.domain === domain && o.question === question);
+        const acceptedIdx = accepted.findIndex(
+          (o) => o.domain === domain && o.question === question
+        );
+
+        if (dupMode === "skip" && (existing || acceptedIdx !== -1)) {
+          fails.push({
+            rowNo,
             question,
             answer,
-            similarQuestions: similar,
+            similar: similarTxt.join("\n"),
             domain,
-            hitCount: 0,
-            createdBy: "管理员",
-            createdAt: now,
-            updatedBy: "管理员",
-            updatedAt: now,
+            reason: "同一业务域内已存在相同的标准问题",
           });
+          return;
         }
+
+        const base = existing ?? (acceptedIdx !== -1 ? accepted[acceptedIdx] : null);
+        const entry: StandardQaItem = base
+          ? { ...base, answer, similarQuestions: similar, updatedBy: "管理员", updatedAt: now }
+          : {
+              id: `qa-${String((nextNum += 1)).padStart(2, "0")}`,
+              question,
+              answer,
+              similarQuestions: similar,
+              domain,
+              hitCount: 0,
+              createdBy: "管理员",
+              createdAt: now,
+              updatedBy: "管理员",
+              updatedAt: now,
+            };
+        if (acceptedIdx !== -1) accepted[acceptedIdx] = entry;
+        else accepted.push(entry);
       });
 
-      if (accepted.length > 0) setItems((prev) => [...accepted, ...prev]);
+      // 覆盖模式下同名条目按 id 替换原有记录，其余新增在前
+      if (accepted.length > 0) {
+        const acceptedIds = new Set(accepted.map((a) => a.id));
+        setItems((prev) => [...accepted, ...prev.filter((p) => !acceptedIds.has(p.id))]);
+      }
       setImportResult({ okCount: accepted.length, fails });
       setImportStep("result");
     } catch {
@@ -743,6 +767,21 @@ export default function StandardQaPage() {
 
         {importStep === "upload" ? (
           <div className="space-y-3">
+            {/* 重名处理 */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">重名处理</label>
+              <div className="flex gap-5">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+                  <input type="radio" checked={dupMode === "skip"} onChange={() => setDupMode("skip")} className="accent-primary-600" />
+                  跳过同名问题
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+                  <input type="radio" checked={dupMode === "overwrite"} onChange={() => setDupMode("overwrite")} className="accent-primary-600" />
+                  覆盖已有同名问题
+                </label>
+              </div>
+            </div>
+
             {/* 上传区域 */}
             <div
               onClick={() => fileInputRef.current?.click()}

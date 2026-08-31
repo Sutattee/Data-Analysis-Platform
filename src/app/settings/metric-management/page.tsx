@@ -58,10 +58,18 @@ export default function MetricManagementPage() {
   const [file, setFile] = useState<File | null>(null);
   const [importError, setImportError] = useState("");
 
-  // 详情
+  // 详情 / 删除
   const [detailTarget, setDetailTarget] = useState<MetricManage | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MetricManage | null>(null);
   // 达标反推设置（列表操作入口 → 右侧滑出窗口）
   const [reverseMetric, setReverseMetric] = useState<MetricManage | null>(null);
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    setMetrics((prev) => prev.filter((m) => m.id !== deleteTarget.id));
+    toast("已删除", "success");
+    setDeleteTarget(null);
+  }
 
   const filtered = useMemo(() => {
     const kw = applied.trim().toLowerCase();
@@ -86,8 +94,8 @@ export default function MetricManagementPage() {
 
   // 下载模板（生成 csv 内容，模拟 xlsx 模板）
   function downloadTemplate() {
-    const header = "指标中文名称,指标编码,业务域,业务定义,计算口径,小数位数,度量单位,同义词(选填),负责人,描述(选填)\n";
-    const sample = "总利润,I_FIN_001,产品销售,,,2,元,,Frank,\n";
+    const header = "指标中文名称,指标编码,业务域,业务定义,计算口径,来源数据库,来源表,来源字段中文名称,来源字段英文名称,SQL,涉及字段含义,小数位数,度量单位,同义词(选填),负责人,描述(选填)\n";
+    const sample = "总利润,I_FIN_001,产品销售,,,dw_finance,ads_profit,总利润,total_profit,SELECT income_total - cost_total FROM ads_profit,income_total：收入总额；cost_total：成本费用总额,2,元,,Frank,\n";
     const blob = new Blob(["﻿" + header + sample], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -190,6 +198,14 @@ export default function MetricManagementPage() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => setDeleteTarget(m)}
+                      >
+                        删除
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -265,9 +281,19 @@ export default function MetricManagementPage() {
             <Field label="业务定义" value={detailTarget.definition} />
             <Field label="统计口径" value={detailTarget.formula} />
             <Field label="计算公式" value={detailTarget.calcFormula} />
+            <Field label="来源数据库" value={detailTarget.sourceDb} />
+            <Field label="来源表" value={detailTarget.sourceTable} />
+            <Field label="来源字段中文名称" value={detailTarget.sourceFieldCn} />
+            <Field label="来源字段英文名称" value={<code className="text-xs">{detailTarget.sourceFieldEn}</code>} />
+            <Field label="SQL" value={<code className="text-xs break-all">{detailTarget.sourceSql}</code>} />
+            <Field label="涉及字段含义" value={detailTarget.fieldMeaning} />
             <Field label="小数位数" value={String(detailTarget.decimals)} />
             <Field label="度量单位" value={detailTarget.unit} />
-            <Field label="同义词" value={detailTarget.synonyms} />
+            <Field label="支持维度" value={detailTarget.dimensions} />
+            <Field label="统计对象" value={detailTarget.statObject} />
+            <Field label="统计粒度" value={detailTarget.statGranularity} />
+            <Field label="数据更新频率" value={detailTarget.updateFrequency} />
+            <Field label="同义词（选填）" value={detailTarget.synonyms} />
             <Field label="描述" value={detailTarget.description} />
             <Field label="负责人" value={detailTarget.owner} />
             <Field label="创建时间" value={detailTarget.createdAt} />
@@ -285,6 +311,22 @@ export default function MetricManagementPage() {
           if (reverseMetric) updateReverseItems(reverseMetric.id, next);
         }}
       />
+
+      {/* 删除二次确认 */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="删除指标"
+        size="sm"
+      >
+        <p className="text-sm text-gray-600">
+          确定要删除指标「{deleteTarget?.nameCn}」吗？删除后不可恢复。
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteTarget(null)}>取消</Button>
+          <Button variant="danger" onClick={confirmDelete}>确认删除</Button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Card } from "@/components/ui/Card";
 import { DEPT_POWER } from "@/lib/mock-data/energy-overview";
 
-// 区域电耗对比：当期实际 vs 历史均值（横向条形图，按实际值降序，按天口径）
+// 区域电耗对比：当期实际（横向条形图，按实际值降序，按天口径）
 export function DeptPowerCompareChart() {
   const data = useMemo(() => [...DEPT_POWER].sort((a, b) => b.actual - a.actual), []);
 
@@ -22,7 +22,6 @@ export function DeptPowerCompareChart() {
             formatter={(v: any, n: any) => [Number(v).toLocaleString(), n]}
           />
           <Legend wrapperStyle={{ fontSize: 11, textAlign: "center" }} />
-          <Bar dataKey="avg" name="历史均值" fill="#93c5fd" radius={[0, 4, 4, 0]} barSize={12} />
           <Bar dataKey="actual" name="当期实际" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12} />
         </BarChart>
       </ResponsiveContainer>

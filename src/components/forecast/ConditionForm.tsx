@@ -340,6 +340,10 @@ export function ConditionForm({
           <Field label="历史数据范围">
             <div className={readonlyCls}>{HISTORY_RANGE}</div>
           </Field>
+          {/* 模型：展示该指标当前预测类型默认使用的最新版本模型，仅展示不可修改 */}
+          <Field label="模型">
+            <div className={readonlyCls}>{model.name}</div>
+          </Field>
         </div>
 
         <div className="my-4 border-t border-gray-100" />

@@ -122,9 +122,6 @@ export default function EnergyCoefficientPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">折标系数管理</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          统一维护能源折标准煤系数与能源碳排放因子及其历史版本，历史版本永久保留不可删除
-        </p>
       </div>
 
       {/* 筛选区 + 新增按钮 */}
