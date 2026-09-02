@@ -388,7 +388,7 @@ export interface AlertRecord {
 
 // ========== 告警管理（数据告警策略）==========
 export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间";
-export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "正常区间";
+export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "历史均值" | "正常区间";
 export type AlertDetectCycle = "每小时" | "每日" | "每月";
 export type AlertScope = "全部适用对象" | "指定对象"; // 保留类型兼容；新表单固定为指定对象
 
@@ -446,12 +446,11 @@ export interface MetricManage {
   createdAt: string;       // 创建时间
   updatedAt?: string;      // 更新时间
   calcFormula?: string;    // 计算公式
-  sourceDb?: string;       // 来源数据库
-  sourceTable?: string;    // 来源表
-  sourceFieldCn?: string;  // 来源字段中文名称
-  sourceFieldEn?: string;  // 来源字段英文名称
-  sourceSql?: string;      // SQL
-  fieldMeaning?: string;   // 涉及字段含义
+  defaultAgg?: string;     // 默认聚合
+  derivedFormula?: string; // 派生公式
+  sourceId?: string;       // 数据源ID
+  mainTable?: string;      // 主表
+  measureExpr?: string;    // 度量表达式
   target?: { value: number; direction: "不高于" | "不低于" }; // 目标值（目标值管理）
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }

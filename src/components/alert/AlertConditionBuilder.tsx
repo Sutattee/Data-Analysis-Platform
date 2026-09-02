@@ -9,6 +9,7 @@ import {
   FORECAST_METRIC_OPTIONS,
   metricDefOf,
   activeTargetForMetric,
+  historicalAvgForMetric,
 } from "@/lib/mock-data/alert-strategies";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 
@@ -80,6 +81,9 @@ export function AlertConditionBuilder({
     return t.direction === "处于目标区间" ? `${t.lower}～${t.upper}` : String(t.value ?? "");
   };
 
+  // 历史均值：系统自动带入最新历史均值（近30个统计周期），不支持编辑
+  const avgOf = (metric: string): string => historicalAvgForMetric(metric);
+
   return (
     <div>
       {/* 多条件关系（仅多于1条时显示）*/}
@@ -114,10 +118,12 @@ export function AlertConditionBuilder({
         {conditions.map((c, i) => {
           const isRange = c.baselineType === "正常区间";
           const isTarget = c.baselineType === "目标值";
+          const isHistoryAvg = c.baselineType === "历史均值";
           const allowedBaselines = OPERATOR_BASELINE_MAP[c.operator];
           const [lo, hi] = rangeParts(c.baselineValue);
           const unit = metricDefOf(c.metric)?.unit ?? "";
           const targetValue = targetOf(c.metric);
+          const avgValue = avgOf(c.metric);
 
           // 判断方式 ↔ 基准类型 联动
           function handleOperatorChange(newOp: AlertCondition["operator"]) {
@@ -128,9 +134,11 @@ export function AlertConditionBuilder({
             // 单值 ↔ 正常区间 切换时清空，避免格式错配（单值 vs 下限～上限）
             const willBeRange = (patch.baselineType ?? c.baselineType) === "正常区间";
             if (isRange !== willBeRange) patch.baselineValue = "";
-            // 切换后若为目标值类型 → 自动带入有效目标值
+            // 切换后若为目标值/历史均值类型 → 自动带入系统值
             if ((patch.baselineType ?? c.baselineType) === "目标值") {
               patch.baselineValue = targetValue;
+            } else if ((patch.baselineType ?? c.baselineType) === "历史均值") {
+              patch.baselineValue = avgValue;
             }
             update(i, patch);
           }
@@ -142,12 +150,15 @@ export function AlertConditionBuilder({
             if (newBt === "目标值") {
               // 自动带入有效目标值（不支持编辑）
               patch.baselineValue = targetValue;
+            } else if (newBt === "历史均值") {
+              // 自动带入最新历史均值（不支持编辑）
+              patch.baselineValue = avgValue;
             } else if (isRange !== willBeRange) {
               patch.baselineValue = "";
             }
             update(i, patch);
           }
-          // 切换数据指标：目标值类型时重新带入新指标的有效目标值
+          // 切换数据指标：目标值/历史均值类型时重新带入新指标的系统值
           function handleMetricChange(name: string) {
             const patch: Partial<AlertCondition> = { metric: name };
             if (c.baselineType === "目标值") {
@@ -156,6 +167,15 @@ export function AlertConditionBuilder({
                 patch.baselineValue = t;
               } else {
                 // 新指标未配置目标值 → 回退为基准值
+                patch.baselineType = "基准值";
+                patch.baselineValue = "";
+              }
+            } else if (c.baselineType === "历史均值") {
+              const avg = avgOf(name);
+              if (avg) {
+                patch.baselineValue = avg;
+              } else {
+                // 新指标暂无历史均值 → 回退为基准值
                 patch.baselineType = "基准值";
                 patch.baselineValue = "";
               }
@@ -244,6 +264,22 @@ export function AlertConditionBuilder({
                       <div className={readonlyCls}>该指标未配置目标值</div>
                     )}
                   </div>
+                ) : isHistoryAvg ? (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500">历史均值</span>
+                    {avgValue ? (
+                      <div className="flex">
+                        <div className={`${readonlyCls} rounded-r-none`}>
+                          {avgValue}
+                        </div>
+                        <span className="inline-flex h-[38px] items-center rounded-r-lg border border-l-0 border-dashed border-gray-300 bg-gray-50 px-3 text-xs text-gray-400">
+                          {unit}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className={readonlyCls}>该指标暂无历史均值</div>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-gray-500">{c.baselineType}</span>
@@ -303,10 +339,15 @@ export function AlertConditionBuilder({
                 </div>
               </div>
 
-              {/* 目标值说明 / 区间说明 */}
+              {/* 目标值/历史均值说明 / 区间说明 */}
               {isTarget && (
                 <p className="mt-1.5 text-[11px] text-gray-400">
                   目标值由系统自动带入（来自目标值管理，含单位），不支持编辑
+                </p>
+              )}
+              {isHistoryAvg && (
+                <p className="mt-1.5 text-[11px] text-gray-400">
+                  历史均值由系统自动带入（最新统计周期均值，含单位），不支持编辑
                 </p>
               )}
               {isRange && (

@@ -388,7 +388,7 @@ export function ConditionForm({
             {effTarget ? (
               <>
                 {renderTargetValueField()}
-                <Field label="当前累计实际值">
+                <Field label="当前实际值">
                   <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
                 </Field>
                 <Field label="剩余生产计划">
@@ -524,7 +524,7 @@ export function ConditionForm({
             {effTarget ? (
               <>
                 {renderTargetValueField()}
-                <Field label="当前累计实际值">
+                <Field label="当前实际值">
                   <div className={readonlyCls}>{metric.targetCtx?.currentAcc}</div>
                 </Field>
                 <Field label="已完成产量">

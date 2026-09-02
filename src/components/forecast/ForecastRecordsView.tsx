@@ -229,18 +229,6 @@ export function ForecastRecordsView() {
                 {detail.status}
               </span>
             </div>
-            <Field
-              label="预测来源"
-              value={
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    detail.source === "系统自动" ? "bg-primary-50 text-primary-700" : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {detail.source}
-                </span>
-              }
-            />
             <Field label="预测类型" value={detail.type} />
             <Field label="预测指标" value={detail.metricName} />
             <Field label="预测对象" value={detail.object} />

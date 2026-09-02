@@ -535,7 +535,7 @@ function targetForecast(m: ForecastMetric, input: ForecastInput, meta: ForecastR
     ],
     chart: { kind: "target", points },
     conclusions: buildConclusions(m, model2(m, input), [
-      `当前累计实际值：${m.targetCtx!.currentAcc}；剩余生产计划：${m.targetCtx!.remainingPlan.toLocaleString()} 箱（系统自动加载）。`,
+      `当前实际值：${m.targetCtx!.currentAcc}；剩余生产计划：${m.targetCtx!.remainingPlan.toLocaleString()} 箱（系统自动加载）。`,
       `预测截止时间：${deadline}；预测区间：${fmt(forecastEnd * 0.98, d)}～${fmt(forecastEnd * 1.02, d)} ${m.unit}。`,
       isTemp
         ? `本次按临时测算目标 ${targetLabel} ${m.unit} 判断，不修改正式目标配置。`

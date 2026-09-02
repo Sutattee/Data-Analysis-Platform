@@ -219,16 +219,18 @@ export function listObjects(): ObjectRelation[] {
   return [...objects].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-// 告警对象候选：按指标自动筛选已关联的对象（对象名称 + 所属组织/部门/系统聚合），供数据告警「告警对象」多选
+// 告警对象候选：按指标自动筛选已关联的对象，按「全厂 → 车间/部门 → 系统」层级去重罗列
+// 供数据告警「告警对象」自动展示（仅展示、不支持编辑）
 export function objectsForMetric(metricName: string): string[] {
-  const names = new Set<string>();
+  const depts = new Set<string>();
+  const systems = new Set<string>();
+  let matched = false;
   for (const o of objects) {
     if (o.metrics.some((m) => m.nameCn === metricName)) {
-      names.add(o.org);
-      names.add(o.dept);
-      names.add(o.system);
-      names.add(o.name);
+      matched = true;
+      depts.add(o.dept);
+      systems.add(o.system);
     }
   }
-  return Array.from(names);
+  return matched ? ["全厂", ...Array.from(depts), ...Array.from(systems)] : [];
 }

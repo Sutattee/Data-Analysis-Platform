@@ -92,10 +92,10 @@ export default function MetricManagementPage() {
     setMetrics((prev) => prev.map((m) => (m.id === metricId ? { ...m, reverseItems: next } : m)));
   }
 
-  // 下载模板（生成 csv 内容，模拟 xlsx 模板）
+  // 下载模板（生成 csv 内容，模拟 xlsx 模板；表头与指标详情字段一致）
   function downloadTemplate() {
-    const header = "指标中文名称,指标编码,业务域,业务定义,计算口径,来源数据库,来源表,来源字段中文名称,来源字段英文名称,SQL,涉及字段含义,小数位数,度量单位,同义词(选填),负责人,描述(选填)\n";
-    const sample = "总利润,I_FIN_001,产品销售,,,dw_finance,ads_profit,总利润,total_profit,SELECT income_total - cost_total FROM ads_profit,income_total：收入总额；cost_total：成本费用总额,2,元,,Frank,\n";
+    const header = "指标中文名称,指标编码,业务域,业务定义,统计口径,计算公式,默认聚合,派生公式,数据源ID,主表,度量表达式,小数位数,度量单位,支持维度,统计对象,统计粒度,数据更新频率,同义词(选填),负责人,描述(选填)\n";
+    const sample = "总利润,I_FIN_001,产品销售,,按月汇总收入总额与成本费用总额后相减,收入总额-成本费用总额,求和,income_total - cost_total,ds_finance_dw,ads_profit,SUM(income_total) - SUM(cost_total),2,元,时间、组织、产品,什邡卷烟厂,月,月,,Frank,\n";
     const blob = new Blob(["﻿" + header + sample], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -275,18 +275,17 @@ export default function MetricManagementPage() {
           <div className="space-y-3">
             {/* 基础信息 */}
             <div className="text-sm font-semibold text-gray-800">基础信息</div>
-            <Field label="中文名称" value={detailTarget.nameCn} />
+            <Field label="指标中文名称" value={detailTarget.nameCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.code}</code>} />
             <Field label="业务域" value={detailTarget.domain} />
             <Field label="业务定义" value={detailTarget.definition} />
             <Field label="统计口径" value={detailTarget.formula} />
             <Field label="计算公式" value={detailTarget.calcFormula} />
-            <Field label="来源数据库" value={detailTarget.sourceDb} />
-            <Field label="来源表" value={detailTarget.sourceTable} />
-            <Field label="来源字段中文名称" value={detailTarget.sourceFieldCn} />
-            <Field label="来源字段英文名称" value={<code className="text-xs">{detailTarget.sourceFieldEn}</code>} />
-            <Field label="SQL" value={<code className="text-xs break-all">{detailTarget.sourceSql}</code>} />
-            <Field label="涉及字段含义" value={detailTarget.fieldMeaning} />
+            <Field label="默认聚合" value={detailTarget.defaultAgg} />
+            <Field label="派生公式" value={<code className="text-xs break-all">{detailTarget.derivedFormula}</code>} />
+            <Field label="数据源ID" value={<code className="text-xs">{detailTarget.sourceId}</code>} />
+            <Field label="主表" value={<code className="text-xs">{detailTarget.mainTable}</code>} />
+            <Field label="度量表达式" value={<code className="text-xs break-all">{detailTarget.measureExpr}</code>} />
             <Field label="小数位数" value={String(detailTarget.decimals)} />
             <Field label="度量单位" value={detailTarget.unit} />
             <Field label="支持维度" value={detailTarget.dimensions} />
@@ -294,10 +293,8 @@ export default function MetricManagementPage() {
             <Field label="统计粒度" value={detailTarget.statGranularity} />
             <Field label="数据更新频率" value={detailTarget.updateFrequency} />
             <Field label="同义词（选填）" value={detailTarget.synonyms} />
-            <Field label="描述" value={detailTarget.description} />
             <Field label="负责人" value={detailTarget.owner} />
-            <Field label="创建时间" value={detailTarget.createdAt} />
-            <Field label="更新时间" value={detailTarget.updatedAt} />
+            <Field label="描述（选填）" value={detailTarget.description} />
           </div>
         )}
       </Drawer>

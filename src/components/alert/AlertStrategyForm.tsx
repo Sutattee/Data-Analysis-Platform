@@ -75,7 +75,8 @@ function toFormData(s: AlertStrategy): FormData {
     type: s.type,
     domain: s.domain,
     scope: s.scope,
-    objects: [...s.objects],
+    // 告警对象为系统按指标自动带入（仅展示），编辑进入时按新规则重算保持一致
+    objects: s.conditions[0]?.metric ? objectsForMetric(s.conditions[0].metric) : [...s.objects],
     conditions: s.conditions.map((c) => ({ ...c })),
     relation: s.relation,
     level: s.level,
@@ -135,14 +136,14 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
     set("notifyMethods", data.notifyMethods.includes(m) ? data.notifyMethods.filter((x) => x !== m) : [...data.notifyMethods, m]);
   }
 
-  // 告警对象候选：按首条条件的指标自动筛选已关联的对象（对象管理维护）
+  // 告警对象：按首条条件的指标自动筛选已关联的对象（对象管理维护），仅展示、不支持编辑
   const alertObjectOptions = objectsForMetric(data.conditions[0]?.metric ?? "");
 
   function validate(): boolean {
     const e: Record<string, string> = {};
     const ce: string[] = [];
     if (!data.name.trim()) e.name = "请输入告警名称";
-    if (data.objects.length === 0) e.objects = "请选择告警对象";
+    if (data.objects.length === 0) e.objects = "请先在触发条件中选择数据指标";
     data.conditions.forEach((c, i) => {
       const miss: string[] = [];
       if (!c.metric.trim()) miss.push("指标");
@@ -264,42 +265,38 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
               errors={condErrors}
               onChange={(conditions, relation) => {
                 const firstMetric = conditions[0]?.metric ?? "";
-                // 指标变化时联动告警对象：过滤已选对象，固定对象（唯一候选）自动带入
-                const candidates = objectsForMetric(firstMetric);
-                const objects =
-                  candidates.length === 1
-                    ? [candidates[0]]
-                    : data.objects.filter((o) => candidates.includes(o));
                 setData((prev) => ({
                   ...prev,
                   conditions,
                   relation,
                   domain: firstMetric ? domainOfMetric(firstMetric) : prev.domain,
-                  objects,
+                  // 告警对象随指标自动带入（该指标已关联对象全量），仅展示、不支持编辑
+                  objects: objectsForMetric(firstMetric),
                 }));
               }}
             />
           </div>
 
-          {/* 告警对象（触发条件之后）：按指标自动筛选已关联的对象，支持多选；固定对象自动带入且不可修改 */}
+          {/* 告警对象（触发条件之后）：按指标自动筛选并罗列已关联的对象，仅展示、不支持编辑 */}
           <div className="md:col-span-2">
             <label className={labelCls}>告警对象 <span className="text-red-500">*</span></label>
-            {alertObjectOptions.length === 1 ? (
-              <div className="flex h-[42px] items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 text-sm text-gray-500">
-                {alertObjectOptions[0]}
-                <span className="ml-2 text-xs text-gray-400">（该指标为固定对象，自动带入且不可修改）</span>
-              </div>
-            ) : (
-              <SearchMultiSelect
-                options={alertObjectOptions.map((o) => ({ value: o, label: o }))}
-                value={data.objects}
-                onChange={(v) => set("objects", v)}
-                placeholder="请选择告警对象"
-                error={errors.objects}
-              />
-            )}
+            <div className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
+              {alertObjectOptions.length > 0 ? (
+                alertObjectOptions.map((o) => (
+                  <span
+                    key={o}
+                    className="inline-flex items-center rounded-md border border-gray-200 bg-white px-2 py-0.5 text-sm text-gray-600"
+                  >
+                    {o}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-400">请先在触发条件中选择数据指标</span>
+              )}
+            </div>
+            {errors.objects && <p className="mt-1 text-xs text-red-500">{errors.objects}</p>}
             <p className="mt-1 text-xs text-gray-400">
-              根据所选数据指标自动筛选已关联的对象（对象管理维护）；未选择指标时请先完善触发条件。
+              根据所选数据指标自动筛选并罗列该指标已关联的对象（对象管理维护），仅展示、不支持编辑。
             </p>
           </div>
 

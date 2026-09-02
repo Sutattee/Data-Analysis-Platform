@@ -14,17 +14,17 @@ import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
 export const ALERT_OPERATORS: AlertOperator[] = ["<", "≤", ">", "≥", "≠", "=", "超出正常区间"];
-export const ALERT_BASELINE_TYPES: AlertBaselineType[] = ["目标值", "基准值", "上限", "下限", "正常区间"];
+export const ALERT_BASELINE_TYPES: AlertBaselineType[] = ["目标值", "基准值", "上限", "下限", "历史均值", "正常区间"];
 
 // 判断方式 → 合适的基准类型候选（触发条件联动筛选）
-// 单值比较可搭配 目标值/基准值/上限/下限；「超出正常区间」仅搭配正常区间。
+// 单值比较可搭配 目标值/基准值/上限/下限/历史均值；「超出正常区间」仅搭配正常区间。
 export const OPERATOR_BASELINE_MAP: Record<AlertOperator, AlertBaselineType[]> = {
-  "<": ["目标值", "基准值", "上限", "下限"],
-  "≤": ["目标值", "基准值", "上限", "下限"],
-  ">": ["目标值", "基准值", "上限", "下限"],
-  "≥": ["目标值", "基准值", "上限", "下限"],
-  "≠": ["目标值", "基准值", "上限", "下限"],
-  "=": ["目标值", "基准值", "上限", "下限"],
+  "<": ["目标值", "基准值", "上限", "下限", "历史均值"],
+  "≤": ["目标值", "基准值", "上限", "下限", "历史均值"],
+  ">": ["目标值", "基准值", "上限", "下限", "历史均值"],
+  "≥": ["目标值", "基准值", "上限", "下限", "历史均值"],
+  "≠": ["目标值", "基准值", "上限", "下限", "历史均值"],
+  "=": ["目标值", "基准值", "上限", "下限", "历史均值"],
   "超出正常区间": ["正常区间"],
 };
 export const ALERT_DETECT_CYCLES: AlertDetectCycle[] = ["每小时", "每日", "每月"];
@@ -53,6 +53,25 @@ export function activeTargetForMetric(name: string): MetricTargetVersion | null 
   const def = metricDefOf(name);
   if (!def) return null;
   return activeTargetOf(def.id) ?? null;
+}
+
+// 各指标最新历史均值（模拟统计：近30个统计周期日均值，位数与指标小数位数一致）
+export const METRIC_HISTORICAL_AVG: Record<string, string> = {
+  单位产量碳排放量: "0.0338",
+  包装设备运行效率: "88.5",
+  卷接设备运行效率: "91.2",
+  单箱耗烟叶量: "7.2",
+  单箱耗嘴棒量: "2515",
+  优质品率: "96.8",
+  单箱综合能耗: "30.6",
+  生产效率: "94.3",
+  烘丝机出口水分偏差: "0.32",
+  百小时停机断料率: "4.15",
+};
+
+// 最新历史均值（基准类型=历史均值时系统自动带入，不支持编辑；无数据返回空串）
+export function historicalAvgForMetric(name: string): string {
+  return METRIC_HISTORICAL_AVG[name] ?? "";
 }
 
 // 通知预览模板：按告警类型区分

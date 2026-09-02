@@ -18,31 +18,29 @@ export function GridMonitorTable({ rows, onDevices, onRecords }: GridMonitorTabl
         <table className="w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
-              <th className="px-4 py-3 text-left">网格名称</th>
-              <th className="px-4 py-3 text-left">所属系统</th>
-              <th className="px-4 py-3 text-right">实际值(kWh)</th>
-              <th className="px-4 py-3 text-right">历史均值(kWh)</th>
-              <th className="px-4 py-3 text-right">偏差率</th>
-              <th className="px-4 py-3 text-left">监测状态</th>
-              <th className="px-4 py-3 text-right">操作</th>
+              <th className="px-6 py-3 text-left">网格名称</th>
+              <th className="px-6 py-3 text-right">实际值(kWh)</th>
+              <th className="px-6 py-3 text-right">历史均值(kWh)</th>
+              <th className="px-6 py-3 text-right">偏差率</th>
+              <th className="px-6 py-3 text-left">监测状态</th>
+              <th className="px-6 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {rows.map((r) => (
               <tr key={r.gridId} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
-                <td className="px-4 py-3 text-gray-600">{r.system}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-700">{r.actual.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-500">{r.avg.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmtDev(r.deviation)}</td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-3 font-medium text-gray-900">{r.name}</td>
+                <td className="px-6 py-3 text-right tabular-nums text-gray-700">{r.actual.toLocaleString()}</td>
+                <td className="px-6 py-3 text-right tabular-nums text-gray-500">{r.avg.toLocaleString()}</td>
+                <td className="px-6 py-3 text-right tabular-nums text-gray-700">{fmtDev(r.deviation)}</td>
+                <td className="px-6 py-3">
                   {r.status === "正常" ? (
                     <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">正常</span>
                   ) : (
                     <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">异常</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-xs">
+                <td className="px-6 py-3 text-right text-xs">
                   <button className="text-primary-600 hover:underline" onClick={() => onDevices(r)}>
                     查看关联设备
                   </button>
@@ -55,7 +53,7 @@ export function GridMonitorTable({ rows, onDevices, onRecords }: GridMonitorTabl
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
                   该部门暂无监测网格
                 </td>
               </tr>

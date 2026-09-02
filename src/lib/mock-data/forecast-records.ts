@@ -139,7 +139,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
     targetCompare: "目标 不高于 0.035 kg CO₂/万支",
     conditions: [
       { name: "考核周期", value: "本季度（至 2026-09-30）", source: "系统自动确定" },
-      { name: "当前累计实际值", value: "0.0341 kg CO₂/万支", source: "系统自动加载" },
+      { name: "当前实际值", value: "0.0341 kg CO₂/万支", source: "系统自动加载" },
       { name: "剩余生产计划", value: "72,000 箱", source: "生产计划数据" },
     ],
     conclusions: [
@@ -347,7 +347,7 @@ export const FORECAST_RECORDS: ForecastRecord[] = [
     targetCompare: "目标 不高于 31.0 kgce/箱；当时累计 30.8",
     conditions: [
       { name: "考核周期", value: "本年度（至 2026-12-31）", source: "系统自动确定" },
-      { name: "当前累计实际值", value: "30.8 kgce/箱（截至 2026-06-29）", source: "系统自动加载" },
+      { name: "当前实际值", value: "30.8 kgce/箱（截至 2026-06-29）", source: "系统自动加载" },
       { name: "剩余生产计划", value: "251,000 箱", source: "生产计划数据" },
     ],
     conclusions: [
