@@ -30,7 +30,7 @@ const GRADE_ORDER: EvalGrade[] = ["优秀", "良好", "一般", "预警", "告�
 const pickHighestGrade = (grades: EvalGrade[]): EvalGrade | undefined =>
   grades.length ? grades.reduce((a, b) => (GRADE_ORDER.indexOf(b) > GRADE_ORDER.indexOf(a) ? b : a)) : undefined;
 
-interface GenCfg {
+export interface GenCfg {
   base: number; // 实际值基准（带缓慢下降的节能趋势）
   avgBase?: number; // 历史均值基准
   target?: number;
@@ -54,7 +54,7 @@ function applyAnomalies(pts: HistPoint[], cfg: GenCfg, decimals: number) {
 }
 
 // 月度序列：2024-01 起 32 个点
-function genMonthly(cfg: GenCfg): HistPoint[] {
+export function genMonthly(cfg: GenCfg): HistPoint[] {
   const { base, avgBase, target, seed, decimals = 1 } = cfg;
   const waveAmp = cfg.waveAmp ?? 0.03;
   const drift = cfg.drift ?? 0.0018;
@@ -75,7 +75,7 @@ function genMonthly(cfg: GenCfg): HistPoint[] {
 }
 
 // 日度序列：2024-01-01 ~ 2026-08-09
-function genDaily(cfg: GenCfg): HistPoint[] {
+export function genDaily(cfg: GenCfg): HistPoint[] {
   const { base, avgBase, target, seed, decimals = 1 } = cfg;
   const waveAmp = cfg.waveAmp ?? 0.05;
   const drift = cfg.drift ?? 0.00006;

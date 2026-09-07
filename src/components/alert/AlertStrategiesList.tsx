@@ -45,15 +45,20 @@ function validateStrategy(s: AlertStrategy): { ok: boolean; msg: string } {
 type Phase = "loading" | "success" | "error";
 type ConfirmModal = { kind: "delete" | "disable"; id: string } | null;
 
-export function AlertStrategiesList() {
+// metrics：指标白名单。传入 → 仅展示监测白名单指标的策略（生产管理告警中心）
+export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
   const router = useRouter();
   const { state } = useApp();
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
+  // 新建/编辑路由按板块区分：生产管理走 /production/alert/management
+  const mgmtPath = metrics ? "/production/alert/management" : "/alert/management";
 
   // 默认展示「当前异常」类型的告警策略
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
-    getAlertStrategies().filter((s) => s.type === "当前异常")
+    getAlertStrategies().filter(
+      (s) => s.type === "当前异常" && (!metrics || s.conditions.some((c) => metrics.includes(c.metric)))
+    )
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<StratFilter>(EMPTY_FILTER);
@@ -162,9 +167,14 @@ export function AlertStrategiesList() {
 
   // 指标去重展示
   const metricsOf = (s: AlertStrategy) => Array.from(new Set(s.conditions.map((c) => c.metric))).join("、");
-  // 该策略关联的告警记录（按领域+类型模拟关联）
-  const recordsOf = (s: AlertStrategy) =>
-    ALERT_RECORDS.filter((r) => r.domain === s.domain && r.type === s.type).slice(0, 6);
+  // 该策略关联的告警记录：优先按策略指标名精确匹配，无命中再回退领域+类型
+  const recordsOf = (s: AlertStrategy) => {
+    const metricSet = new Set(s.conditions.map((c) => c.metric));
+    const byMetric = ALERT_RECORDS.filter((r) => metricSet.has(r.metricName) && r.type === s.type);
+    const recs =
+      byMetric.length > 0 ? byMetric : ALERT_RECORDS.filter((r) => r.domain === s.domain && r.type === s.type);
+    return recs.slice(0, 6);
+  };
 
   return (
     <div className="space-y-4">
@@ -181,11 +191,12 @@ export function AlertStrategiesList() {
           <Button onClick={handleSearch}>查询</Button>
           <Button variant="secondary" onClick={handleReset}>重置</Button>
           {isAdmin && (
-            <Button className="ml-auto" onClick={() => router.push("/alert/management/new")}>+ 新建数据告警</Button>
+            <Button className="ml-auto" onClick={() => router.push(`${mgmtPath}/new`)}>+ 新建数据告警</Button>
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
+          {/* 组织级联筛选仅能源域适用（辅料为全厂级指标） */}
+          {!metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />}
         </div>
       </Card>
 
@@ -251,7 +262,7 @@ export function AlertStrategiesList() {
                         <Button variant="ghost" size="sm" onClick={() => setRecordsTarget(s)}>告警记录</Button>
                         {isAdmin && (
                           <>
-                            <Button variant="ghost" size="sm" onClick={() => router.push(`/alert/management/${s.id}/edit`)}>编辑</Button>
+                            <Button variant="ghost" size="sm" onClick={() => router.push(`${mgmtPath}/${s.id}/edit`)}>编辑</Button>
                             {s.enabled ? (
                               <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-700" onClick={() => setConfirm({ kind: "disable", id: s.id })}>停用</Button>
                             ) : (
@@ -334,7 +345,7 @@ export function AlertStrategiesList() {
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setViewTarget(null)}>关闭</Button>
               {isAdmin && (
-                <Button onClick={() => { const t = viewTarget; setViewTarget(null); router.push(`/alert/management/${t.id}/edit`); }}>编辑</Button>
+                <Button onClick={() => { const t = viewTarget; setViewTarget(null); router.push(`${mgmtPath}/${t.id}/edit`); }}>编辑</Button>
               )}
             </div>
           </div>

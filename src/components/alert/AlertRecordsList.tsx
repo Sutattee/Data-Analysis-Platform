@@ -11,6 +11,7 @@ import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import {
   ALERT_RECORDS,
   ALERT_LEVELS,
+  PRODUCTION_MATERIAL_METRICS,
   sortAlerts,
   orgPathOf,
   EMPTY_ORG_FILTER,
@@ -43,12 +44,18 @@ const dateCls = selectCls;
 type Phase = "loading" | "success" | "error";
 type SortMode = "default" | "time_desc" | "time_asc";
 
-export function AlertRecordsList() {
+// metrics：指标白名单。传入 → 仅展示白名单指标的记录（生产管理告警中心）；
+// 不传 → 展示全部并排除生产辅料记录（能源告警中心维持原有口径）
+export function AlertRecordsList({ metrics }: { metrics?: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // 全量告警记录（当前异常 + 预测风险均展示），等级等筛选在 sorted 中进行
-  const [records, setRecords] = useState<AlertRecord[]>(() => ALERT_RECORDS.map((r) => ({ ...r })));
+  const [records, setRecords] = useState<AlertRecord[]>(() =>
+    ALERT_RECORDS.filter((r) =>
+      metrics ? metrics.includes(r.metricName) : !PRODUCTION_MATERIAL_METRICS.includes(r.metricName)
+    ).map((r) => ({ ...r }))
+  );
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/date）
   const [applied, setApplied] = useState<AlertFilter>(EMPTY_FILTER);
   // 支持 URL ?object= 预筛选（仪表盘异常点击跳转），映射为组织级联筛选
@@ -183,7 +190,8 @@ export function AlertRecordsList() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 mt-3">
-          <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
+          {/* 组织级联筛选仅能源域适用（辅料为全厂级指标） */}
+          {!metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">时间范围</span>
             <input type="date" className={dateCls} value={filter.dateFrom} onChange={(e) => setFilter({ ...filter, dateFrom: e.target.value })} />
@@ -250,7 +258,7 @@ export function AlertRecordsList() {
                     <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
-                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`/alert/records/${r.id}`)}>
+                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`${metrics ? "/production/alert/records" : "/alert/records"}/${r.id}`)}>
                         查看
                       </Button>
                     </td>

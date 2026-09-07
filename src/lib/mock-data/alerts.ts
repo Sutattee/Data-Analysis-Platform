@@ -57,6 +57,17 @@ export const ALERT_OBJECTS: AlertObject[] = [
   { code: "EM-04", name: "蒸汽能源网格", domain: "能源消耗", metric: "蒸汽管网损耗率", target: 8, unit: "%", low: false },
 ];
 
+// ========== 生产管理 · 辅料指标告警对象（全厂级，高于上限为异常） ==========
+export const MATERIAL_ALERT_OBJECTS: AlertObject[] = [
+  { code: "MAT-01", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗盘纸量", target: 30, unit: "米/箱", low: false },
+  { code: "MAT-02", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗商标纸（小盒）量", target: 2480, unit: "张/箱", low: false },
+  { code: "MAT-03", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗烟叶量", target: 40.0, unit: "公斤/箱", low: false },
+  { code: "MAT-04", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗嘴棒量", target: 48000, unit: "支/箱", low: false },
+];
+
+// 辅料指标白名单：生产管理告警中心按此过滤（能源告警中心默认排除）
+export const PRODUCTION_MATERIAL_METRICS: string[] = MATERIAL_ALERT_OBJECTS.map((o) => o.metric);
+
 // ========== 接收人候选池（供策略页"接收人"多选搜索复用） ==========
 export const ALERT_USERS = [
   { username: "zhangwei", name: "张伟" },
@@ -109,8 +120,8 @@ function tsAt(offsetMin: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
-// ========== 生成 56 条告警记录（确定性；对象 14 个 × 4 条，保证各业务域均有 5 个等级样本） ==========
-export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) => {
+// ========== 基础告警记录 56 条（确定性；对象 14 个 × 4 条，保证各业务域均有 5 个等级样本） ==========
+const BASE_ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) => {
   const obj = ALERT_OBJECTS[i % ALERT_OBJECTS.length];
   const level = ALERT_LEVELS[i % ALERT_LEVELS.length];
   const type = ALERT_TYPES[i % 2 === 0 ? 0 : 1];
@@ -195,6 +206,101 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) =>
     handledBy: handled ? receiver : undefined,
   };
 });
+
+// ========== 生产管理 · 辅料指标告警记录 16 条（4 指标 × 4 条，SC 前缀编号） ==========
+// 辅料专属原因/建议文案（贴合辅料消耗场景，与辅料消耗页异常口径一致）
+const MATERIAL_CAUSES = [
+  (o: AlertObject) => `部分机台${o.metric}偏高，经排查为高速运行下拼接与换卷损耗增加所致。`,
+  (o: AlertObject) => `当班牌号结构变化，小批量排产占比上升，摊薄效应减弱导致${o.metric}上浮。`,
+  (o: AlertObject) => `来料批次间物理指标波动，剔除率上升，间接推高${o.metric}。`,
+];
+const MATERIAL_SUGGESTIONS = [
+  (o: AlertObject) => `复核高耗机台的拼接与换卷定额，落实降耗措施后跟踪${o.metric}变化。`,
+  (o: AlertObject) => `结合排产计划优化牌号组合，减少小批量切换频次，关注${o.metric}回落情况。`,
+  (o: AlertObject) => `加强来料批次检验与上机适应性验证，必要时调整工艺参数。`,
+];
+
+function buildProductionAlertRecords(): AlertRecord[] {
+  return Array.from({ length: 16 }, (_, i) => {
+    const obj = MATERIAL_ALERT_OBJECTS[i % MATERIAL_ALERT_OBJECTS.length];
+    const level = ALERT_LEVELS[i % ALERT_LEVELS.length];
+    const type = ALERT_TYPES[i % 2 === 0 ? 0 : 1];
+    const gap = LEVEL_GAP[level];
+    const triggerMin = 900 + i * 407; // 与基础记录的 i*311 步进错开
+    const triggerTime = tsAt(triggerMin);
+    const receiver = ALERT_USERS[(i + 2) % ALERT_USERS.length].name;
+    const handled = i % 3 === 0;
+
+    // 数值精度：量级大的指标（商标纸/嘴棒）取整展示
+    const dec = obj.target >= 100 ? 0 : 1;
+    const deviated = obj.target + gap;
+    const approaching = obj.target + gap * 0.6;
+    const valueLabel =
+      type === "当前异常" ? `当前值${deviated.toFixed(dec)}${obj.unit}` : `预测值${approaching.toFixed(dec)}${obj.unit}`;
+    const baselineLabel =
+      type === "当前异常" ? `基准值${obj.target.toFixed(dec)}${obj.unit}` : `目标上限${obj.target.toFixed(dec)}${obj.unit}`;
+    const delta = type === "当前异常" ? gap : gap * 0.6;
+    const deviationValue = `+${delta.toFixed(2)}${obj.unit}`;
+    const deviationRate = `+${((delta / obj.target) * 100).toFixed(1)}%`;
+
+    const title =
+      type === "当前异常"
+        ? `${obj.name}${obj.metric}超出上限`
+        : `${obj.name}${obj.metric}持续上升，预计超出阈值`;
+
+    // 预计越界时间（预测风险）
+    let forecastTime: string | undefined;
+    if (type === "预测风险") {
+      const fd = new Date(BASE_TS + (triggerMin + 60 * 24 * 15) * 60000);
+      forecastTime = `预计${fd.getFullYear()}年${fd.getMonth() + 1}月越界`;
+    }
+
+    // 编号：SC + 触发日期(YYYYMMDD) + 3位序号（与基础 YJ 前缀区分）
+    const dateStr = triggerTime.slice(0, 10).replace(/-/g, "");
+    const id = `SC${dateStr}${pad3(i + 1)}`;
+
+    return {
+      id,
+      level,
+      title,
+      type,
+      domain: obj.domain,
+      objectCode: obj.code,
+      objectName: obj.name,
+      metricName: obj.metric,
+      triggerTime,
+      // 核心告警数据
+      valueLabel,
+      baselineLabel,
+      deviationValue,
+      deviationRate,
+      confidenceRange:
+        type === "预测风险"
+          ? `${(approaching - 1.2).toFixed(dec)}～${(approaching + 1.4).toFixed(dec)}${obj.unit}`
+          : undefined,
+      duration: type === "当前异常" ? DURATIONS[i % DURATIONS.length] : undefined,
+      forecastTime,
+      riskProb: type === "预测风险" && i % 2 === 0 ? `${75 + (i % 20)}%` : undefined,
+      // 判定依据
+      strategyName: type === "当前异常" ? `${obj.metric}异常告警策略` : `${obj.metric}风险告警策略`,
+      triggerCondition: `${obj.metric}高于基准值${gap.toFixed(1)}%`,
+      // 原因与建议
+      causeSummary: i % 3 === 0 ? undefined : MATERIAL_CAUSES[i % MATERIAL_CAUSES.length](obj),
+      causeType: i % 3 === 0 ? undefined : i % 2 === 0 ? "AI生成" : "人工补录",
+      suggestion: MATERIAL_SUGGESTIONS[i % MATERIAL_SUGGESTIONS.length](obj),
+      // 责任与处理情况
+      receiver,
+      notifyMethods: NOTIFY_COMBOS[i % NOTIFY_COMBOS.length],
+      notifyStatus: i % 9 === 0 ? "发送失败" : "已发送",
+      handleNote: handled ? HANDLE_NOTES[i % HANDLE_NOTES.length] : undefined,
+      handledAt: handled ? tsAt(triggerMin + 150) : undefined,
+      handledBy: handled ? receiver : undefined,
+    };
+  });
+}
+
+// 全量告警记录：基础 56 条 + 生产辅料 16 条（AnomalyDrawer / 告警详情按 id 全局查找）
+export const ALERT_RECORDS: AlertRecord[] = [...BASE_ALERT_RECORDS, ...buildProductionAlertRecords()];
 
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========
 // 供「新建告警-指定对象」分层多选 与「告警记录/管理」级联筛选 共用

@@ -116,9 +116,11 @@ function Tip({ text }: { text: string }) {
 interface AlertStrategyFormProps {
   mode: "new" | "edit";
   initial?: AlertStrategy;
+  listPath?: string; // 保存/取消返回的列表页（生产管理入口传 /production/alert/management）
+  metricOptions?: string[]; // 指标候选（生产管理入口传辅料白名单）
 }
 
-export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
+export function AlertStrategyForm({ mode, initial, listPath = "/alert/management", metricOptions }: AlertStrategyFormProps) {
   const router = useRouter();
   const toast = useToast();
   const { state } = useApp();
@@ -221,7 +223,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
       updateAlertStrategy(s);
       toast("保存成功", "success");
     }
-    router.push("/alert/management");
+    router.push(listPath);
   }
 
   // 非管理员不应进入此页（外壳页也会拦截），此处兜底
@@ -272,6 +274,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
               conditions={data.conditions}
               relation={data.relation}
               errors={condErrors}
+              metricOptions={metricOptions}
               onChange={(conditions, relation) => {
                 const firstMetric = conditions[0]?.metric ?? "";
                 setData((prev) => ({
@@ -407,7 +410,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
 
       {/* 底部操作 */}
       <div className="flex justify-center items-center gap-3 pt-4 mt-4 border-t border-gray-100 flex-shrink-0">
-        <Button variant="secondary" onClick={() => router.push("/alert/management")}>取消</Button>
+        <Button variant="secondary" onClick={() => router.push(listPath)}>取消</Button>
         <Button onClick={handleSave}>保存</Button>
       </div>
     </div>

@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { metricList } from "./metric-management";
 import { activeTargetOf } from "./metric-targets";
+import { PRODUCTION_MATERIAL_METRICS } from "./alerts";
 import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
@@ -32,8 +33,10 @@ export const ALERT_SCOPE_OPTIONS: AlertScope[] = ["全部适用对象", "指定�
 export const NOTIFY_METHOD_OPTIONS = ["邮件"];
 export const FORECAST_RANGES = ["未来3天", "未来7天", "未来15天", "未来1个月", "未来2个月", "未来3个月"];
 
-// 指标候选（指标管理同源，支持关键字搜索）
-export const METRIC_OPTIONS: string[] = metricList.map((m) => m.nameCn);
+// 指标候选（指标管理同源，支持关键字搜索）；能源板块口径：不含生产辅料指标
+export const METRIC_OPTIONS: string[] = metricList
+  .map((m) => m.nameCn)
+  .filter((name) => !PRODUCTION_MATERIAL_METRICS.includes(name));
 // 支持预测模型的指标（预测风险类型仅可选这些）
 export const FORECAST_METRIC_OPTIONS: string[] = [
   "单箱综合能耗",
@@ -326,6 +329,94 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
     repeatAlert: false,
     enabled: true,
     updatedAt: "2026-07-10 13:40",
+  },
+  {
+    id: "AS-031",
+    name: "单箱耗盘纸量超上限策略",
+    description: "单箱耗盘纸量超出上限且偏离达到 3%",
+    type: "当前异常",
+    domain: "生产管理",
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
+    conditions: [
+      { metric: "单箱耗盘纸量", operator: ">", baselineType: "上限", baselineValue: "30", deviation: "3" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每日",
+    notifyTemplate: "",
+    notifyMethods: ["站内消息", "邮件"],
+    receivers: ["王芳"],
+    repeatAlert: true,
+    repeatCount: 3,
+    repeatInterval: 10,
+    enabled: true,
+    updatedAt: "2026-07-26 09:40",
+  },
+  {
+    id: "AS-032",
+    name: "单箱耗商标纸（小盒）量超上限策略",
+    description: "单箱耗商标纸（小盒）量超出上限监测",
+    type: "当前异常",
+    domain: "生产管理",
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
+    conditions: [
+      { metric: "单箱耗商标纸（小盒）量", operator: ">", baselineType: "上限", baselineValue: "2480", deviation: "3" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每日",
+    notifyTemplate: "",
+    notifyMethods: ["站内消息", "邮件"],
+    receivers: ["陈静", "高亚东"],
+    repeatAlert: false,
+    enabled: true,
+    updatedAt: "2026-07-24 15:20",
+  },
+  {
+    id: "AS-033",
+    name: "单箱耗烟叶量超上限策略",
+    description: "单箱耗烟叶量超出上限且偏离达到 5%",
+    type: "当前异常",
+    domain: "生产管理",
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
+    conditions: [
+      { metric: "单箱耗烟叶量", operator: ">", baselineType: "上限", baselineValue: "40.0", deviation: "5" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每日",
+    notifyTemplate: "",
+    notifyMethods: ["站内消息", "邮件"],
+    receivers: ["李强", "刘洋"],
+    repeatAlert: true,
+    repeatCount: 3,
+    repeatInterval: 10,
+    enabled: true,
+    updatedAt: "2026-07-21 10:15",
+  },
+  {
+    id: "AS-034",
+    name: "单箱耗嘴棒量超上限关注策略",
+    description: "单箱耗嘴棒量超出上限即关注",
+    type: "当前异常",
+    domain: "生产管理",
+    scope: "指定对象",
+    objects: ["什邡卷烟厂"],
+    conditions: [
+      { metric: "单箱耗嘴棒量", operator: ">", baselineType: "上限", baselineValue: "48000", deviation: "3" },
+    ],
+    relation: "且",
+    level: "关注",
+    detectCycle: "每日",
+    notifyTemplate: "",
+    notifyMethods: ["站内消息"],
+    receivers: ["周婷"],
+    repeatAlert: false,
+    enabled: false,
+    updatedAt: "2026-07-16 14:05",
   },
   {
     id: "AS-009",

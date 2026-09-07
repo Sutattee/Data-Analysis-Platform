@@ -26,7 +26,15 @@ const ENERGY_NAV: NavItem[] = [
 export const PRIMARY_NAV: NavItem[] = [
   { label: "首页",       href: "/home",         icon: "🏠" },
   { label: "智能驾驶舱", href: "/cockpit",      icon: "🛰️" },
-  { label: "生产管理",   href: "/production",   icon: "🏭" },
+  { label: "生产管理",   href: "/production",   icon: "🏭", children: [
+    { label: "辅料消耗", href: "/production/materials", icon: "🧵" },
+    { label: "预测分析", href: "/production/forecast",  icon: "📈" },
+    { label: "告警中心", href: "/production/alert", icon: "⚠️", children: [
+      { label: "告警记录", href: "/production/alert/records",    icon: "📋" },
+      { label: "告警管理", href: "/production/alert/management", icon: "🛠️" },
+    ]},
+    { label: "智能问数", href: "/production/qa", icon: "💬" },
+  ], matchPrefixes: ["/production"] },
   { label: "工艺质量",   href: "/quality",      icon: "✅" },
   {
     label: "能源消耗",

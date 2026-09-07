@@ -1,5 +1,6 @@
-import { ComingSoon } from "@/components/ui/ComingSoon";
+import { redirect } from "next/navigation";
 
+// 一级菜单「生产管理」含二级菜单，直接访问落到默认子页「辅料消耗」。
 export default function ProductionPage() {
-  return <ComingSoon title="生产管理" />;
+  redirect("/production/materials");
 }

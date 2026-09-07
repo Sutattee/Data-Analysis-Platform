@@ -25,6 +25,7 @@ interface AlertConditionBuilderProps {
   relation: "且" | "或";
   errors?: string[];
   onChange: (conditions: AlertCondition[], relation: "且" | "或") => void;
+  metricOptions?: string[]; // 指标候选（不传用能源口径 METRIC_OPTIONS；生产管理入口传辅料白名单）
 }
 
 // 新建一条空条件
@@ -44,9 +45,10 @@ export function AlertConditionBuilder({
   relation,
   errors = [],
   onChange,
+  metricOptions,
 }: AlertConditionBuilderProps) {
   const isForecast = type === "预测风险";
-  const metricOptions = isForecast ? FORECAST_METRIC_OPTIONS : METRIC_OPTIONS;
+  const options = metricOptions ?? (isForecast ? FORECAST_METRIC_OPTIONS : METRIC_OPTIONS);
 
   function update(i: number, patch: Partial<AlertCondition>) {
     onChange(
@@ -203,7 +205,7 @@ export function AlertConditionBuilder({
                 <div className="flex flex-col gap-1 min-w-[190px] flex-1">
                   <span className="text-xs text-gray-500">数据指标</span>
                   <SearchSelect
-                    options={metricOptions.map((m) => ({ value: m, label: m, hint: metricDefOf(m)?.unit }))}
+                    options={options.map((m) => ({ value: m, label: m, hint: metricDefOf(m)?.unit }))}
                     value={c.metric}
                     onChange={handleMetricChange}
                     placeholder="请选择或搜索指标"

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store/AppContext";
-import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import { ALERT_RECORDS, PRODUCTION_MATERIAL_METRICS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import type { AnomalyDetail, AnomalyGridRow } from "@/lib/mock-data/grid-forecast";
 import { AnomalyAiPanel } from "./AnomalyAiPanel";
@@ -235,7 +235,11 @@ export function AnomalyDrawer({
               onClick={() => {
                 // 记录抽屉快照，返回总览页时一键恢复异常详情
                 sessionStorage.setItem("anomaly-drawer-return", JSON.stringify(detail));
-                router.push(`/alert/records/${rec.id}`);
+                // 辅料指标记录跳生产管理板块的告警详情，其余跳能源板块
+                const base = PRODUCTION_MATERIAL_METRICS.includes(rec.metricName)
+                  ? "/production/alert/records"
+                  : "/alert/records";
+                router.push(`${base}/${rec.id}`);
               }}
             >
               查看告警记录详情
