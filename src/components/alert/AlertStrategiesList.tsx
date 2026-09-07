@@ -219,6 +219,7 @@ export function AlertStrategiesList() {
                   <th className="text-left px-4 py-3">告警名称</th>
                   <th className="text-left px-4 py-3">数据指标</th>
                   <th className="text-left px-4 py-3">触发条件</th>
+                  <th className="text-left px-4 py-3">告警等级</th>
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
                       启用状态
@@ -237,6 +238,7 @@ export function AlertStrategiesList() {
                     <td className="px-4 py-3 text-gray-600 max-w-[220px]">
                       <div className="truncate" title={formatConditions(s)}>{formatConditions(s)}</div>
                     </td>
+                    <td className="px-4 py-3 text-gray-600">{s.level}</td>
                     <td className="px-4 py-3">
                       <span className={s.enabled ? "text-green-600 font-medium" : "text-gray-400"}>
                         {s.enabled ? "启用" : "停用"}

@@ -277,6 +277,10 @@ export default function MetricManagementPage() {
             <div className="text-sm font-semibold text-gray-800">基础信息</div>
             <Field label="指标中文名称" value={detailTarget.nameCn} />
             <Field label="指标编码" value={<code className="text-xs">{detailTarget.code}</code>} />
+            <Field
+              label="指标类型"
+              value={detailTarget.metricType ? `${detailTarget.metricType}（${detailTarget.metricType === "atomic" ? "原子" : "派生"}）` : undefined}
+            />
             <Field label="业务域" value={detailTarget.domain} />
             <Field label="业务定义" value={detailTarget.definition} />
             <Field label="统计口径" value={detailTarget.formula} />

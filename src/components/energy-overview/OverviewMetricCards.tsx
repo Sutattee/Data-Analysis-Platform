@@ -13,12 +13,24 @@ function CardShell({ color, children }: { color: string; children: React.ReactNo
   );
 }
 
-const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+// 涨跌方向符号：上升 ↑ / 下降 ↓ / 持平 0
+const sign = (n: number) => (n > 0 ? `↑${n}` : n < 0 ? `↓${Math.abs(n)}` : `${n}`);
 
 // 涨跌语义色：与「好方向」一致为绿、相反为橙（能耗类下降为好 → 下降绿、上升橙）
 function trendCls(v: number, goodDirection: "down" | "up") {
   const good = goodDirection === "down" ? v <= 0 : v >= 0;
   return good ? "text-green-600" : "text-orange-500";
+}
+
+// 目标值/历史均值对比行：仅括号内「↑/↓数值」按语义着色，其余文字（含括号）黑色
+function renderCompareText(text: string, good: boolean) {
+  const m = text.match(/^(.*?)[（(]([↑↓][^）)]*)[）)](.*)$/);
+  if (!m) return <span className="text-gray-900">{text}</span>;
+  return (
+    <span className="text-gray-900">
+      {m[1]}（<span className={good ? "text-green-600" : "text-orange-500"}>{m[2]}</span>）{m[3]}
+    </span>
+  );
 }
 
 // 是否支持「万支｜箱」单位切换
@@ -53,6 +65,8 @@ export function OverviewMetricCards() {
           isAlt && ut && ut.altDecimals !== undefined ? ut.altDecimals : c.decimals;
         const displayCompare =
           isAlt && ut && ut.altCompare ? ut.altCompare : c.compare;
+        const displayCompare2 =
+          isAlt && ut && ut.altCompare2 ? ut.altCompare2 : c.compare2;
         const toggleable = hasUnitToggle(c);
         // 当前选中的单位口径：默认单位为「箱」时切换态 = 万支；默认「万支」时切换态 = 箱
         const wanZhiActive = toggleable && (c.unit.endsWith("/万支") ? !isAlt : isAlt);
@@ -86,27 +100,34 @@ export function OverviewMetricCards() {
               )}
             </div>
             <div className="mb-1 flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-gray-900">
+              <span className={`text-2xl font-bold ${c.valueTone === "warning" ? "text-orange-500" : "text-gray-900"}`}>
                 {displayValue.toLocaleString(undefined, {
                   minimumFractionDigits: displayDecimals,
                   maximumFractionDigits: displayDecimals,
                 })}
               </span>
-              <span className="text-sm text-gray-400">{displayUnit}</span>
+              <span className={`text-sm ${c.valueTone === "warning" ? "text-orange-500" : "text-gray-400"}`}>
+                {displayUnit}
+              </span>
               <span className="text-[10px] text-gray-300">{c.period}</span>
             </div>
             {displayCompare && (
-              <div className={`text-xs font-medium ${displayCompare.good ? "text-green-600" : "text-orange-500"}`}>
-                {displayCompare.text}
-              </div>
+              <div className="text-xs font-medium">{renderCompareText(displayCompare.text, displayCompare.good)}</div>
+            )}
+            {displayCompare2 && (
+              <div className="text-xs font-medium">{renderCompareText(displayCompare2.text, displayCompare2.good)}</div>
             )}
             {(c.yoy !== undefined || c.mom !== undefined) && (
               <div className="mt-0.5 flex items-center gap-1.5 text-xs">
                 {c.yoy !== undefined && (
-                  <span className={trendCls(c.yoy, c.goodDirection)}>同比 {sign(c.yoy)}%</span>
+                  <span className="text-gray-900">
+                    同比 <span className={trendCls(c.yoy, c.goodDirection)}>{sign(c.yoy)}%</span>
+                  </span>
                 )}
                 {c.mom !== undefined && (
-                  <span className={trendCls(c.mom, c.goodDirection)}>环比 {sign(c.mom)}%</span>
+                  <span className="text-gray-900">
+                    环比 <span className={trendCls(c.mom, c.goodDirection)}>{sign(c.mom)}%</span>
+                  </span>
                 )}
               </div>
             )}

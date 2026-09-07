@@ -4,14 +4,17 @@ import { useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
 import { Card } from "@/components/ui/Card";
 import { SegmentedControl } from "./SegmentedControl";
-import { GRADE_STYLE, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
-import { DAILY_SERIES, SERIES_META, buildOverviewAnomaly, lastDays, round, type SeriesKey } from "@/lib/mock-data/energy-overview";
+import { AnomalyLevelLegend } from "./AnomalyLevelLegend";
+import { ALERT_LEVEL_COLOR, GRADE_TO_LEVEL, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
+import { DAILY_SERIES, SERIES_META, buildOverviewAnomaly, byMonth, byYear, lastDays, lastWeeks, round, type SeriesKey } from "@/lib/mock-data/energy-overview";
 
 type DailyKey = Exclude<SeriesKey, "comprehensive" | "electricity" | "carbon">;
+type Range = "日" | "周" | "月" | "年";
 
 const NAME_MAP: Record<string, string> = { actual: "实际值", avg: "历史均值" };
 
-// 通用「指标页签 + 按天折线（实际 / 历史均值 + 异常点）」图表，渲染近 90 天
+// 通用「指标页签（标题下方）+ 折线（实际 / 历史均值）」图表；
+// 统计粒度切换（标题右侧）：日 / 周 / 月 / 年，异常偏差点仅日粒度展示
 export function TabbedSeriesChart({
   title,
   tabs,
@@ -28,6 +31,8 @@ export function TabbedSeriesChart({
   hideLabel?: boolean;
 }) {
   const [active, setActive] = useState<DailyKey>(tabs[0].key);
+  // 统计粒度：日=近90天 / 周=近12周聚合 / 月=按月聚合 / 年=按年聚合
+  const [range, setRange] = useState<Range>("日");
   // 卷包电耗单位口径：箱（默认） / 万支（1箱 = 5万支，kWh/万支 = kWh/箱 × 0.2）
   const [packUnit, setPackUnit] = useState<"箱" | "万支">("箱");
   const meta = SERIES_META[active];
@@ -37,7 +42,12 @@ export function TabbedSeriesChart({
   const displayUnit = wanZhi ? "kWh/万支" : meta.unit;
 
   const data = useMemo(() => {
-    const pts = lastDays(DAILY_SERIES[active], 90);
+    const src = DAILY_SERIES[active];
+    const pts =
+      range === "日" ? lastDays(src, 90)
+      : range === "周" ? lastWeeks(src, 12)
+      : range === "月" ? byMonth(src)
+      : byYear(src);
     if (!wanZhi) return pts;
     // 万支口径：实际 / 均值 / 目标同步换算
     return pts.map((p) => ({
@@ -46,12 +56,13 @@ export function TabbedSeriesChart({
       avg: p.avg !== undefined ? round(p.avg * 0.2, 2) : undefined,
       target: p.target !== undefined ? round(p.target * 0.2, 2) : undefined,
     }));
-  }, [active, wanZhi]);
+  }, [active, range, wanZhi]);
 
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    if (pt?.anomaly) {
+    // 异常点仅日粒度展示，点击查看异常详情也仅日粒度生效
+    if (range === "日" && pt?.anomaly) {
       // 卷包电耗按当前单位口径生成异常详情（标题 / 单位 / 数值一致）
       onAnomaly(buildOverviewAnomaly(active, pt, isPack ? { label: displayLabel, unit: displayUnit } : undefined));
     }
@@ -61,15 +72,29 @@ export function TabbedSeriesChart({
     <Card
       title={title}
       headerRight={
-        hideTabs ? undefined : (
+        // 统计粒度切换：标题右侧，与标题高度对齐
+        <SegmentedControl
+          options={[
+            { value: "日", label: "日" },
+            { value: "周", label: "周" },
+            { value: "月", label: "月" },
+            { value: "年", label: "年" },
+          ]}
+          value={range}
+          onChange={setRange}
+        />
+      }
+    >
+      {/* 指标页签：图表标题下方（单指标图表隐藏） */}
+      {!hideTabs && (
+        <div className="mb-2">
           <SegmentedControl
             options={tabs.map((t) => ({ value: t.key, label: t.label }))}
             value={active}
             onChange={setActive}
           />
-        )
-      }
-    >
+        </div>
+      )}
       {!hideLabel && (
         <div className="mb-1 flex items-center justify-between gap-2 text-xs text-gray-500">
           <span>
@@ -103,7 +128,7 @@ export function TabbedSeriesChart({
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} onClick={handleClick}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={14} />
+          <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={range === "日" ? 14 : range === "月" ? 2 : 0} />
           <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={52} domain={["auto", "auto"]} />
           <Tooltip
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
@@ -111,21 +136,23 @@ export function TabbedSeriesChart({
           />
           <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
           <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
-          {data
-            .filter((d) => d.anomaly)
-            .map((d) => (
-              <ReferenceDot
-                key={d.iso}
-                x={d.date}
-                y={d.actual}
-                r={5}
-                fill={GRADE_STYLE[d.anomaly!].color}
-                stroke="#fff"
-                strokeWidth={1.5}
-                ifOverflow="extendDomain"
-                className="cursor-pointer"
-              />
-            ))}
+          {/* 异常偏差点仅日粒度展示（周 / 月 / 年聚合粒度不展示） */}
+          {range === "日" &&
+            data
+              .filter((d) => d.anomaly)
+              .map((d) => (
+                <ReferenceDot
+                  key={d.iso}
+                  x={d.date}
+                  y={d.actual}
+                  r={5}
+                  fill={ALERT_LEVEL_COLOR[GRADE_TO_LEVEL[d.anomaly!]]}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                  ifOverflow="extendDomain"
+                  className="cursor-pointer"
+                />
+              ))}
         </LineChart>
       </ResponsiveContainer>
       <div className="mt-3 flex justify-center gap-4 text-xs text-gray-500">
@@ -135,15 +162,7 @@ export function TabbedSeriesChart({
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-blue-500" /> 历史均值
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-yellow-400" /> 关注
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-orange-500" /> 告警
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-red-500" /> 危险
-        </span>
+        {range === "日" && <AnomalyLevelLegend />}
       </div>
     </Card>
   );

@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
 import { Card } from "@/components/ui/Card";
-import { GRADE_STYLE, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
+import { AnomalyLevelLegend } from "./AnomalyLevelLegend";
+import { ALERT_LEVEL_COLOR, GRADE_TO_LEVEL, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
 import { CARBON_MONTHLY, buildOverviewAnomaly } from "@/lib/mock-data/energy-overview";
 
 const NAME_MAP: Record<string, string> = { actual: "实际值", target: "目标值" };
@@ -75,7 +76,7 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
                 x={d.date}
                 y={d.actual}
                 r={5}
-                fill={GRADE_STYLE[d.anomaly!].color}
+                fill={ALERT_LEVEL_COLOR[GRADE_TO_LEVEL[d.anomaly!]]}
                 stroke="#fff"
                 strokeWidth={1.5}
                 ifOverflow="extendDomain"
@@ -91,15 +92,7 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-orange-500" /> 目标值
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-yellow-400" /> 关注
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-orange-500" /> 告警
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-red-500" /> 危险
-        </span>
+        <AnomalyLevelLegend />
       </div>
     </Card>
   );

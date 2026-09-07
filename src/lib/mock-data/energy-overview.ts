@@ -1,6 +1,6 @@
 // 能源总览 — 模拟数据（确定性生成：固定锚点，无 Date.now / Math.random）
 // 数据从 2024-01 起至当前；单位：单箱综合能耗 kgce/箱、电耗 kWh/箱、蒸汽 t、天然气 Nm³、碳排放 kg CO₂（口径 kg CO₂/万支）
-import { GRADE_TO_LEVEL, pickAlertRecordId, type AnomalyDetail, type EvalGrade } from "./grid-forecast";
+import { GRADE_TO_LEVEL, pickAlertRecordId, type AnomalyDetail, type AnomalyGridRow, type EvalGrade } from "./grid-forecast";
 
 // ===== 时间锚点（固定，保证刷新稳定）=====
 const END_DATE = new Date(2026, 7, 9); // 日度末点 2026-08-09
@@ -25,8 +25,8 @@ export const round = (v: number, decimals: number) => {
 };
 
 // 异常等级 → 实际值抬升幅度（能耗类指标：高于基准即异常）
-const GRADE_LIFT: Record<EvalGrade, number> = { 优秀: 1, 良好: 1, 一般: 1.04, 预警: 1.08, 危险: 1.13 };
-const GRADE_ORDER: EvalGrade[] = ["优秀", "良好", "一般", "预警", "危险"];
+const GRADE_LIFT: Record<EvalGrade, number> = { 优秀: 1, 良好: 1, 一般: 1.04, 预警: 1.08, 告警: 1.10, 危险: 1.13 };
+const GRADE_ORDER: EvalGrade[] = ["优秀", "良好", "一般", "预警", "告警", "危险"];
 const pickHighestGrade = (grades: EvalGrade[]): EvalGrade | undefined =>
   grades.length ? grades.reduce((a, b) => (GRADE_ORDER.indexOf(b) > GRADE_ORDER.indexOf(a) ? b : a)) : undefined;
 
@@ -123,10 +123,10 @@ export const COMPREHENSIVE_MONTHLY = genMonthly({
   ],
   emptyCauseOffset: 6,
 });
-// 单箱综合能耗日度（仅供「近12周」聚合，不直接展示）
+// 单箱综合能耗日度（「日」档展示近90天 + 「近12周」聚合共用；目标线与月度一致 31.0）
 const COMPREHENSIVE_DAILY = genDaily({
-  base: 30.3, avgBase: 30.6, seed: 3, decimals: 1,
-  anomalies: [{ offset: 70, grade: "预警" }, { offset: 31, grade: "一般" }],
+  base: 30.3, avgBase: 30.6, target: 31.0, seed: 3, decimals: 1,
+  anomalies: [{ offset: 70, grade: "告警" }, { offset: 31, grade: "一般" }],
 });
 
 // 单箱电耗：月度 + 日度
@@ -136,14 +136,14 @@ export const ELECTRICITY_MONTHLY = genMonthly({
 });
 export const ELECTRICITY_DAILY = genDaily({
   base: 24.7, avgBase: 25.0, seed: 7, decimals: 1,
-  anomalies: [{ offset: 9, grade: "一般" }, { offset: 33, grade: "预警" }, { offset: 58, grade: "一般" }],
+  anomalies: [{ offset: 9, grade: "一般" }, { offset: 33, grade: "告警" }, { offset: 58, grade: "一般" }],
 });
 
 // 单位产量碳排放：月度（口径 kg CO₂/万支；实际 + 目标 0.035，无均值线）
 export const CARBON_MONTHLY = genMonthly({
   base: 0.0338, target: 0.035, seed: 11, decimals: 3,
   drift: 0.002, waveAmp: 0.02,
-  anomalies: [{ offset: 5, grade: "一般" }, { offset: 20, grade: "预警" }],
+  anomalies: [{ offset: 5, grade: "一般" }, { offset: 20, grade: "告警" }],
 });
 
 // 车间单位电耗（日 + 月）
@@ -154,12 +154,12 @@ export const SILK_POWER_MONTHLY = genMonthly({ base: 0.462, avgBase: 0.47, seed:
 export const PACK_POWER_MONTHLY = genMonthly({ base: 20.5, avgBase: 20.8, seed: 17, decimals: 1, anomalies: [{ offset: 9, grade: "一般" }, { offset: 20, grade: "危险" }] });
 
 // 蒸汽（日）
-const STEAM_TOTAL_DAILY = genDaily({ base: 126, avgBase: 129, seed: 19, decimals: 0, waveAmp: 0.06, anomalies: [{ offset: 11, grade: "危险" }, { offset: 37, grade: "预警" }, { offset: 63, grade: "一般" }] });
+const STEAM_TOTAL_DAILY = genDaily({ base: 126, avgBase: 129, seed: 19, decimals: 0, waveAmp: 0.06, anomalies: [{ offset: 11, grade: "危险" }, { offset: 37, grade: "告警" }, { offset: 63, grade: "一般" }] });
 const STEAM_SILK_DAILY = genDaily({ base: 0.32, avgBase: 0.33, seed: 23, decimals: 2, anomalies: [{ offset: 28, grade: "一般" }] });
 const STEAM_HVAC_DAILY = genDaily({ base: 27.5, avgBase: 29.0, seed: 29, decimals: 1, waveAmp: 0.08, anomalies: [{ offset: 8, grade: "一般" }, { offset: 45, grade: "预警" }] });
 
 // 天然气（日）
-const GAS_UNIT_DAILY = genDaily({ base: 0.027, avgBase: 0.029, seed: 31, decimals: 3, anomalies: [{ offset: 19, grade: "预警" }, { offset: 52, grade: "一般" }] });
+const GAS_UNIT_DAILY = genDaily({ base: 0.027, avgBase: 0.029, seed: 31, decimals: 3, anomalies: [{ offset: 19, grade: "告警" }, { offset: 52, grade: "一般" }] });
 const GAS_BOILER_DAILY = genDaily({ base: 2650, avgBase: 2720, seed: 37, decimals: 0, waveAmp: 0.06, anomalies: [{ offset: 30, grade: "危险" }, { offset: 66, grade: "一般" }] });
 const GAS_SILK_DAILY = genDaily({ base: 540, avgBase: 560, seed: 41, decimals: 0, anomalies: [{ offset: 14, grade: "一般" }] });
 
@@ -205,7 +205,32 @@ export function lastWeeks(pts: HistPoint[], n: number, decimals = 1): HistPoint[
 // 近12周（综合能耗周档）
 export const COMPREHENSIVE_WEEKLY = lastWeeks(COMPREHENSIVE_DAILY, 12);
 
-// 按年聚合月度序列（年档：每年均值）
+// 近90天（综合能耗日档）
+export const COMPREHENSIVE_DAILY_VIEW = lastDays(COMPREHENSIVE_DAILY, 90);
+
+// 按月聚合日度序列（月档：每月均值，组内异常取最高等级）
+export function byMonth(pts: HistPoint[], decimals = 1): HistPoint[] {
+  const map = new Map<string, HistPoint[]>();
+  for (const p of pts) {
+    const m = p.iso.slice(0, 7);
+    map.set(m, [...(map.get(m) ?? []), p]);
+  }
+  const out: HistPoint[] = [];
+  map.forEach((list, m) => {
+    out.push({
+      date: m,
+      iso: `${m}-01`,
+      actual: round(list.reduce((s, p) => s + p.actual, 0) / list.length, decimals),
+      avg: round(list.reduce((s, p) => s + (p.avg ?? 0), 0) / list.length, decimals),
+      target: list[0].target,
+      anomaly: pickHighestGrade(list.filter((p) => p.anomaly).map((p) => p.anomaly!)),
+      causeEmpty: list.some((p) => p.causeEmpty),
+    });
+  });
+  return out;
+}
+
+// 按年聚合（年档：每年均值，组内异常取最高等级）
 export function byYear(pts: HistPoint[], decimals = 1): HistPoint[] {
   const map = new Map<string, HistPoint[]>();
   for (const p of pts) {
@@ -220,6 +245,8 @@ export function byYear(pts: HistPoint[], decimals = 1): HistPoint[] {
       actual: round(list.reduce((s, p) => s + p.actual, 0) / list.length, decimals),
       avg: round(list.reduce((s, p) => s + (p.avg ?? 0), 0) / list.length, decimals),
       target: list[0].target,
+      anomaly: pickHighestGrade(list.filter((p) => p.anomaly).map((p) => p.anomaly!)),
+      causeEmpty: list.some((p) => p.causeEmpty),
     });
   });
   return out;
@@ -348,6 +375,83 @@ export const SERIES_META: Record<SeriesKey, SeriesMeta> = {
   },
 };
 
+// 电耗异常明细数据：网格层（当日重点网格电耗，kWh）→ 设备层（下钻展示）
+// 偏差率：网格层 = 偏差值÷历史均值×100%（百分比），设备层 = 比率保留 4 位小数
+const GRID_DETAIL_SETS: Partial<Record<SeriesKey, AnomalyGridRow[]>> = {
+  // 全厂单箱电耗：跨车间重点网格
+  electricity: [
+    {
+      name: "1#卷接包机组", actual: 2182, avg: 1990,
+      devices: [
+        { code: "ET3A05_5", reading: 1286, avg: 1120 },
+        { code: "ET3A05_6", reading: 896, avg: 870 },
+      ],
+    },
+    {
+      name: "2#卷接包机组", actual: 1866, avg: 1740,
+      devices: [
+        { code: "ET3A06_3", reading: 986, avg: 910 },
+        { code: "ET3A06_4", reading: 880, avg: 830 },
+      ],
+    },
+    {
+      name: "制丝一线烘丝", actual: 3120, avg: 2850,
+      devices: [
+        { code: "ST2B01_1", reading: 1630, avg: 1480 },
+        { code: "ST2B01_2", reading: 1490, avg: 1370 },
+      ],
+    },
+  ],
+  // 制丝车间每公斤电耗：制丝线网格
+  silkPower: [
+    {
+      name: "制丝一线烘丝", actual: 3120, avg: 2850,
+      devices: [
+        { code: "ST2B01_1", reading: 1630, avg: 1480 },
+        { code: "ST2B01_2", reading: 1490, avg: 1370 },
+      ],
+    },
+    {
+      name: "制丝二线烘丝", actual: 2748, avg: 2610,
+      devices: [
+        { code: "ST2B02_1", reading: 1420, avg: 1330 },
+        { code: "ST2B02_2", reading: 1328, avg: 1280 },
+      ],
+    },
+    {
+      name: "膨丝塔", actual: 1962, avg: 1810,
+      devices: [
+        { code: "PT1C03_2", reading: 1032, avg: 940 },
+        { code: "PT1C03_3", reading: 930, avg: 870 },
+      ],
+    },
+  ],
+  // 卷包车间单位电耗：卷接包机组网格
+  packPower: [
+    {
+      name: "1#卷接包机组", actual: 2182, avg: 1990,
+      devices: [
+        { code: "ET3A05_5", reading: 1286, avg: 1120 },
+        { code: "ET3A05_6", reading: 896, avg: 870 },
+      ],
+    },
+    {
+      name: "2#卷接包机组", actual: 1866, avg: 1740,
+      devices: [
+        { code: "ET3A06_3", reading: 986, avg: 910 },
+        { code: "ET3A06_4", reading: 880, avg: 830 },
+      ],
+    },
+    {
+      name: "3#卷接包机组", actual: 2010, avg: 1880,
+      devices: [
+        { code: "ET3A07_1", reading: 1096, avg: 1010 },
+        { code: "ET3A07_2", reading: 914, avg: 870 },
+      ],
+    },
+  ],
+};
+
 // 图表异常点 → 抽屉详情（metaOverride：覆盖标题/单位口径，如卷包电耗切换「万支」展示）
 export function buildOverviewAnomaly(
   key: SeriesKey,
@@ -358,6 +462,8 @@ export function buildOverviewAnomaly(
   const grade = pt.anomaly ?? "一般";
   const baseVal = pt.target ?? pt.avg ?? pt.actual;
   const value = `${pt.actual} ${meta.unit}`;
+  const diff = pt.actual - baseVal;
+  const sign = diff >= 0 ? "+" : "-";
   const cause = pt.causeEmpty
     ? ""
     : `经分析，本次${meta.label}升至 ${value}，主要受${meta.summary}共同影响。\n首要原因是${meta.reasons[0]}；\n其次，${meta.reasons[1]}；\n此外，${meta.reasons[2]}。`;
@@ -367,13 +473,14 @@ export function buildOverviewAnomaly(
     metricName: meta.label,
     current: value,
     baseline: pt.target !== undefined ? `目标 ≤${pt.target} ${meta.unit}` : `历史均值 ${pt.avg} ${meta.unit}`,
-    deviation: `超出基准 ${(((pt.actual - baseVal) / baseVal) * 100).toFixed(1)}%`,
+    deviationValue: `${sign}${Number(Math.abs(diff).toPrecision(3))} ${meta.unit}`,
+    deviationRate: `${sign}${((Math.abs(diff) / baseVal) * 100).toFixed(1)}%`,
     triggerTime: `${pt.iso} 09:20`,
-    duration: "2小时40分钟",
     cause,
     suggestion: meta.suggestion,
     recordId: pickAlertRecordId(meta.dept),
     level: GRADE_TO_LEVEL[grade],
+    gridDetails: GRID_DETAIL_SETS[key], // 电耗类异常附带网格明细（其余指标无）
   };
 }
 
@@ -385,17 +492,20 @@ export interface OverviewCard {
   value: number;
   unit: string;
   decimals: number;
-  compare?: { label: string; text: string; good: boolean }; // 目标 / 历史均值对比行
+  compare?: { label: string; text: string; good: boolean }; // 目标值对比行
+  compare2?: { label: string; text: string; good: boolean }; // 历史均值对比行（有目标值行的卡片第二行展示）
   yoy?: number; // 同比 %
   mom?: number; // 环比 %
   goodDirection: "down" | "up"; // 值下降为好 / 上升为好（决定涨跌配色语义）
   grade?: EvalGrade; // 评价等级（色条 + 角标；预警/危险加异常图标）
+  valueTone?: "warning"; // 数值警示色（如污水COD 接近限值，值与单位显示橙色）
   // 单位切换支持：箱 ↔ 万支
   unitToggle?: {
     altUnit: string; // 切换后的单位
     convertFactor: number; // 原值 × convertFactor = 切换后的值
     altDecimals?: number; // 切换后的小数位（可选，不指定则保持原 decimals）
-    altCompare?: { label: string; text: string; good: boolean }; // 切换后的对比文案
+    altCompare?: { label: string; text: string; good: boolean }; // 切换后的目标值对比文案
+    altCompare2?: { label: string; text: string; good: boolean }; // 切换后的历史均值对比文案
   };
 }
 
@@ -403,61 +513,69 @@ export const overviewCards: OverviewCard[] = [
   {
     key: "comprehensive", label: "单箱卷烟综合能耗", period: "本月",
     value: 29.8, unit: "kgce/箱", decimals: 1,
-    compare: { label: "目标 ≤31.0", text: "低于目标 1.2 kgce/箱（3.9%）", good: true },
+    compare: { label: "目标值 31", text: "目标值：31（↓1.2）", good: true },
+    compare2: { label: "历史均值 30", text: "历史均值：30（↓0.2）", good: true },
     yoy: -3.5, mom: -1.8, goodDirection: "down", grade: "良好",
     unitToggle: {
       altUnit: "kgce/万支", convertFactor: 0.2, altDecimals: 2,
-      altCompare: { label: "目标 ≤6.20", text: "低于目标 0.24 kgce/万支（3.9%）", good: true },
+      altCompare: { label: "目标值 6.20", text: "目标值：6.20（↓0.24）", good: true },
+      altCompare2: { label: "历史均值 6.00", text: "历史均值：6.00（↓0.04）", good: true },
     },
   },
   {
     key: "electricity", label: "单箱电耗", period: "本月",
     value: 24.6, unit: "kWh/箱", decimals: 1,
-    compare: { label: "历史均值 25.0", text: "低于历史均值 0.4 kWh/箱（-1.6%）", good: true },
-    yoy: -2.7, mom: -0.9, goodDirection: "down", grade: "优秀",
+    compare: { label: "目标值 24", text: "目标值：24（↑0.6）", good: false },
+    compare2: { label: "历史均值 25", text: "历史均值：25（↓0.4）", good: true },
+    yoy: -2.7, mom: -0.9, goodDirection: "down", grade: "一般",
     unitToggle: {
       altUnit: "kWh/万支", convertFactor: 0.2, altDecimals: 2,
-      altCompare: { label: "历史均值 5.00", text: "低于历史均值 0.08 kWh/万支（1.6%）", good: true },
+      altCompare: { label: "目标值 4.80", text: "目标值：4.80（↑0.12）", good: false },
+      altCompare2: { label: "历史均值 5.00", text: "历史均值：5.00（↓0.08）", good: true },
     },
   },
   {
     key: "steam", label: "蒸汽耗总量", period: "本月",
     value: 3860, unit: "t", decimals: 0,
-    compare: { label: "历史均值 4,000", text: "低于历史均值 140 t（-3.5%）", good: true },
+    compare: { label: "目标值 4,200", text: "目标值：4,200（↓340）", good: true },
+    compare2: { label: "历史均值 4,000", text: "历史均值：4,000（↓140）", good: true },
     yoy: -4.2, mom: 1.3, goodDirection: "down", grade: "一般",
   },
   {
-    key: "gas", label: "单箱天然气耗", period: "本月",
-    value: 0.82, unit: "Nm³/箱", decimals: 2,
-    compare: { label: "历史均值 0.90", text: "低于历史均值 0.08 Nm³/箱（-8.9%）", good: true },
-    yoy: -5.7, mom: -2.2, goodDirection: "down", grade: "优秀",
+    key: "waterPerOutput", label: "单位产量水耗", period: "本季度",
+    value: 0.12, unit: "m³/万支", decimals: 2,
+    yoy: -4.1, mom: 1.6, goodDirection: "down", grade: "优秀",
     unitToggle: {
-      altUnit: "Nm³/万支", convertFactor: 0.2, altDecimals: 3,
-      altCompare: { label: "历史均值 0.180", text: "低于历史均值 0.016 Nm³/万支（8.9%）", good: true },
+      altUnit: "m³/箱", convertFactor: 5, altDecimals: 2,
     },
   },
   {
     key: "carbon", label: "单位产量碳排放量", period: "本季度",
     value: 0.032, unit: "kg CO₂/万支", decimals: 3,
-    compare: { label: "目标 ≤0.035", text: "低于目标 0.003 kg CO₂/万支", good: true },
-    yoy: -5.6, mom: -2.1, goodDirection: "down", grade: "优秀",
+    compare: { label: "目标值 0.030", text: "目标值：0.030（↑0.002）", good: false },
+    yoy: -0.02, mom: 0.01, goodDirection: "down", grade: "一般",
     unitToggle: {
       altUnit: "kg CO₂/箱", convertFactor: 5, altDecimals: 4,
-      altCompare: { label: "目标 ≤0.175", text: "低于目标 0.015 kg CO₂/箱", good: true },
+      altCompare: { label: "目标值 0.150", text: "目标值：0.150（↑0.010）", good: false },
     },
   },
   {
-    key: "waterPerOutput", label: "单位产量水耗", period: "本季度",
-    value: 0.12, unit: "m³/万支", decimals: 2,
-    yoy: -4.1, mom: -1.6, goodDirection: "down", grade: "优秀",
+    key: "gas", label: "单箱天然气耗", period: "本月",
+    value: 0.82, unit: "Nm³/箱", decimals: 2,
+    compare: { label: "目标值 1.5", text: "目标值：1.5（↓0.58）", good: true },
+    compare2: { label: "历史均值 1", text: "历史均值：1（↓0.08）", good: true },
+    yoy: -5.7, mom: 2.2, goodDirection: "down", grade: "优秀",
     unitToggle: {
-      altUnit: "m³/箱", convertFactor: 5, altDecimals: 2,
+      altUnit: "Nm³/万支", convertFactor: 0.2, altDecimals: 3,
+      altCompare: { label: "目标值 0.300", text: "目标值：0.300（↓0.116）", good: true },
+      altCompare2: { label: "历史均值 0.200", text: "历史均值：0.200（↓0.016）", good: true },
     },
   },
   {
     key: "cod", label: "污水COD", period: "本季度",
     value: 42, unit: "mg/L", decimals: 0,
     goodDirection: "down", grade: "良好",
+    valueTone: "warning", // 接近排放限值，数值橙色提示
   },
 ];
 

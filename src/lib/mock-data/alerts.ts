@@ -130,10 +130,11 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) =>
     type === "当前异常"
       ? `基准值${obj.target.toFixed(1)}${obj.unit}`
       : `${obj.low ? "目标下限" : "目标上限"}${obj.target.toFixed(1)}${obj.unit}`;
-  const deviation =
-    type === "当前异常"
-      ? `${obj.low ? "低于基准" : "超出上限"}${gap.toFixed(1)}%`
-      : `预计${obj.low ? "低于" : "超出"}${(gap * 0.6).toFixed(1)}%`;
+  // 偏离值（带方向与单位）与偏离率（带方向）：当前异常取全额偏离，预测风险取预计偏离（60%）
+  const delta = type === "当前异常" ? gap : gap * 0.6;
+  const sign = obj.low ? "-" : "+";
+  const deviationValue = `${sign}${delta.toFixed(2)}${obj.unit}`;
+  const deviationRate = `${sign}${((delta / obj.target) * 100).toFixed(1)}%`;
 
   // 标题
   const title =
@@ -169,7 +170,8 @@ export const ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) =>
     // 核心告警数据
     valueLabel,
     baselineLabel,
-    deviation,
+    deviationValue,
+    deviationRate,
     confidenceRange:
       type === "预测风险"
         ? `${(approaching - 1.2).toFixed(1)}～${(approaching + 1.4).toFixed(1)}${obj.unit}`

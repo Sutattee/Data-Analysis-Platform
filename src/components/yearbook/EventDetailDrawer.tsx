@@ -88,6 +88,8 @@ export function EventDetailDrawer({
                 暂无完整事件经过（缺少处置与恢复过程信息）
               </div>
             )}
+            {/* 原因分析（AI 生成的异常原因分析结论） */}
+            <Field label="原因分析" value={e.causeAnalysis ? <span className="text-gray-600">{e.causeAnalysis}</span> : "-"} />
           </section>
 
           {/* ③ 影响与证据 */}

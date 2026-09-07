@@ -107,7 +107,7 @@ export function getOverviewCards(): OverviewCardData[] {
         { label: "预测峰值", value: "46.5 t · 预计 8月13日出现", tone: "orange" },
         { label: "同工况历史累计", value: "279.0 t", tone: "muted" },
         { label: "预计差异", value: "增加 7.4 t（2.7%）", tone: "orange" },
-        { label: "每日预测区间", value: "34.3 ～ 48.8 t", tone: "muted" },
+        { label: "预测区间", value: "34.3 ～ 48.8 t", tone: "muted" },
       ],
       spark: {
         kind: "bar",

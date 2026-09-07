@@ -29,8 +29,8 @@ const QUICK_ENTRIES = [
     href: "/qa",
   },
   {
-    label: "报告生成",
-    desc: "AI 自动撰写分析报告",
+    label: "年鉴报告",
+    desc: "AI 自动撰写年鉴报告",
     icon: (
       <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
         <rect x="4" y="2" width="16" height="20" rx="2" fill="#8B5CF6" />
@@ -39,7 +39,7 @@ const QUICK_ENTRIES = [
         <rect x="7" y="14" width="6" height="2" rx="1" fill="white" />
       </svg>
     ),
-    href: "/reports",
+    href: "/energy/yearbook/reports",
   },
   {
     label: "指标溯源",

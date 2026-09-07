@@ -12,8 +12,21 @@ import {
 import type { AlertLevel } from "@/types";
 
 // ===== 五级评价 =====
-export type EvalGrade = "优秀" | "良好" | "一般" | "预警" | "危险";
+export type EvalGrade = "优秀" | "良好" | "一般" | "预警" | "告警" | "危险";
 export type ForecastStatus = "预计达标" | "存在超标风险" | "预计超标";
+
+// 异常明细数据（电耗类异常：网格层行，点击网格名称可下钻至设备层）
+export interface AnomalyDeviceRow {
+  code: string; // 设备编码
+  reading: number; // 当日读数（kWh）
+  avg: number; // 历史均值（kWh）
+}
+export interface AnomalyGridRow {
+  name: string; // 网格名称
+  actual: number; // 当日重点网格电耗实际值（kWh）
+  avg: number; // 该网格历史均值（kWh）
+  devices: AnomalyDeviceRow[]; // 设备层明细（下钻展示）
+}
 
 // 异常详情（抽屉展示，可由告警记录或趋势异常点构造）
 export interface AnomalyDetail {
@@ -22,17 +35,18 @@ export interface AnomalyDetail {
   baseline?: string;
   current?: string; // 当前值（当前异常）
   forecastValue?: string; // 预测值（预测异常）
-  deviation?: string;
+  deviationValue?: string; // 偏离值（带方向与单位，如 +220.47 kWh）
+  deviationRate?: string; // 偏离率（带方向，如 +647.8%）
   confidenceRange?: string; // 置信区间（预测异常）
   triggerTime?: string; // 发生时间（当前异常）
   forecastTime?: string; // 预计越界时间（预测异常）
-  duration?: string;
   cause?: string;
   causeType?: "AI生成" | "人工补录"; // 原因类型（cause 存在时有值）
   suggestion?: string;
   dept?: string; // 部门 / 车间（能源总览等页面构造的异常携带）
   recordId?: string; // 存在时抽屉显示「查看告警记录详情」
   level?: AlertLevel; // 告警等级（与告警记录页一致）
+  gridDetails?: AnomalyGridRow[]; // 异常明细数据（网格层，可下钻至设备层；电耗类异常携带）
 }
 
 export const GRADE_STYLE: Record<EvalGrade, { color: string; soft: string; text: string }> = {
@@ -40,7 +54,17 @@ export const GRADE_STYLE: Record<EvalGrade, { color: string; soft: string; text:
   良好: { color: "#84cc16", soft: "bg-lime-50", text: "text-lime-700" },
   一般: { color: "#eab308", soft: "bg-yellow-50", text: "text-yellow-700" },
   预警: { color: "#f97316", soft: "bg-orange-50", text: "text-orange-700" },
-  危险: { color: "#ef4444", soft: "bg-red-50", text: "text-red-700" },
+  告警: { color: "#ef4444", soft: "bg-red-50", text: "text-red-700" },
+  危险: { color: "#b91c1c", soft: "bg-red-100", text: "text-red-800" },
+};
+
+// 告警等级五色（趋势图异常点与图例统一使用）：提示蓝灰 / 关注黄 / 预警橙 / 告警红 / 危险深红
+export const ALERT_LEVEL_COLOR: Record<AlertLevel, string> = {
+  提示: "#64748b",
+  关注: "#eab308",
+  预警: "#f97316",
+  告警: "#ef4444",
+  危险: "#b91c1c",
 };
 
 export const FORECAST_STATUS_STYLE: Record<ForecastStatus, { color: string; soft: string; text: string }> = {
@@ -72,12 +96,13 @@ export function gradeByShare(ratio: number): EvalGrade {
   return "优秀";
 }
 
-// 评价等级 → 告警等级映射（用于异常抽屉的告警等级标签）
+// 评价等级 → 告警等级映射（用于异常抽屉的告警等级标签与异常点五色映射）
 export const GRADE_TO_LEVEL: Record<EvalGrade, AlertLevel> = {
   "优秀": "提示",
   "良好": "提示",
   "一般": "关注",
   "预警": "预警",
+  "告警": "告警",
   "危险": "危险",
 };
 

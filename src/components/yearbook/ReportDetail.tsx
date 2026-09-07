@@ -107,7 +107,6 @@ export function ReportDetail() {
               <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
                 <th className={th}>事件编号</th>
                 <th className={th}>事件标题</th>
-                <th className={th}>事件类型</th>
                 <th className={th}>发生时间</th>
                 <th className={th}>持续时长</th>
                 <th className={th}>生成时版本</th>
@@ -126,7 +125,6 @@ export function ReportDetail() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-900 max-w-[220px] truncate" title={e.title}>{e.title}</td>
-                  <td className="px-4 py-3 text-gray-600">{e.type}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs max-w-[220px] truncate" title={e.timeLabel}>{e.timeLabel}</td>
                   <td className="px-4 py-3 text-gray-600">{e.duration}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{e.version}</td>

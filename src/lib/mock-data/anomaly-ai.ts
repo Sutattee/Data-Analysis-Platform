@@ -29,7 +29,9 @@ export function contextSummaryOf(detail: AnomalyDetail): string {
     detail.metricName ? `指标名称：${detail.metricName}` : null,
     detail.current ? `异常值：${detail.current}` : detail.forecastValue ? `预测值：${detail.forecastValue}` : null,
     detail.baseline ? `基准值/阈值：${detail.baseline}` : null,
-    detail.deviation ? `偏离程度：${detail.deviation}` : null,
+    detail.deviationValue || detail.deviationRate
+      ? `偏离值：${detail.deviationValue ?? "—"}｜偏离率：${detail.deviationRate ?? "—"}`
+      : null,
     detail.triggerTime ? `发生时间：${detail.triggerTime}` : null,
     detail.forecastTime ? `预计越界时间：${detail.forecastTime}` : null,
     detail.level ? `告警等级：${detail.level}` : null,
@@ -133,7 +135,7 @@ function insufficientReply(detail: AnomalyDetail): string {
   const missing: string[] = [];
   if (!detail.current && !detail.forecastValue) missing.push("异常值/预测值");
   if (!detail.baseline) missing.push("基准值或阈值");
-  if (!detail.deviation) missing.push("偏离程度");
+  if (!detail.deviationValue && !detail.deviationRate) missing.push("偏离值/偏离率");
   if (!detail.triggerTime && !detail.forecastTime) missing.push("发生时间");
   return (
     "当前数据不足，暂无法确定异常原因。\n" +
@@ -152,7 +154,7 @@ function buildAnalysis(detail: AnomalyDetail, userText: string, history: Anomaly
   if (!userText.trim()) {
     const metric = detail.metricName ?? "该指标";
     const obj = detail.dept ?? "相关对象";
-    const dev = detail.deviation ?? "超出基准";
+    const dev = detail.deviationRate ?? "超出基准";
     return (
       `根据当前异常上下文（${contextSummaryOf(detail)}），初步分析如下：\n\n` +
       `1. 【运行或工艺调整】${metric}偏离可能源于${obj}运行模式或工艺参数变化（影响程度：中；证据：偏离程度 ${dev}；可信度：70%）。\n` +
@@ -200,7 +202,8 @@ export function generateAnomalyReply(
     !detail.current &&
     !detail.forecastValue &&
     !detail.baseline &&
-    !detail.deviation;
+    !detail.deviationValue &&
+    !detail.deviationRate;
   if (contextInsufficient) {
     return { content: insufficientReply(detail), adoptable: false };
   }

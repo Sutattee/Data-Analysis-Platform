@@ -365,7 +365,8 @@ export interface AlertRecord {
   // —— 核心告警数据 ——
   valueLabel: string;         // 告警值（当前异常=当前值 / 预测风险=预测值）
   baselineLabel: string;      // 基准 / 阈值
-  deviation: string;          // 偏离程度
+  deviationValue: string;     // 偏离值（带方向与单位，如 +220.47 kWh）
+  deviationRate: string;      // 偏离率（带方向，如 +647.8%）
   confidenceRange?: string;   // 置信区间（仅预测风险）
   duration?: string;          // 持续时间（仅当前异常）
   forecastTime?: string;      // 预计越界时间（仅预测风险）
@@ -399,7 +400,7 @@ export interface AlertCondition {
   operator: AlertOperator;        // 判断方式
   baselineType: AlertBaselineType; // 基准类型
   baselineValue: string;          // 基准值；正常区间为 "下限~上限"；目标值为系统带入的目标值
-  deviation?: string;             // 偏离比例 %（选填，不填=越界即触发）
+  deviation?: string;             // 偏离比例区间 %（如 5-10；正常区间类型不填）
 }
 
 // 数据告警策略
@@ -431,6 +432,7 @@ export interface MetricManage {
   nameCn: string;          // 指标中文名称
   nameEn: string;          // 指标英文名称（保留：溯源拓扑等仍在用，列表/详情改用 code）
   code: string;            // 指标编码
+  metricType?: "atomic" | "derived"; // 指标类型（atomic=原子 / derived=派生）
   domain: string;          // 业务域
   definition: string;      // 业务定义
   formula: string;         // 计算口径
@@ -564,6 +566,7 @@ export interface MajorEvent {
   metrics: string[]; // 影响指标名
   impactSummary: string; // 影响摘要（有数据依据的主要影响结果）
   process: string; // 事件经过（≤2000 字）
+  causeAnalysis?: string; // 原因分析（AI 生成的异常原因分析结论）
   timeline: EventTimelineItem[]; // 时间轴（缺处置/恢复信息时为空段）
   alertIds: string[]; // 关联预警记录 id（技改投运/计划调整等可为空）
   aiBasis?: string; // AI 识别依据（AI识别事件）

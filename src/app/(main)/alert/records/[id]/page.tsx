@@ -95,7 +95,8 @@ export default function AlertDetailPage() {
         metricName: record.metricName,
         current: record.valueLabel,
         baseline: record.baselineLabel,
-        deviation: record.deviation,
+        deviationValue: record.deviationValue,
+        deviationRate: record.deviationRate,
         triggerTime: record.triggerTime,
         cause: record.causeSummary,
       };
@@ -150,8 +151,7 @@ export default function AlertDetailPage() {
             <Field label="告警编号" value={record.id} />
             <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
             <Field label="业务域" value={record.domain} />
-            <Field label="告警对象编号" value={<span className="font-mono text-xs">{record.objectCode}</span>} />
-            <Field label="告警对象名称" value={record.objectName} />
+            <Field label="告警对象" value={`${record.objectName}（${record.objectCode}）`} />
             <Field label="告警触发时间" value={record.triggerTime} />
           </div>
         </Card>
@@ -162,7 +162,8 @@ export default function AlertDetailPage() {
             <Field label="指标名称" value={record.metricName} />
             <Field label="告警值" value={record.valueLabel} />
             <Field label="基准 / 阈值" value={record.baselineLabel} />
-            <Field label="偏离程度" value={record.deviation} />
+            <Field label="偏离值" value={record.deviationValue} />
+            <Field label="偏离率" value={record.deviationRate} />
           </div>
         </Card>
 

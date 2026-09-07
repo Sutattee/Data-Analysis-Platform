@@ -156,6 +156,15 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
         (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim()))
       )
         miss.push("基准值");
+      // 偏离比例：正常区间外的基准类型必填，区间格式如 5-10（下限 < 上限）
+      if (c.baselineType !== "正常区间") {
+        const m = (c.deviation ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+        if (!m) miss.push("偏离比例(如5-10)");
+        else if (Number(m[1]) >= Number(m[2])) {
+          ce[i] = "偏离比例区间下限需小于上限（如 5-10）";
+          return;
+        }
+      }
       ce[i] = miss.length ? `请完善${miss.join("、")}` : "";
     });
     if (data.notifyMethods.length === 0) e.notifyMethods = "请选择通知方式";
@@ -304,7 +313,7 @@ export function AlertStrategyForm({ mode, initial }: AlertStrategyFormProps) {
           <div>
             <label className={labelCls}>
               检测周期 <span className="text-red-500">*</span>
-              <Tip text="配置告警策略的执行频率；策略启用后持续监测，已有告警的处理状态不影响后续执行。" />
+              <Tip text="即配置告警策略的执行频率；启用后持续监测，若后续检测数据恢复正常则不再触发告警，并自动将对应数据的异常状态更新为“正常”。" />
             </label>
             <select className={selectCls} value={data.detectCycle} onChange={(e) => set("detectCycle", e.target.value as AlertDetectCycle)}>
               {ALERT_DETECT_CYCLES.map((c) => (

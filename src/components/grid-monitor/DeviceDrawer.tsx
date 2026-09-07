@@ -68,7 +68,6 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50 text-[11px] font-medium text-gray-500">
               <th className="px-3 py-2.5 text-left">设备编码</th>
-              <th className="px-3 py-2.5 text-left">设备名称</th>
               <th className="px-3 py-2.5 text-right">当日读数(kWh)</th>
               <th className="px-3 py-2.5 text-right">历史均值(kWh)</th>
               <th className="px-3 py-2.5 text-right">偏差率</th>
@@ -79,9 +78,8 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
           <tbody className="divide-y divide-gray-50">
             {devices.map((d) => (
               <tr key={d.code} className="hover:bg-gray-50">
-                <td className="px-3 py-2.5 font-mono text-gray-600">{d.code}</td>
-                <td className="px-3 py-2.5 text-gray-800">
-                  {d.name}
+                <td className="px-3 py-2.5 font-mono text-gray-600">
+                  {d.code}
                   {d.note && <p className="text-[10px] text-red-500">{d.note}</p>}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-gray-700">
@@ -97,7 +95,7 @@ export function DeviceDrawer({ open, onClose, row, devices, dateIso }: DeviceDra
             ))}
             {devices.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-12 text-center text-sm text-gray-400">
+                <td colSpan={6} className="px-3 py-12 text-center text-sm text-gray-400">
                   暂无关联设备数据
                 </td>
               </tr>

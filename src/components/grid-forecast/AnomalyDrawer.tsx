@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
-import type { AnomalyDetail } from "@/lib/mock-data/grid-forecast";
+import type { AnomalyDetail, AnomalyGridRow } from "@/lib/mock-data/grid-forecast";
 import { AnomalyAiPanel } from "./AnomalyAiPanel";
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -25,6 +25,96 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div>
       <h4 className="mb-2 text-xs font-semibold text-gray-500">{title}</h4>
       <div className="grid grid-cols-2 gap-3">{children}</div>
+    </div>
+  );
+}
+
+// 异常明细数据：网格层表格，点击网格名称（蓝色 + >）下钻至设备层，「返回上级」回到网格层
+function GridDetailBlock({
+  rows,
+  drilled,
+  onDrill,
+}: {
+  rows: AnomalyGridRow[];
+  drilled: AnomalyGridRow | null;
+  onDrill: (g: AnomalyGridRow | null) => void;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 text-xs font-semibold text-gray-500">异常明细数据</h4>
+      <div className="overflow-hidden rounded-lg border border-gray-100">
+        {!drilled ? (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500">
+                <th className="px-3 py-2 text-left font-medium">网格名称</th>
+                <th className="px-3 py-2 text-right font-medium">实际值</th>
+                <th className="px-3 py-2 text-right font-medium">历史均值</th>
+                <th className="px-3 py-2 text-right font-medium">偏差率</th>
+                <th className="px-3 py-2 text-left font-medium">监测状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((g) => {
+                // 偏差率 = 偏差值 ÷ 历史均值 × 100%
+                const rate = ((g.actual - g.avg) / g.avg) * 100;
+                return (
+                  <tr key={g.name} className="border-t border-gray-50">
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onDrill(g)}
+                        className="font-medium text-primary-600 transition-colors hover:text-primary-700"
+                      >
+                        {g.name}&gt;
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-800">{g.actual.toLocaleString()} kWh</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{g.avg.toLocaleString()} kWh</td>
+                    <td className="px-3 py-2 text-right text-orange-500">+{rate.toFixed(1)}%</td>
+                    <td className="px-3 py-2 text-red-500">异常</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div>
+            {/* 设备层顶部：返回上级按钮 */}
+            <div className="border-b border-gray-50 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => onDrill(null)}
+                className="text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
+              >
+                ← 返回上级
+              </button>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500">
+                  <th className="px-3 py-2 text-left font-medium">设备编码</th>
+                  <th className="px-3 py-2 text-right font-medium">当日读数</th>
+                  <th className="px-3 py-2 text-right font-medium">历史均值</th>
+                  <th className="px-3 py-2 text-right font-medium">偏差率</th>
+                  <th className="px-3 py-2 text-left font-medium">监测状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drilled.devices.map((d) => (
+                  <tr key={d.code} className="border-t border-gray-50">
+                    <td className="px-3 py-2 text-gray-800">{d.code}</td>
+                    <td className="px-3 py-2 text-right text-gray-800">{d.reading.toLocaleString()} kWh</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{d.avg.toLocaleString()} kWh</td>
+                    <td className="px-3 py-2 text-right text-orange-500">{((d.reading - d.avg) / d.avg).toFixed(4)}</td>
+                    <td className="px-3 py-2 text-red-500">异常</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -47,9 +137,9 @@ export function AnomalyDrawer({
   const metricName = detail?.metricName ?? rec?.metricName ?? "-";
   const baseline = detail?.baseline ?? rec?.baselineLabel;
   const current = detail?.current ?? rec?.valueLabel;
-  const deviation = detail?.deviation ?? rec?.deviation;
+  const deviationValue = detail?.deviationValue ?? rec?.deviationValue;
+  const deviationRate = detail?.deviationRate ?? rec?.deviationRate;
   const triggerTime = detail?.triggerTime ?? rec?.triggerTime;
-  const duration = detail?.duration ?? rec?.duration;
   const suggestion = detail?.suggestion ?? rec?.suggestion;
   const level = detail?.level ?? rec?.level;
   const isForecast = !!detail?.forecastValue;
@@ -65,6 +155,8 @@ export function AnomalyDrawer({
   const [aiFilledText, setAiFilledText] = useState<string | undefined>(undefined);
   // AI 辅助对话面板
   const [aiOpen, setAiOpen] = useState(false);
+  // 异常明细数据下钻：当前展开的网格（null = 网格层）
+  const [drillGrid, setDrillGrid] = useState<AnomalyGridRow | null>(null);
 
   // —— 处置建议编辑态 ——
   const [suggestionEditing, setSuggestionEditing] = useState(false);
@@ -81,6 +173,7 @@ export function AnomalyDrawer({
     setSuggestionEditing(false);
     setSuggestionDraft("");
     setSavedSuggestion(undefined);
+    setDrillGrid(null);
   }, [detail]);
 
   const baseCause = detail?.cause ?? rec?.causeSummary;
@@ -166,18 +259,24 @@ export function AnomalyDrawer({
               <>
                 <Field label="预测值" value={detail?.forecastValue} />
                 <Field label="置信区间" value={detail?.confidenceRange} />
-                <Field label="偏离程度" value={deviation} />
+                <Field label="偏离值" value={deviationValue} />
+                <Field label="偏离率" value={deviationRate} />
                 <Field label="预计越界时间" value={detail?.forecastTime} />
               </>
             ) : (
               <>
                 <Field label="当前值" value={current} />
-                <Field label="偏离程度" value={deviation} />
+                <Field label="偏离值" value={deviationValue} />
+                <Field label="偏离率" value={deviationRate} />
                 <Field label="发生时间" value={triggerTime} />
-                <Field label="持续时间" value={duration} />
               </>
             )}
           </Section>
+
+          {/* 异常明细数据（网格层 → 设备层下钻；电耗类异常携带） */}
+          {detail?.gridDetails && detail.gridDetails.length > 0 && (
+            <GridDetailBlock rows={detail.gridDetails} drilled={drillGrid} onDrill={setDrillGrid} />
+          )}
 
           {/* 异常原因（AI 综合分析，可补充 / 修正） */}
           <div>
