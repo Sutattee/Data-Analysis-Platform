@@ -7,7 +7,11 @@ export const MATERIAL_FORECAST_MODEL = "辅料消耗时序预测模型 v1.2";
 export const MATERIAL_HISTORY_RANGE = "2024-01-01 至 2026-08-09"; // 历史数据范围（系统自动确定）
 export const MATERIAL_DATA_END = "2026-08-09"; // 数据截止日
 export const NEXT_MONTH_LABEL = "下个月（2026-09-01 ~ 2026-09-30）"; // 预测时间范围（唯一选项）
-export const DEFAULT_PLAN_OUTPUT = 3200; // 各牌号下个月计划产量之和（箱），自动带入可编辑
+
+// 各牌号下个月计划产量（箱），系统自动带入（与 MATERIAL_BRANDS 对齐），允许编辑
+export const DEFAULT_BRAND_PLANS: number[] = [3000, 2400, 2600, 2000];
+// 各牌号计划产量之和（箱），作为预测的规模效应基准
+export const DEFAULT_PLAN_OUTPUT = DEFAULT_BRAND_PLANS.reduce((s, v) => s + v, 0);
 
 // 三档历史单耗（最差 / 均值 / 最优），量级与辅料消耗页序列一致
 interface MaterialForecastMetric {
@@ -28,7 +32,31 @@ export const MATERIAL_FORECAST_METRICS: Record<MaterialKey, MaterialForecastMetr
 
 export type ConsumeLevel = "最差" | "均值" | "最优";
 
-// 各牌号历史单耗下拉选项：仅档位名（数值在选定档位后自动拉取展示）
+// 各牌号历史单耗三档数据（与 MATERIAL_BRANDS 对齐；全厂档位值见 MATERIAL_FORECAST_METRICS）
+export const BRAND_CONSUME_LEVELS: Record<MaterialKey, Record<ConsumeLevel, number[]>> = {
+  tipPaper: {
+    最差: [31.2, 30.6, 30.9, 30.3],
+    均值: [30.0, 29.4, 29.7, 29.1],
+    最优: [29.2, 28.7, 29.0, 28.5],
+  },
+  boxLabel: {
+    最差: [2620, 2570, 2600, 2550],
+    均值: [2520, 2470, 2500, 2450],
+    最优: [2460, 2420, 2440, 2400],
+  },
+  tobacco: {
+    最差: [40.5, 39.9, 40.2, 39.6],
+    均值: [38.9, 38.3, 38.6, 38.0],
+    最优: [37.8, 37.3, 37.6, 37.0],
+  },
+  filterRod: {
+    最差: [52400, 51500, 52000, 51000],
+    均值: [50400, 49500, 50000, 49000],
+    最优: [48900, 48100, 48500, 47700],
+  },
+};
+
+// 各牌号历史单耗下拉选项：仅档位名（选定档位后以表格拉取展示各牌号数值）
 export const CONSUME_LEVEL_OPTIONS: { value: ConsumeLevel; label: string }[] = [
   { value: "最差", label: "最差" },
   { value: "均值", label: "均值" },

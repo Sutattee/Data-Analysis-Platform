@@ -23,7 +23,7 @@ function autoMark(pts: HistPoint[], rule: "avg" | "target"): HistPoint[] {
 }
 
 // ===== 序列（日 / 月；无趋势性改善，drift=0）=====
-// 盘纸：无目标值，实际值高于历史均值时标记异常
+// 盘纸：无目标值，实际值高于历史均值时标记异常（日/月粒度均展示异常点）
 const TIP_PAPER_DAILY = autoMark(
   genDaily({
     base: 29.7, avgBase: 30.0, seed: 23, decimals: 1, drift: 0, waveAmp: 0.012,
@@ -31,7 +31,10 @@ const TIP_PAPER_DAILY = autoMark(
   }),
   "avg"
 );
-const TIP_PAPER_MONTHLY = genMonthly({ base: 29.7, avgBase: 30.0, seed: 23, decimals: 1, drift: 0, waveAmp: 0.02 });
+const TIP_PAPER_MONTHLY = autoMark(
+  genMonthly({ base: 29.7, avgBase: 30.0, seed: 23, decimals: 1, drift: 0, waveAmp: 0.02 }),
+  "avg"
+);
 
 // 商标纸（小盒）：实际值高于目标值时标记异常
 const BOX_LABEL_DAILY = autoMark(
@@ -136,7 +139,8 @@ export const MATERIAL_META: Record<MaterialKey, MaterialMeta> = {
 };
 
 // 图表异常点 → 抽屉详情（口径同能源总览；关联同指标同等级的告警记录）
-export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint): AnomalyDetail {
+// brand：盘纸牌号下钻口径时传入，异常标题体现牌号
+export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint, brand?: string): AnomalyDetail {
   const meta = MATERIAL_META[key];
   const grade = pt.anomaly ?? "一般";
   const level = GRADE_TO_LEVEL[grade];
@@ -152,7 +156,7 @@ export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint): AnomalyDe
     ALERT_RECORDS.find((r) => r.metricName === meta.label && r.level === level)?.id ??
     ALERT_RECORDS.find((r) => r.metricName === meta.label)?.id;
   return {
-    title: `${meta.label}异常`,
+    title: `${meta.label}异常${brand && brand !== "全部" ? `（${brand}）` : ""}`,
     dept: meta.dept,
     metricName: meta.label,
     current: value,
@@ -168,46 +172,97 @@ export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint): AnomalyDe
   };
 }
 
+// ===== 牌号体系（下钻明细 / 预测算量共用）=====
+export const MATERIAL_BRANDS = ["牌号A", "牌号B", "牌号C", "牌号D"];
+
+// ===== 盘纸牌号下钻序列（各牌号确定性生成；日序列末端锚定指标卡各牌号昨日值）=====
+const BRAND_TIP_VALUES = [30.6, 29.4, 29.9, 28.8]; // 与 materialCards 盘纸卡 brandDetails[].value 一致
+const BRAND_TIP_DAILY: HistPoint[][] = MATERIAL_BRANDS.map((_, i) => {
+  const base = BRAND_TIP_VALUES[i];
+  const pts = genDaily({ base, avgBase: base + 0.3, seed: 51 + i * 5, decimals: 1, drift: 0, waveAmp: 0.014 });
+  pts[pts.length - 1].actual = base; // 末端锚定该牌号昨日值
+  return autoMark(pts, "avg");
+});
+const BRAND_TIP_MONTHLY: HistPoint[][] = MATERIAL_BRANDS.map((_, i) => {
+  const base = BRAND_TIP_VALUES[i];
+  return autoMark(
+    genMonthly({ base, avgBase: base + 0.3, seed: 61 + i * 5, decimals: 1, drift: 0, waveAmp: 0.02 }),
+    "avg"
+  );
+});
+
+// 盘纸牌号趋势取数（日=近 90 天；未知牌号回退全口径）
+export function tipPaperBrandView(brand: string, range: "日" | "月"): HistPoint[] {
+  const i = MATERIAL_BRANDS.indexOf(brand);
+  if (i < 0) return range === "日" ? materialDailyView("tipPaper") : MATERIAL_MONTHLY.tipPaper;
+  return range === "日" ? lastDays(BRAND_TIP_DAILY[i], 90) : BRAND_TIP_MONTHLY[i];
+}
+
 // ===== 顶部指标卡（昨日口径）=====
-// 括号百分比 =（对比值 − 实际值）÷ 实际值；着色规则：↓ 绿（向好）/ ↑ 橙（偏离）
+// 括号百分比 =（实际值 − 对比值）÷ 实际值；箭头仅表示数值升降（实际高 ↑ / 低 ↓），不代表业务好坏
+// 着色：单耗类卡 ↓ 绿 / ↑ 橙；生产率类卡 ↓ 橙 / ↑ 绿（downGreen 区分）
 export interface MaterialCard {
-  key: MaterialKey;
+  key: MaterialKey | "labor";
   label: string;
-  value: number;
+  value: number; // 昨日实际值
   unit: string;
   decimals: number;
-  compare?: { text: string; good: boolean }; // 目标值行
-  compare2?: { text: string; good: boolean }; // 历史均值行
+  target?: number; // 目标值
+  avg?: number; // 历史均值
   yoy: number; // 同比（%）
   mom: number; // 环比（%）
+  downGreen: boolean; // true = 下降着绿色（单耗类）；false = 上升着绿色（生产率类）
+  brandDetails?: BrandDetail[]; // 各牌号昨日口径明细（与 MATERIAL_BRANDS 对齐，仅盘纸卡）
+}
+
+// 牌号下钻明细：实际值 / 历史均值 / 同比 / 环比（昨日口径）
+export interface BrandDetail {
+  value: number;
+  avg: number;
+  yoy: number;
+  mom: number;
 }
 
 export const materialCards: MaterialCard[] = [
   {
     key: "tipPaper", label: "单箱耗盘纸量",
     value: 29.8, unit: "米/箱", decimals: 1,
-    compare2: { text: "历史均值：30（↑0.7%）", good: false },
+    avg: 30,
     yoy: -3.5, mom: -1.8,
+    downGreen: true,
+    brandDetails: [
+      { value: 30.6, avg: 30.9, yoy: -2.8, mom: 1.2 },
+      { value: 29.4, avg: 29.3, yoy: -4.1, mom: -0.9 },
+      { value: 29.9, avg: 30.1, yoy: -3.2, mom: 0.6 },
+      { value: 28.8, avg: 29.0, yoy: -5.0, mom: -1.5 },
+    ], // 支持下拉选择牌号查看明细
   },
   {
     key: "boxLabel", label: "单箱耗商标纸（小盒）量",
     value: 2500, unit: "张/箱", decimals: 0,
-    compare: { text: "目标值：2480（↓0.8%）", good: true },
-    compare2: { text: "历史均值：2520（↑0.8%）", good: false },
+    target: 2480, avg: 2520,
     yoy: -2.7, mom: -0.9,
+    downGreen: true,
   },
   {
     key: "tobacco", label: "单箱耗烟叶量",
     value: 38.6, unit: "公斤/箱", decimals: 1,
-    compare: { text: "目标值：40.0（↑3.6%）", good: false },
-    compare2: { text: "历史均值：39.5（↑2.3%）", good: false },
+    target: 40.0, avg: 39.5,
     yoy: -4.2, mom: 1.3,
+    downGreen: true,
   },
   {
     key: "filterRod", label: "单箱耗嘴棒量",
     value: 50000, unit: "支/箱", decimals: 0,
-    compare: { text: "目标值：48000（↓4%）", good: true },
-    compare2: { text: "历史均值：51000（↑2%）", good: false },
+    target: 48000, avg: 51000,
     yoy: -5.7, mom: 2.2,
+    downGreen: true,
+  },
+  {
+    key: "labor", label: "在岗职工人均劳动生产率",
+    value: 200, unit: "箱/人", decimals: 0,
+    avg: 210,
+    yoy: 1.5, mom: -0.5,
+    downGreen: false,
   },
 ];

@@ -14,6 +14,18 @@ function fileStamp(): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
 }
 
+// 文件名周期前缀：报告年度＋报告名称＋导出日期（月度报告带「2026年8月」，生产报告带「2026年度」；能耗年鉴报告无周期字段则不带前缀）
+function periodPrefix(report: YearbookReport): string {
+  if (report.periodType === "月度" && report.month) return `${report.year}年${report.month}月`;
+  if (report.periodType === "年度") return `${report.year}年度`;
+  return "";
+}
+
+// 第一章标题（月度报告为「月度事件概览」）
+function overviewTitle(report: YearbookReport): string {
+  return report.periodType === "月度" ? "一、月度事件概览" : "一、年度事件概览";
+}
+
 // 报告 → 可独立打开的 HTML 文档（标题 / 元信息 / 三章正文 / 附录事件清单）
 export function reportToHtml(report: YearbookReport): string {
   const paras = (text: string) =>
@@ -42,7 +54,7 @@ export function reportToHtml(report: YearbookReport): string {
 <h1 style="text-align:center;font-size:22px;margin:0 0 12px;">${escapeHtml(report.name)}</h1>
 <p style="text-align:center;color:#6b7280;font-size:13px;margin:4px 0;">报告周期：${report.periodStart} 至 ${report.periodEnd}｜纳入事件 ${report.includedEvents.length} 件｜数据截止：${report.dataCutoff}</p>
 <p style="text-align:center;color:#6b7280;font-size:13px;margin:4px 0;">生成：${report.generatedAt}（${report.generatedBy}）${report.updatedAt ? `｜最近更新：${report.updatedAt}（${report.updatedBy ?? "—"}）` : ""}</p>
-${h2("一、年度事件概览")}
+${h2(overviewTitle(report))}
 ${paras(report.sections.overview)}
 ${h2("二、重大事件纪要")}
 ${paras(report.sections.chronicle)}
@@ -64,7 +76,7 @@ export function exportReportWord(report: YearbookReport): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${report.name.replace(/[\\/:*?"<>|]/g, "")}_${fileStamp()}.doc`;
+  a.download = `${periodPrefix(report)}${report.name.replace(/[\\/:*?"<>|]/g, "")}_${fileStamp()}.doc`;
   document.body.appendChild(a);
   a.click();
   a.remove();

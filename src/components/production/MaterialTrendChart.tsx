@@ -7,10 +7,12 @@ import { SegmentedControl } from "@/components/energy-overview/SegmentedControl"
 import { AnomalyLevelLegend } from "@/components/energy-overview/AnomalyLevelLegend";
 import { ALERT_LEVEL_COLOR, GRADE_TO_LEVEL, type AnomalyDetail } from "@/lib/mock-data/grid-forecast";
 import {
+  MATERIAL_BRANDS,
   MATERIAL_META,
   MATERIAL_MONTHLY,
   buildMaterialAnomaly,
   materialDailyView,
+  tipPaperBrandView,
   type MaterialKey,
 } from "@/lib/mock-data/material-consumption";
 
@@ -19,7 +21,8 @@ type Range = "日" | "月";
 const NAME_MAP: Record<string, string> = { actual: "实际值", avg: "历史均值", target: "目标值" };
 
 // 辅料消耗趋势图（单指标）：实际值（蓝实线）/ 历史均值（蓝虚线）/ 目标值（橙虚线），支持日 / 月切换；
-// 异常偏差点仅日档展示（五色），点击弹出异常详情抽屉
+// 盘纸支持牌号下拉下钻（全部牌号 / 牌号A~D）；
+// 异常偏差点（五色）：盘纸日/月粒度均展示，其余指标仅日档；点击弹出异常详情抽屉
 export function MaterialTrendChart({
   seriesKey,
   onAnomaly,
@@ -28,34 +31,60 @@ export function MaterialTrendChart({
   onAnomaly: (d: AnomalyDetail) => void;
 }) {
   const [range, setRange] = useState<Range>("日");
+  const [brand, setBrand] = useState<string>("全部"); // 盘纸牌号下钻（其余指标不显示下拉）
   const meta = MATERIAL_META[seriesKey];
+  const isTip = seriesKey === "tipPaper";
+  const brandActive = isTip && brand !== "全部";
   const hasTarget = MATERIAL_MONTHLY[seriesKey].some((p) => p.target !== undefined);
+  // 盘纸趋势日、月粒度均展示异常点
+  const showAnomaly = range === "日" || seriesKey === "tipPaper";
 
   const data = useMemo(
-    () => (range === "日" ? materialDailyView(seriesKey) : MATERIAL_MONTHLY[seriesKey]),
-    [seriesKey, range]
+    () =>
+      brandActive
+        ? tipPaperBrandView(brand, range)
+        : range === "日"
+          ? materialDailyView(seriesKey)
+          : MATERIAL_MONTHLY[seriesKey],
+    [seriesKey, range, brand, brandActive]
   );
 
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    // 异常点仅日档展示，点击查看异常详情也仅日档生效
-    if (range === "日" && pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt));
+    // 异常点展示的粒度才支持点击查看异常详情
+    if (showAnomaly && pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt, isTip ? brand : undefined));
   }
 
   return (
     <Card
       title={`${meta.label}趋势（${meta.unit}）`}
       headerRight={
-        // 统计粒度切换：标题右侧，与标题高度对齐
-        <SegmentedControl
-          options={[
-            { value: "日", label: "日" },
-            { value: "月", label: "月" },
-          ]}
-          value={range}
-          onChange={setRange}
-        />
+        // 牌号下钻下拉（仅盘纸）+ 统计粒度切换：标题右侧，与标题高度对齐
+        <div className="flex items-center gap-2">
+          {isTip && (
+            <select
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="px-2.5 py-1 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+            >
+              <option value="全部">全部牌号</option>
+              {MATERIAL_BRANDS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          )}
+          <SegmentedControl
+            options={[
+              { value: "日", label: "日" },
+              { value: "月", label: "月" },
+            ]}
+            value={range}
+            onChange={setRange}
+          />
+        </div>
       }
     >
       <ResponsiveContainer width="100%" height={240}>
@@ -72,8 +101,8 @@ export function MaterialTrendChart({
           )}
           <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
           <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
-          {/* 异常偏差点仅日档展示（月档聚合粒度不展示） */}
-          {range === "日" &&
+          {/* 异常偏差点：盘纸日/月档均展示，其余仅日档 */}
+          {showAnomaly &&
             data
               .filter((d) => d.anomaly)
               .map((d) => (
@@ -103,7 +132,7 @@ export function MaterialTrendChart({
             <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-orange-500" /> 目标值
           </span>
         )}
-        {range === "日" && <AnomalyLevelLegend labels={{ 关注: "一般" }} />}
+        {showAnomaly && <AnomalyLevelLegend labels={{ 关注: "一般" }} />}
       </div>
     </Card>
   );

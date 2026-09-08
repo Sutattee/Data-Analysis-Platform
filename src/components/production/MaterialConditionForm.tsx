@@ -5,11 +5,12 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
-import { MATERIAL_META, type MaterialKey } from "@/lib/mock-data/material-consumption";
+import { MATERIAL_BRANDS, MATERIAL_META, type MaterialKey } from "@/lib/mock-data/material-consumption";
 import {
+  BRAND_CONSUME_LEVELS,
   CONSUME_LEVEL_OPTIONS,
-  consumeLevelValue,
-  DEFAULT_PLAN_OUTPUT,
+  DEFAULT_BRAND_PLANS,
+  MATERIAL_FORECAST_METRICS,
   MATERIAL_FORECAST_MODEL,
   MATERIAL_HISTORY_RANGE,
   NEXT_MONTH_LABEL,
@@ -63,17 +64,20 @@ export function MaterialConditionForm({
   running: boolean;
 }) {
   const [metricKey, setMetricKey] = useState<MaterialKey>("tipPaper");
-  // 各牌号下个月计划产量（自动带入，允许编辑）
-  const [planInput, setPlanInput] = useState(String(DEFAULT_PLAN_OUTPUT));
+  // 各牌号下个月计划产量（系统自动带入，允许编辑）
+  const [plans, setPlans] = useState<string[]>(() => DEFAULT_BRAND_PLANS.map(String));
   // 各牌号历史单耗档位（自动带入，随指标联动）
   const [level, setLevel] = useState<ConsumeLevel>("均值");
 
-  const planNum = Number(planInput);
-  const planErr = !/^\d+(\.\d+)?$/.test(planInput.trim()) || planNum <= 0 ? "请输入大于 0 的数值" : undefined;
+  const planNums = plans.map((p) => Number(p));
+  const planErr = plans.some((p, i) => !/^\d+(\.\d+)?$/.test(p.trim()) || planNums[i] <= 0)
+    ? "各牌号计划产量需为大于 0 的数值"
+    : undefined;
+  const planTotal = planNums.reduce((s, v) => s + v, 0);
 
   function handleSubmit() {
     if (planErr || running) return;
-    onRun({ metricKey, planOutput: planNum, consumeLevel: level });
+    onRun({ metricKey, planOutput: planTotal, consumeLevel: level });
   }
 
   return (
@@ -122,30 +126,73 @@ export function MaterialConditionForm({
 
           <div className="my-4 border-t border-gray-100" />
 
-          {/* 业务条件 */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* 业务条件：各牌号计划产量表格（可编辑）+ 各牌号历史单耗表格（随档位联动） */}
+          <div className="space-y-4">
             <Field label="各牌号下个月计划产量" error={planErr}>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={planInput}
-                  onChange={(e) => setPlanInput(e.target.value)}
-                  className={`${inputCls} pr-10`}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">箱</span>
-              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400">
+                    <th className="py-1.5 text-left font-normal">牌号</th>
+                    <th className="py-1.5 text-right font-normal">下个月计划产量</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {MATERIAL_BRANDS.map((brand, i) => (
+                    <tr key={brand} className="border-b border-gray-50 last:border-0">
+                      <td className="py-1.5 text-gray-600">{brand}</td>
+                      <td className="py-1.5">
+                        <div className="relative ml-auto w-44">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={plans[i]}
+                            onChange={(e) => setPlans((prev) => prev.map((p, j) => (j === i ? e.target.value : p)))}
+                            className={`${inputCls} py-1.5 pr-8`}
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">箱</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-gray-100">
+                    <td className="py-1.5 text-xs text-gray-400">合计</td>
+                    <td className="py-1.5 text-right text-xs font-medium text-gray-700">
+                      {planTotal.toLocaleString("en-US")} 箱
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </Field>
+
             <Field label="各牌号历史单耗数据">
               <SearchSelect
                 options={CONSUME_LEVEL_OPTIONS}
                 value={level}
                 onChange={(v) => setLevel(v as ConsumeLevel)}
               />
-              {/* 选定档位后自动拉取对应数值展示（仅数值 + 单位） */}
-              <div className="mt-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-800">
-                {consumeLevelValue(metricKey, level)}
-              </div>
+              {/* 选定档位后自动拉取各牌号单耗展示 */}
+              <table className="mt-2 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400">
+                    <th className="py-1.5 text-left font-normal">牌号</th>
+                    <th className="py-1.5 text-right font-normal">历史单耗数据{level}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BRAND_CONSUME_LEVELS[metricKey][level].map((v, i) => (
+                    <tr key={MATERIAL_BRANDS[i]} className="border-b border-gray-50 last:border-0">
+                      <td className="py-1.5 text-gray-600">{MATERIAL_BRANDS[i]}</td>
+                      <td className="py-1.5 text-right font-medium text-gray-800">
+                        {v.toLocaleString("en-US", {
+                          minimumFractionDigits: MATERIAL_FORECAST_METRICS[metricKey].decimals,
+                          maximumFractionDigits: MATERIAL_FORECAST_METRICS[metricKey].decimals,
+                        })}{" "}
+                        {MATERIAL_META[metricKey].unit}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </Field>
           </div>
 

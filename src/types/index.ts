@@ -457,6 +457,25 @@ export interface MetricManage {
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }
 
+// ========== 指标值维护（人工填报指标数据） ==========
+export interface MetricValueRecord {
+  id: string;                 // mv-001 递增
+  metricId: string;           // 关联指标管理（如 m18）
+  metricName: string;         // 指标名称快照
+  statObject: string;         // 统计对象（企业/部门）
+  periodStart: string;        // 起始月 YYYY-MM
+  periodEnd: string;          // 结束月 YYYY-MM（当期值 = periodStart）
+  dataType: "当期值" | "累计值";
+  value: number;              // 指标值
+  unit: string;               // 单位（随指标自动带出）
+  source?: string;            // 数据来源（选填）
+  remark?: string;            // 备注（选填）
+  createdBy: string;          // 创建人
+  createdAt: string;          // 创建时间
+  updatedBy?: string;         // 最近更新人
+  updatedAt?: string;         // 最近更新时间
+}
+
 // ========== 目标值管理（指标详情内，版本化） ==========
 export type TargetPeriod = "月度" | "季度" | "年度";
 
@@ -596,6 +615,8 @@ export interface ReportEventSnapshot {
 export interface YearbookReport {
   id: string;
   year: number;
+  periodType?: "年度" | "月度"; // 报告周期类型（生产管理重大事件报告支持月度；缺省为年度）
+  month?: number; // 月度报告的月份（periodType 为"月度"时有值）
   name: string; // ≤100 字，同年度内不重复
   periodStart: string;
   periodEnd: string;
@@ -652,6 +673,7 @@ export type VisitContentType =
   | "预测分析记录"
   | "告警记录"
   | "重大事件记录"
+  | "重大事件报告"
   | "年度报告"
   | "年鉴报告"
   | "普通报告"

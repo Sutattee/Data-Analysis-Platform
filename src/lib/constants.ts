@@ -27,8 +27,13 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "首页",       href: "/home",         icon: "🏠" },
   { label: "智能驾驶舱", href: "/cockpit",      icon: "🛰️" },
   { label: "生产管理",   href: "/production",   icon: "🏭", children: [
+    { label: "设备运行效率", href: "/production/equipment-efficiency", icon: "⚙️" },
     { label: "辅料消耗", href: "/production/materials", icon: "🧵" },
     { label: "预测分析", href: "/production/forecast",  icon: "📈" },
+    { label: "重大事件", href: "/production/major-events", icon: "🗓️", children: [
+      { label: "事件列表", href: "/production/major-events/events",  icon: "📋" },
+      { label: "事件报告", href: "/production/major-events/reports", icon: "📚" },
+    ]},
     { label: "告警中心", href: "/production/alert", icon: "⚠️", children: [
       { label: "告警记录", href: "/production/alert/records",    icon: "📋" },
       { label: "告警管理", href: "/production/alert/management", icon: "🛠️" },
@@ -62,6 +67,7 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "业务术语",   href: "/settings/biz-term" },
       { label: "业务逻辑",   href: "/settings/biz-logic" },
       { label: "折标系数",   href: "/settings/energy-coefficient" },
+      { label: "指标值维护", href: "/settings/metric-value" },
       { label: "标准问答",   href: "/settings/standard-qa" },
       { label: "对话管理",   href: "/settings/conversation" },
     ],

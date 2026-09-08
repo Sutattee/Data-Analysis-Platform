@@ -87,6 +87,14 @@ const CONTENT_TYPE_ICONS: Record<string, React.ReactNode> = {
       <circle cx="10" cy="15.5" r="1" fill="white" />
     </svg>
   ),
+  重大事件报告: (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="3" y="2" width="14" height="16" rx="2" fill="#EF4444" />
+      <rect x="6" y="5" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="8" width="8" height="1.5" rx="0.75" fill="white" />
+      <rect x="6" y="11" width="5" height="1.5" rx="0.75" fill="white" />
+    </svg>
+  ),
   年度报告: (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
       <rect x="3" y="2" width="14" height="16" rx="2" fill="#10B981" />
@@ -111,6 +119,7 @@ const ALLOWED_CONTENT_TYPES = [
   "预测分析记录",
   "告警记录",
   "重大事件记录",
+  "重大事件报告",
   "年度报告",
   "普通报告",
 ];
