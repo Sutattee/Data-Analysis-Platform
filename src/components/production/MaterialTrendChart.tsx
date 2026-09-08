@@ -22,7 +22,7 @@ const NAME_MAP: Record<string, string> = { actual: "实际值", avg: "历史均�
 
 // 辅料消耗趋势图（单指标）：实际值（蓝实线）/ 历史均值（蓝虚线）/ 目标值（橙虚线），支持日 / 月切换；
 // 盘纸支持牌号下拉下钻（全部牌号 / 牌号A~D）；
-// 异常偏差点（五色）：盘纸日/月粒度均展示，其余指标仅日档；点击弹出异常详情抽屉
+// 异常偏差点（五色）：全部指标日/月粒度均展示；点击弹出异常详情抽屉
 export function MaterialTrendChart({
   seriesKey,
   onAnomaly,
@@ -36,8 +36,6 @@ export function MaterialTrendChart({
   const isTip = seriesKey === "tipPaper";
   const brandActive = isTip && brand !== "全部";
   const hasTarget = MATERIAL_MONTHLY[seriesKey].some((p) => p.target !== undefined);
-  // 盘纸趋势日、月粒度均展示异常点
-  const showAnomaly = range === "日" || seriesKey === "tipPaper";
 
   const data = useMemo(
     () =>
@@ -52,8 +50,8 @@ export function MaterialTrendChart({
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    // 异常点展示的粒度才支持点击查看异常详情
-    if (showAnomaly && pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt, isTip ? brand : undefined));
+    // 异常点支持点击查看异常详情
+    if (pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt, isTip ? brand : undefined));
   }
 
   return (
@@ -101,10 +99,9 @@ export function MaterialTrendChart({
           )}
           <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
           <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
-          {/* 异常偏差点：盘纸日/月档均展示，其余仅日档 */}
-          {showAnomaly &&
-            data
-              .filter((d) => d.anomaly)
+          {/* 异常偏差点：全部指标日/月档均展示 */}
+          {data
+            .filter((d) => d.anomaly)
               .map((d) => (
                 <ReferenceDot
                   key={d.iso}
@@ -132,7 +129,7 @@ export function MaterialTrendChart({
             <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-orange-500" /> 目标值
           </span>
         )}
-        {showAnomaly && <AnomalyLevelLegend labels={{ 关注: "一般" }} />}
+        <AnomalyLevelLegend labels={{ 关注: "一般" }} />
       </div>
     </Card>
   );

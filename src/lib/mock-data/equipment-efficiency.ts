@@ -141,23 +141,54 @@ export function hourlyView(unit: string, shift: Shift, range: HourlyRange, team?
   return range === "日" ? lastDays(pts, 90) : range === "周" ? lastWeeks(pts, 12, 0) : byMonth(pts, 0);
 }
 
+// ===== 台时产量指标卡（昨日口径，按机组下钻）=====
+// 所选机组昨日实际值 / 目标值（各机组一致 1100）/ 近 90 天历史均值 / 同比环比
+// 同比无上年同期序列，按机组序号围绕全厂 -4.2% 确定性微调；环比由序列末端两日计算
+export interface HourlyUnitCard {
+  value: number;
+  target: number;
+  avg: number;
+  yoy: number;
+  mom: number;
+}
+export function hourlyCardOf(unit: string): HourlyUnitCard {
+  const i = Math.max(0, EQUIPMENT_UNITS.indexOf(unit));
+  const pts = lastDays(UNIT_HOURLY_DAILY[unit] ?? UNIT_HOURLY_DAILY[EQUIPMENT_UNITS[0]], 90);
+  const last = pts[pts.length - 1];
+  const prev = pts[pts.length - 2];
+  const avg = round(pts.reduce((s, p) => s + (p.avg ?? p.actual), 0) / pts.length, 0);
+  return {
+    value: last.actual,
+    target: HOURLY_TARGET,
+    avg,
+    yoy: parseFloat((-4.2 + ((i % 5) - 2) * 0.7).toFixed(1)),
+    mom: parseFloat((((last.actual - prev.actual) / prev.actual) * 100).toFixed(1)),
+  };
+}
+
 // ===== 机台日计划产量完成率（昨日口径，16 机组全量横条）=====
 export interface UnitCompletion {
   name: string;
   rate: number; // 完成率（%）
+  plan: number; // 计划产量（箱）
+  actual: number; // 完成产量（箱）= plan × rate
 }
-export const UNIT_COMPLETION: UnitCompletion[] = EQUIPMENT_UNITS.map((name, i) => ({
-  name,
-  rate: 90 + ((i * 37 + 13) % 16), // 90%~105% 确定性分布
-}));
+export const UNIT_COMPLETION: UnitCompletion[] = EQUIPMENT_UNITS.map((name, i) => {
+  const rate = 90 + ((i * 37 + 13) % 16); // 90%~105% 确定性分布
+  const plan = Math.round((11200 + ((i * 613) % 2600)) / 100) * 100; // 11,200~13,800 箱（整百）
+  return { name, rate, plan, actual: round((plan * rate) / 100, 0) };
+});
 
-// 完成率班次下钻：按班次系数拆分日完成率（与台时产量班次口径一致：早班略高、晚班略低），三班均值≈日完成率
+// 完成率班次下钻：按班次系数拆分日完成率（与台时产量班次口径一致：早班略高、晚班略低），三班均值≈日完成率；
+// 计划产量按班次权重拆分（早班略大），完成产量 = 班次计划 × 班次完成率
 const COMPLETION_SHIFT_FACTOR: Record<Exclude<Shift, "全天">, number> = { 早班: 1.04, 中班: 1.01, 晚班: 0.95 };
+const COMPLETION_SHIFT_PLAN_W: Record<Exclude<Shift, "全天">, number> = { 早班: 0.34, 中班: 0.33, 晚班: 0.33 };
 export function unitCompletionByShift(unit: string): UnitCompletion[] {
-  const day = UNIT_COMPLETION.find((u) => u.name === unit)?.rate ?? 100;
+  const day = UNIT_COMPLETION.find((u) => u.name === unit) ?? UNIT_COMPLETION[0];
   return (Object.keys(COMPLETION_SHIFT_FACTOR) as Exclude<Shift, "全天">[]).map((shift, i) => {
-    const rate = round(day * COMPLETION_SHIFT_FACTOR[shift] + Math.sin(i * 2.7) * 0.4, 1);
-    return { name: shift, rate: Math.min(120, Math.max(60, rate)) }; // 防御性夹紧
+    const rate = Math.min(120, Math.max(60, round(day.rate * COMPLETION_SHIFT_FACTOR[shift] + Math.sin(i * 2.7) * 0.4, 1))); // 防御性夹紧
+    const plan = round(day.plan * COMPLETION_SHIFT_PLAN_W[shift], 0);
+    return { name: shift, rate, plan, actual: round((plan * rate) / 100, 0) };
   });
 }
 

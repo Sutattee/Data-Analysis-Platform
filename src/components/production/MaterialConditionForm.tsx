@@ -55,7 +55,7 @@ function Field({
 
 const METRIC_KEYS: MaterialKey[] = ["tipPaper", "boxLabel", "tobacco", "filterRod"];
 
-// 辅料预测条件区：预测类型（未来值预测）+ 通用预测条件，内部持有全部状态
+// 辅料预测条件区：通用预测条件 + 业务条件，内部持有全部状态（仅支持未来值预测，不再展示预测类型选择）
 export function MaterialConditionForm({
   onRun,
   running,
@@ -81,22 +81,8 @@ export function MaterialConditionForm({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <div className="mb-3 text-sm font-semibold text-gray-800">① 选择预测类型</div>
-        {/* 仅支持未来值预测：单卡选中态展示 */}
-        <div className="w-full lg:w-1/4">
-          <div className="rounded-lg border-2 border-primary-500 bg-primary-50 p-3.5 text-left">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">📈 未来值预测</div>
-            <p className="mt-1 text-xs leading-relaxed text-gray-500">
-              根据最新实际数据和生产计划、历史数据，预测指标未来数值
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="mb-4 text-sm font-semibold text-gray-800">② 配置预测条件</div>
+    <Card>
+      <div className="mb-4 text-sm font-semibold text-gray-800">配置预测条件</div>
 
         {/* 表单区：宽度减半，右侧留白 */}
         <div className="w-full lg:w-1/2">
@@ -219,7 +205,6 @@ export function MaterialConditionForm({
             {planErr && <span className="text-xs text-red-500">存在未通过校验的条件，请修正后再预测</span>}
           </div>
         </div>
-      </Card>
-    </div>
+    </Card>
   );
 }

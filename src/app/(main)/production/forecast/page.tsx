@@ -10,7 +10,7 @@ import { ConclusionPanel } from "@/components/forecast/ConclusionPanel";
 import { runMaterialForecast, type MaterialForecastInput } from "@/lib/mock-data/material-forecast";
 import type { ForecastResult } from "@/lib/mock-data/forecast";
 
-// 预测分析 · 模拟测算：条件配置（未来值预测）→ 模型测算 → 核心结果与图表 → 三段式结构化结论
+// 预测分析：配置预测条件（未来值预测）→ 模型测算 → 预测结果与图表 → 三段式结构化结论
 export default function MaterialForecastPage() {
   const toast = useToast();
   const [running, setRunning] = useState(false);
@@ -32,7 +32,7 @@ export default function MaterialForecastPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">模拟测算</h1>
+        <h1 className="text-xl font-bold text-gray-900">预测分析</h1>
       </div>
 
       <MaterialConditionForm onRun={handleRun} running={running} />
@@ -50,13 +50,13 @@ export default function MaterialForecastPage() {
       {!running && !result}
 
       {result && (
-        <Card title="③ 预测结果">
+        <Card title="预测结果">
           <ForecastResultView result={result} />
         </Card>
       )}
 
       {result && (
-        <Card title="④ 预测结果分析">
+        <Card title="预测结果分析">
           <ConclusionPanel sections={result.conclusions} />
         </Card>
       )}

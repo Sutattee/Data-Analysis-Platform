@@ -1,6 +1,12 @@
 "use client";
 
-import { EFFICIENCY_CARDS, type EfficiencyCard } from "@/lib/mock-data/equipment-efficiency";
+import { useState } from "react";
+import {
+  EFFICIENCY_CARDS,
+  EQUIPMENT_UNITS,
+  hourlyCardOf,
+  type EfficiencyCard,
+} from "@/lib/mock-data/equipment-efficiency";
 
 // 涨跌文案：↑ / ↓ + 数值（去掉尾零的百分比）
 const pctText = (v: number) => `${v > 0 ? "↑" : v < 0 ? "↓" : ""}${Math.abs(parseFloat(v.toFixed(1)))}%`;
@@ -27,34 +33,55 @@ function CompareLine({ label, base, card }: { label: string; base: number; card:
 }
 
 // 顶部 4 张指标卡：白底，当前值突出显示，昨日口径（效率类 ↓ 橙 / ↑ 绿）
+// 台时产量卡支持机组下拉筛选（默认 1#卷接包机组），切换后展示该机组实际值 / 目标值 / 历史均值
 export function EquipmentMetricCards() {
+  const [unit, setUnit] = useState(EQUIPMENT_UNITS[0]);
+
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-      {EFFICIENCY_CARDS.map((c) => (
-        <div
-          key={c.key}
-          className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md"
-        >
-          <div className="mb-1 flex items-center justify-between gap-1">
-            <span className="truncate text-xs text-gray-500">{c.label}</span>
+      {EFFICIENCY_CARDS.map((raw) => {
+        const c: EfficiencyCard =
+          raw.key === "hourly" ? { ...raw, ...hourlyCardOf(unit) } : raw;
+        return (
+          <div
+            key={c.key}
+            className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md"
+          >
+            <div className="mb-1 flex items-center justify-between gap-1">
+              <span className="truncate text-xs text-gray-500">{c.label}</span>
+              {raw.key === "hourly" && (
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  title="选择机组"
+                  className="max-w-[92px] shrink-0 truncate rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600 outline-none focus:ring-1 focus:ring-primary-400"
+                >
+                  {EQUIPMENT_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="mb-1 flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-gray-900">{fmtNum(c.value, c.decimals)}</span>
+              <span className="text-sm text-gray-400">{c.unit}</span>
+              <span className="text-[10px] text-gray-300">昨日</span>
+            </div>
+            {c.target !== undefined && <CompareLine label="目标值" base={c.target} card={c} />}
+            {c.avg !== undefined && <CompareLine label="历史均值" base={c.avg} card={c} />}
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+              <span className="text-gray-900">
+                同比 <span className={arrowCls(c.yoy)}>{pctText(c.yoy)}</span>
+              </span>
+              <span className="text-gray-900">
+                环比 <span className={arrowCls(c.mom)}>{pctText(c.mom)}</span>
+              </span>
+            </div>
           </div>
-          <div className="mb-1 flex items-baseline gap-1">
-            <span className="text-2xl font-bold text-gray-900">{fmtNum(c.value, c.decimals)}</span>
-            <span className="text-sm text-gray-400">{c.unit}</span>
-            <span className="text-[10px] text-gray-300">昨日</span>
-          </div>
-          {c.target !== undefined && <CompareLine label="目标值" base={c.target} card={c} />}
-          {c.avg !== undefined && <CompareLine label="历史均值" base={c.avg} card={c} />}
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-            <span className="text-gray-900">
-              同比 <span className={arrowCls(c.yoy)}>{pctText(c.yoy)}</span>
-            </span>
-            <span className="text-gray-900">
-              环比 <span className={arrowCls(c.mom)}>{pctText(c.mom)}</span>
-            </span>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

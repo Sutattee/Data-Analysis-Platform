@@ -23,7 +23,8 @@ function autoMark(pts: HistPoint[], rule: "avg" | "target"): HistPoint[] {
 }
 
 // ===== 序列（日 / 月；无趋势性改善，drift=0）=====
-// 盘纸：无目标值，实际值高于历史均值时标记异常（日/月粒度均展示异常点）
+// 异常点：日/月粒度均展示。盘纸无目标值，实际值高于历史均值时标记；其余指标实际值高于目标值时标记；
+// 月度基线距目标较远的指标（烟叶/嘴棒）额外注入确定性异常点保证可见性
 const TIP_PAPER_DAILY = autoMark(
   genDaily({
     base: 29.7, avgBase: 30.0, seed: 23, decimals: 1, drift: 0, waveAmp: 0.012,
@@ -45,7 +46,13 @@ const BOX_LABEL_DAILY = autoMark(
   }),
   "target"
 );
-const BOX_LABEL_MONTHLY = genMonthly({ base: 2495, avgBase: 2520, target: 2480, seed: 29, decimals: 0, drift: 0, waveAmp: 0.015 });
+const BOX_LABEL_MONTHLY = autoMark(
+  genMonthly({
+    base: 2495, avgBase: 2520, target: 2480, seed: 29, decimals: 0, drift: 0, waveAmp: 0.015,
+    anomalies: [{ offset: 8, grade: "预警" }],
+  }),
+  "target"
+);
 
 // 烟叶：实际值高于目标值时标记异常
 const TOBACCO_DAILY = autoMark(
@@ -55,7 +62,13 @@ const TOBACCO_DAILY = autoMark(
   }),
   "target"
 );
-const TOBACCO_MONTHLY = genMonthly({ base: 38.5, avgBase: 39.5, target: 40.0, seed: 31, decimals: 1, drift: 0, waveAmp: 0.02 });
+const TOBACCO_MONTHLY = autoMark(
+  genMonthly({
+    base: 38.5, avgBase: 39.5, target: 40.0, seed: 31, decimals: 1, drift: 0, waveAmp: 0.02,
+    anomalies: [{ offset: 14, grade: "告警" }, { offset: 27, grade: "一般" }],
+  }),
+  "target"
+);
 
 // 嘴棒：实际值高于目标值时标记异常
 const FILTER_ROD_DAILY = autoMark(
@@ -65,7 +78,13 @@ const FILTER_ROD_DAILY = autoMark(
   }),
   "target"
 );
-const FILTER_ROD_MONTHLY = genMonthly({ base: 47000, avgBase: 51000, target: 48000, seed: 37, decimals: 0, drift: 0, waveAmp: 0.02 });
+const FILTER_ROD_MONTHLY = autoMark(
+  genMonthly({
+    base: 47000, avgBase: 51000, target: 48000, seed: 37, decimals: 0, drift: 0, waveAmp: 0.02,
+    anomalies: [{ offset: 5, grade: "一般" }, { offset: 20, grade: "告警" }],
+  }),
+  "target"
+);
 
 export const MATERIAL_DAILY: Record<MaterialKey, HistPoint[]> = {
   tipPaper: TIP_PAPER_DAILY,
