@@ -118,9 +118,10 @@ interface AlertStrategyFormProps {
   initial?: AlertStrategy;
   listPath?: string; // 保存/取消返回的列表页（生产管理入口传 /production/alert/management）
   metricOptions?: string[]; // 指标候选（生产管理入口传辅料白名单）
+  thresholdNote?: React.ReactNode; // 触发条件区块下方说明（费用预算执行入口传阈值示例表）
 }
 
-export function AlertStrategyForm({ mode, initial, listPath = "/alert/management", metricOptions }: AlertStrategyFormProps) {
+export function AlertStrategyForm({ mode, initial, listPath = "/alert/management", metricOptions, thresholdNote }: AlertStrategyFormProps) {
   const router = useRouter();
   const toast = useToast();
   const { state } = useApp();
@@ -158,14 +159,12 @@ export function AlertStrategyForm({ mode, initial, listPath = "/alert/management
         (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim()))
       )
         miss.push("基准值");
-      // 偏离比例：正常区间外的基准类型必填，区间格式如 5-10（下限 < 上限）
-      if (c.baselineType !== "正常区间") {
-        const m = (c.deviation ?? "").trim().match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
-        if (!m) miss.push("偏离比例(如5-10)");
-        else if (Number(m[1]) >= Number(m[2])) {
-          ce[i] = "偏离比例区间下限需小于上限（如 5-10）";
-          return;
-        }
+      // 偏离比例：选填；填写时校验区间格式（如 5-10，下限 < 上限）
+      const devTrim = (c.deviation ?? "").trim();
+      if (devTrim) {
+        const m = devTrim.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+        if (!m) ce[i] = "偏离比例格式如 5-10";
+        else if (Number(m[1]) >= Number(m[2])) ce[i] = "偏离比例区间下限需小于上限（如 5-10）";
       }
       ce[i] = miss.length ? `请完善${miss.join("、")}` : "";
     });
@@ -287,6 +286,7 @@ export function AlertStrategyForm({ mode, initial, listPath = "/alert/management
                 }));
               }}
             />
+            {thresholdNote && <div className="mt-3">{thresholdNote}</div>}
           </div>
 
           {/* 告警对象（触发条件之后）：按指标自动筛选并罗列已关联的对象，仅展示、不支持编辑 */}

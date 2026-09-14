@@ -83,7 +83,6 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
               <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={56} domain={["auto", "auto"]} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="baseline" stroke="#9ca3af" strokeWidth={2} strokeDasharray="5 4" dot={false} name="当前计划工况（基准）" />
               <Line type="monotone" dataKey="scenario" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} name="测算工况" />
             </ComposedChart>
           </ResponsiveContainer>

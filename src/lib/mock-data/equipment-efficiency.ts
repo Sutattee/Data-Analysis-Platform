@@ -35,6 +35,12 @@ export interface EfficiencyCard {
 
 export const EFFICIENCY_CARDS: EfficiencyCard[] = [
   {
+    key: "hourly", label: "台时产量",
+    value: 1000, unit: "箱/台", decimals: 0,
+    target: 1100, avg: 986,
+    yoy: -4.2, mom: 1.3,
+  },
+  {
     key: "pack", label: "包装设备运行效率",
     value: 94, unit: "%", decimals: 1,
     avg: 95.2,
@@ -51,12 +57,6 @@ export const EFFICIENCY_CARDS: EfficiencyCard[] = [
     value: 95, unit: "%", decimals: 1,
     avg: 95.6,
     yoy: -3.1, mom: -1.2,
-  },
-  {
-    key: "hourly", label: "台时产量",
-    value: 1000, unit: "箱/台", decimals: 0,
-    target: 1100, avg: 986,
-    yoy: -4.2, mom: 1.3,
   },
 ];
 
@@ -166,31 +166,29 @@ export function hourlyCardOf(unit: string): HourlyUnitCard {
   };
 }
 
-// ===== 机台日计划产量完成率（昨日口径，16 机组全量横条）=====
+// ===== 机台日计划产量月度完成率（16 机组，8月1日—8月9日口径）=====
+// 月度完成率 = 月累计完成产量 ÷ 月累计计划产量（各日计划相同时等于日完成率均值）；
+// 完成日期 = 当日实际 ≥ 计划的日期；未完成日期 = 当日实际 < 计划的日期
 export interface UnitCompletion {
   name: string;
-  rate: number; // 完成率（%）
-  plan: number; // 计划产量（箱）
-  actual: number; // 完成产量（箱）= plan × rate
+  rate: number; // 月度完成率（%）
+  doneDays: string[]; // 完成日期（如「8月1日」）
+  missedDays: string[]; // 未完成日期
 }
+const AUG_DAYS = 9; // 8月1日~8月9日（数据锚点 2026-08-09）
 export const UNIT_COMPLETION: UnitCompletion[] = EQUIPMENT_UNITS.map((name, i) => {
-  const rate = 90 + ((i * 37 + 13) % 16); // 90%~105% 确定性分布
-  const plan = Math.round((11200 + ((i * 613) % 2600)) / 100) * 100; // 11,200~13,800 箱（整百）
-  return { name, rate, plan, actual: round((plan * rate) / 100, 0) };
+  const baseRate = 90 + ((i * 37 + 13) % 16); // 90%~105% 确定性分布（各机组日完成率中枢）
+  const dayRates = Array.from({ length: AUG_DAYS }, (_, d) => baseRate + Math.sin((i * 3 + d) * 1.7) * 6); // ±6% 日间波动
+  const doneDays: string[] = [];
+  const missedDays: string[] = [];
+  dayRates.forEach((v, d) => (v >= 100 ? doneDays : missedDays).push(`8月${d + 1}日`));
+  return {
+    name,
+    rate: Math.min(120, Math.max(60, round(dayRates.reduce((s, v) => s + v, 0) / AUG_DAYS, 1))), // 防御性夹紧
+    doneDays,
+    missedDays,
+  };
 });
-
-// 完成率班次下钻：按班次系数拆分日完成率（与台时产量班次口径一致：早班略高、晚班略低），三班均值≈日完成率；
-// 计划产量按班次权重拆分（早班略大），完成产量 = 班次计划 × 班次完成率
-const COMPLETION_SHIFT_FACTOR: Record<Exclude<Shift, "全天">, number> = { 早班: 1.04, 中班: 1.01, 晚班: 0.95 };
-const COMPLETION_SHIFT_PLAN_W: Record<Exclude<Shift, "全天">, number> = { 早班: 0.34, 中班: 0.33, 晚班: 0.33 };
-export function unitCompletionByShift(unit: string): UnitCompletion[] {
-  const day = UNIT_COMPLETION.find((u) => u.name === unit) ?? UNIT_COMPLETION[0];
-  return (Object.keys(COMPLETION_SHIFT_FACTOR) as Exclude<Shift, "全天">[]).map((shift, i) => {
-    const rate = Math.min(120, Math.max(60, round(day.rate * COMPLETION_SHIFT_FACTOR[shift] + Math.sin(i * 2.7) * 0.4, 1))); // 防御性夹紧
-    const plan = round(day.plan * COMPLETION_SHIFT_PLAN_W[shift], 0);
-    return { name: shift, rate, plan, actual: round((plan * rate) / 100, 0) };
-  });
-}
 
 // ===== 异常详情构造（趋势图异常点 → 抽屉）=====
 // team：班组筛选口径时传入，标题与原因分析体现「班次·班组」

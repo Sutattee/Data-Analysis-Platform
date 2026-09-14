@@ -9,10 +9,10 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import {
-  SUPPORTED_TARGET_PERIODS,
   hasPeriodConflict,
   nextVersionOf,
   saveTarget,
+  supportedPeriodsOf,
 } from "@/lib/mock-data/metric-targets";
 import type { MetricManage, MetricTargetVersion, TargetDirection, TargetPeriod } from "@/types";
 
@@ -33,9 +33,9 @@ interface TargetFormState {
   changeNote: string;
 }
 
-function toFormState(v: MetricTargetVersion | null): TargetFormState {
+function toFormState(v: MetricTargetVersion | null, defaultPeriod: TargetPeriod): TargetFormState {
   return {
-    period: v?.period ?? "年度",
+    period: v?.period ?? defaultPeriod,
     direction: v?.direction ?? "≤",
     value: v?.value !== undefined ? String(v.value) : "",
     lower: v?.lower !== undefined ? String(v.lower) : "",
@@ -83,7 +83,7 @@ export function TargetFormDrawer({
   const toast = useToast();
   const { state } = useApp();
   const currentUser = state.user?.nickname || state.user?.username || "当前用户";
-  const [form, setForm] = useState<TargetFormState>(toFormState(null));
+  const [form, setForm] = useState<TargetFormState>(() => toFormState(null, supportedPeriodsOf(metric.id)[0]));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   // 周期冲突确认（保存前提示用户确认替代关系）；pendingNums 缓存已通过校验的数值
@@ -94,14 +94,16 @@ export function TargetFormDrawer({
     upper: undefined,
   });
   const isEdit = baseVersion !== null;
+  // 该指标支持的考核周期（物料单耗类：日度/月度；其余：月度/季度/年度）
+  const periods = supportedPeriodsOf(metric.id);
 
   useEffect(() => {
     if (open) {
-      setForm(toFormState(baseVersion));
+      setForm(toFormState(baseVersion, periods[0]));
       setErrors({});
       setConflict(null);
     }
-  }, [open, baseVersion]);
+  }, [open, baseVersion, periods]);
 
   function set<K extends keyof TargetFormState>(key: K, value: TargetFormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -273,7 +275,7 @@ export function TargetFormDrawer({
                 value={form.period}
                 onChange={(e) => set("period", e.target.value as TargetPeriod)}
               >
-                {SUPPORTED_TARGET_PERIODS.map((p) => (
+                {periods.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>

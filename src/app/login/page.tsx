@@ -59,8 +59,9 @@ export default function LoginPage() {
           <Button className="w-full" size="lg" onClick={handleLogin}>
             登 录
           </Button>
-          <p className="text-xs text-gray-400 text-center">
-            默认账号: admin / admin123
+          <p className="text-xs text-gray-400 text-center leading-5">
+            管理员: admin / admin123<br />
+            部门账号: bangong / caiwu / juanbao（密码 123456）
           </p>
         </div>
       </div>

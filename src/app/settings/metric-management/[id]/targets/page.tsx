@@ -35,7 +35,6 @@ export default function MetricTargetsPage() {
           <span className="text-gray-600">目标值管理</span>
         </div>
         <h1 className="text-xl font-bold text-gray-900">{metric.nameCn}</h1>
-        <p className="mt-1 text-sm text-gray-500">目标值版本化管理｜历史版本永久保留，编辑将生成新版本</p>
       </div>
 
       <Card padding>

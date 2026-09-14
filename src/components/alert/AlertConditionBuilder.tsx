@@ -302,10 +302,10 @@ export function AlertConditionBuilder({
                   </div>
                 )}
 
-                {/* 偏离比例（正常区间隐藏；其余基准类型必填区间值，双输入框中间“-”）*/}
+                {/* 偏离比例（选填；正常区间隐藏，双输入框中间“-”）*/}
                 {!isRange && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500">偏离比例(%) <span className="text-red-500">*</span></span>
+                    <span className="text-xs text-gray-500">偏离比例(%，选填)</span>
                     <div className="flex items-center gap-1.5">
                       <input
                         className={inputCls}

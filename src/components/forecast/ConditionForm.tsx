@@ -83,7 +83,6 @@ export function ConditionForm({
   const [calcRangeState, setCalcRangeState] = useState("单日");
   const [customDays, setCustomDays] = useState<number | null>(null); // 自定义范围的预测天数
   const [conds, setConds] = useState<Record<string, string>>({});
-  const [compare, setCompare] = useState(false);
   const [reverseItem, setReverseItem] = useState("");
   const [remainingPlanInput, setRemainingPlanInput] = useState("");
 
@@ -145,7 +144,7 @@ export function ConditionForm({
     }
     onInvalidate?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, metricKey, modelId, rangeState, period, calcRangeState, customDays, conds, compare, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
+  }, [type, metricKey, modelId, rangeState, period, calcRangeState, customDays, conds, reverseItem, targetInput, rangeLowerInput, rangeUpperInput, remainingPlanInput]);
 
   // ----- 校验（即时红字）-----
   const condErrors: Record<string, string> = {};
@@ -289,7 +288,6 @@ export function ConditionForm({
                 .filter(([, v]) => v.trim() !== "")
                 .map(([k, v]) => [k, CONDITION_DICT[k]?.type === "enum" ? v : Number(v)])
             ),
-            compareBaseline: compare,
           }
         : {}),
       ...(type === "达标反推"
@@ -479,16 +477,6 @@ export function ConditionForm({
                 })}
               </div>
             </div>
-
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={compare}
-                onChange={(e) => setCompare(e.target.checked)}
-                className="h-4 w-4 accent-primary-600"
-              />
-              对比当前计划工况（基准）——开启后输出测算工况相对基准的变化量
-            </label>
           </div>
         )}
 

@@ -13,7 +13,11 @@ import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { useApp } from "@/lib/store/AppContext";
 import { useToast } from "@/components/ui/Toast";
 import { ALERT_RECORDS, orgPathOf, EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
+import { EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseSubjectOfMetric } from "@/lib/mock-data/expense-alerts";
+import { DEPT_STATS } from "@/lib/mock-data/expense-indicators";
+import { EXPENSE_NODES } from "@/lib/mock-data/expense-overview";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
+import { SearchSelect } from "@/components/forecast/SearchSelect";
 import {
   getAlertStrategies,
   removeAlertStrategy,
@@ -26,8 +30,16 @@ interface StratFilter {
   keyword: string;
   type: string;
   enabled: string;
+  dept: string;      // 费用口径：部门筛选（"" = 全部部门）
+  subjectId: string; // 费用口径：费用科目筛选（"all" = 全部费用）
 }
-const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "" };
+const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "", dept: "", subjectId: "all" };
+
+// 费用科目下拉选项：全角空格缩进表层级（同费用总览 ExpenseHeader）
+const SUBJECT_OPTIONS = EXPENSE_NODES.map((n) => ({
+  value: n.id,
+  label: `${"　".repeat(n.depth)}${n.name}`,
+}));
 
 // 启用前校验配置完整性
 function validateStrategy(s: AlertStrategy): { ok: boolean; msg: string } {
@@ -45,19 +57,38 @@ function validateStrategy(s: AlertStrategy): { ok: boolean; msg: string } {
 type Phase = "loading" | "success" | "error";
 type ConfirmModal = { kind: "delete" | "disable"; id: string } | null;
 
-// metrics：指标白名单。传入 → 仅展示监测白名单指标的策略（生产管理告警中心）
-export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
+const selectCls =
+  "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
+
+// metrics：指标白名单。传入 → 仅展示监测白名单指标的策略（生产管理/费用预算执行告警中心）；
+// 不传 → 展示全部并排除费用预算执行策略（能源告警中心维持原有口径）
+// basePath：新建/编辑路由前缀（费用预算执行传 /expense/alert/management；缺省按 metrics 二分保持兼容）
+// variant="expense"：费用口径列结构（含所属部门、无告警等级列）与 部门+费用科目 筛选区
+export function AlertStrategiesList({
+  metrics,
+  basePath,
+  variant = "default",
+}: {
+  metrics?: string[];
+  basePath?: string;
+  variant?: "default" | "expense";
+}) {
   const router = useRouter();
   const { state } = useApp();
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
+  const isExpense = variant === "expense";
   // 新建/编辑路由按板块区分：生产管理走 /production/alert/management
-  const mgmtPath = metrics ? "/production/alert/management" : "/alert/management";
+  const mgmtPath = basePath ?? (metrics ? "/production/alert/management" : "/alert/management");
 
   // 默认展示「当前异常」类型的告警策略
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
     getAlertStrategies().filter(
-      (s) => s.type === "当前异常" && (!metrics || s.conditions.some((c) => metrics.includes(c.metric)))
+      (s) =>
+        s.type === "当前异常" &&
+        (metrics
+          ? s.conditions.some((c) => metrics.includes(c.metric))
+          : !s.conditions.some((c) => EXPENSE_ALERT_METRIC_NAMES.has(c.metric)))
     )
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
@@ -84,7 +115,7 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
   }, []);
 
   const sorted = useMemo(() => {
-    // 组织层级筛选：全厂/车间/网格/设备
+    // 组织层级筛选：全厂/车间/网格/设备（仅能源口径）
     const { workshop, grid, equipment } = orgFilter;
     function matchStrategyOrg(s: AlertStrategy): boolean {
       if (!workshop && !grid && !equipment) return true;
@@ -101,25 +132,52 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
         return true;
       });
     }
+    // 费用口径：部门命中（关联部门全集）+ 费用科目命中（任一条件指标的科目子树）
+    function matchExpenseFilters(s: AlertStrategy): boolean {
+      if (applied.dept && !s.objects.includes(applied.dept)) return false;
+      if (applied.subjectId !== "all") {
+        const node = EXPENSE_NODES.find((n) => n.id === applied.subjectId);
+        if (node) {
+          const hit = s.conditions.some((c) => {
+            const sp = expenseSubjectOfMetric(c.metric);
+            return sp === node.path || sp.startsWith(node.path + "\\");
+          });
+          if (!hit) return false;
+        }
+      }
+      return true;
+    }
+    // 关键字：告警名称；费用口径扩展匹配 所属部门/费用科目/指标名称
+    const k = applied.keyword.trim().toLowerCase();
+    function matchKeyword(s: AlertStrategy): boolean {
+      if (!k) return true;
+      if (s.name.toLowerCase().includes(k)) return true;
+      if (!isExpense) return false;
+      if (s.objects.some((o) => o.toLowerCase().includes(k))) return true;
+      return s.conditions.some((c) => {
+        const sp = expenseSubjectOfMetric(c.metric);
+        return c.metric.toLowerCase().includes(k) || sp.toLowerCase().includes(k);
+      });
+    }
     const filtered = strategies.filter(
       (s) =>
-        (!applied.keyword.trim() || s.name.toLowerCase().includes(applied.keyword.trim().toLowerCase())) &&
+        matchKeyword(s) &&
         (!applied.enabled || (applied.enabled === "启用" ? s.enabled : !s.enabled)) &&
-        matchStrategyOrg(s)
+        (isExpense ? matchExpenseFilters(s) : matchStrategyOrg(s))
     );
     return [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [strategies, applied, orgFilter]);
+  }, [strategies, applied, orgFilter, isExpense]);
 
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
   const paged = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const hasFilter =
-    (Object.keys(applied) as (keyof StratFilter)[]).some((k) => applied[k].trim() !== "") ||
+    (Object.keys(applied) as (keyof StratFilter)[]).some((k) => applied[k].trim() !== "" && applied[k] !== "all") ||
     orgFilter.workshop !== "" || orgFilter.grid !== "" || orgFilter.equipment !== "";
 
   function handleSearch() {
-    setApplied((prev) => ({ ...prev, keyword: filter.keyword }));
+    setApplied((prev) => ({ ...prev, keyword: filter.keyword, dept: filter.dept, subjectId: filter.subjectId }));
     setPage(1);
     runLoad();
   }
@@ -165,8 +223,17 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
     setStrategies((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   }
 
-  // 指标去重展示
-  const metricsOf = (s: AlertStrategy) => Array.from(new Set(s.conditions.map((c) => c.metric))).join("、");
+  // 指标去重展示（费用口径去掉「-执行进度偏差」后缀，展示指标名如「日常招待费」）
+  const metricsOf = (s: AlertStrategy) =>
+    Array.from(
+      new Set(
+        s.conditions.map((c) =>
+          isExpense && c.metric.endsWith(EXPENSE_ALERT_METRIC_SUFFIX)
+            ? c.metric.slice(0, -EXPENSE_ALERT_METRIC_SUFFIX.length)
+            : c.metric
+        )
+      )
+    ).join("、");
   // 该策略关联的告警记录：优先按策略指标名精确匹配，无命中再回退领域+类型
   const recordsOf = (s: AlertStrategy) => {
     const metricSet = new Set(s.conditions.map((c) => c.metric));
@@ -185,8 +252,8 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
             value={filter.keyword}
             onChange={(e) => setFilter({ ...filter, keyword: e.target.value })}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="搜索告警名称"
-            className="w-[280px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+            placeholder={isExpense ? "搜索告警名称、部门名称、费用名称、指标名称" : "搜索告警名称"}
+            className="w-[480px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
           <Button onClick={handleSearch}>查询</Button>
           <Button variant="secondary" onClick={handleReset}>重置</Button>
@@ -195,10 +262,43 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
           )}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          {/* 组织级联筛选仅能源域适用（辅料为全厂级指标） */}
-          {!metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />}
+          {isExpense ? (
+            /* 费用口径：部门 + 费用科目（同费用总览）组合筛选 */
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">部门</span>
+                <select
+                  className={selectCls}
+                  value={filter.dept}
+                  onChange={(e) => setFilter({ ...filter, dept: e.target.value })}
+                >
+                  <option value="">全部部门</option>
+                  {DEPT_STATS.map((d) => (
+                    <option key={d.dept} value={d.dept}>{d.dept}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">费用科目</span>
+                <div className="w-52">
+                  <SearchSelect
+                    options={SUBJECT_OPTIONS}
+                    value={filter.subjectId}
+                    onChange={(id) => setFilter({ ...filter, subjectId: id })}
+                    placeholder="全部费用"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            /* 组织级联筛选仅能源域适用（辅料为全厂级指标） */
+            !metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
+          )}
         </div>
       </Card>
+
+      {/* 区块小标题（费用口径） */}
+      {isExpense && <div className="text-sm font-medium text-gray-700">告警列表</div>}
 
       {/* 列表 */}
       <Card padding={false}>
@@ -229,6 +329,8 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
                 <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500">
                   <th className="text-left px-4 py-3">告警名称</th>
                   <th className="text-left px-4 py-3">数据指标</th>
+                  {/* 费用口径在数据指标后展示所属部门（该指标关联部门全集） */}
+                  {isExpense && <th className="text-left px-4 py-3">所属部门</th>}
                   <th className="text-left px-4 py-3">触发条件</th>
                   <th className="text-left px-4 py-3">告警等级</th>
                   <th className="text-left px-4 py-3">
@@ -246,10 +348,17 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-800">{s.name}</td>
                     <td className="px-4 py-3 text-gray-600">{metricsOf(s)}</td>
+                    {isExpense && (
+                      <td className="px-4 py-3 text-gray-600 max-w-[240px]">
+                        <div className="truncate" title={s.objects.join("、")}>{s.objects.join("、")}</div>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-gray-600 max-w-[220px]">
                       <div className="truncate" title={formatConditions(s)}>{formatConditions(s)}</div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{s.level}</td>
+                    <td className="px-4 py-3">
+                      <AlertLevelBadge level={s.level} />
+                    </td>
                     <td className="px-4 py-3">
                       <span className={s.enabled ? "text-green-600 font-medium" : "text-gray-400"}>
                         {s.enabled ? "启用" : "停用"}
@@ -325,7 +434,11 @@ export function AlertStrategiesList({ metrics }: { metrics?: string[] }) {
             <h2 className="text-lg font-bold text-gray-900">{viewTarget.name}</h2>
             {viewTarget.description && <p className="text-gray-500">{viewTarget.description}</p>}
             <DetailRow label="业务域" value={viewTarget.domain} />
-            <DetailRow label="告警对象" value={`${viewTarget.objects.join("、") || "全部适用对象"}`} />
+            {/* 费用口径标签为「所属部门」（值同为该指标关联部门全集） */}
+            <DetailRow
+              label={isExpense ? "所属部门" : "告警对象"}
+              value={`${viewTarget.objects.join("、") || "全部适用对象"}`}
+            />
             <DetailRow label="检测周期" value={viewTarget.detectCycle} />
             <DetailRow label="条件关系" value={viewTarget.conditions.length > 1 ? `满足${viewTarget.relation === "且" ? "全部" : "任一"}条件（${viewTarget.relation}）` : "—"} />
             <div>

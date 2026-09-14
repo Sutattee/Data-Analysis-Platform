@@ -321,7 +321,6 @@ export interface ForecastInput {
   targetUpper?: number; // 临时测算目标区间上限（区间方向）
   calcRange?: string; // 条件测算：预测时间范围（按指标频率的范围选项，或「自定义」）
   conditions?: Record<string, number | string>; // 工况输入
-  compareBaseline?: boolean;
   reverseItem?: string; // 反推内容
   remainingPlan?: number; // 剩余生产计划（反推可调）
 }
@@ -339,7 +338,6 @@ export interface ChartPoint {
   upper?: number; // 预测区间上界
   lower?: number; // 下界
   target?: number; // 目标值（橙线）
-  baseline?: number; // 基准工况
   scenario?: number; // 测算工况
 }
 
@@ -578,15 +576,9 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
   }
   factor = clamp(factor, 0.5, 2.5);
   const scenario = round(m.base * factor, d);
-  const baseline = round(m.base, d); // 系统当前计划工况的预测结果
-  const diff = round(scenario - baseline, d);
-  const diffPct = (diff / baseline) * 100;
-  const compare = input.compareBaseline === true; // 对比基准开关（默认关闭）
-  const headline = compare
-    ? `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}；较系统当前计划工况的预测结果${diff >= 0 ? "增加" : "减少"} ${fmt(Math.abs(diff), d)} ${m.unit}（${fmt(Math.abs(diffPct), 1)}%）`
-    : `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}`;
+  const headline = `预计${m.name} ${fmt(scenario, d)} ${m.unit}，预测区间 ${fmt(scenario * 0.97, d)}～${fmt(scenario * 1.03, d)} ${m.unit}`;
 
-  // 图表：多日 → 双折线；单日 → 对比柱状图
+  // 图表：多日 → 测算工况折线；单日 → 测算工况柱状图
   const days = daysOf(input.calcRange ?? "单日", input.customDays);
   let chart: ForecastResult["chart"];
   if (days > 1) {
@@ -594,7 +586,6 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
     for (let j = 1; j <= days; j++) {
       points.push({
         date: futureLabel(j),
-        baseline: round(baseline * (1 + Math.sin(m.seed + j) * 0.02), d),
         scenario: round(scenario * (1 + Math.sin(m.seed + j) * 0.02), d),
       });
     }
@@ -602,10 +593,7 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
   } else {
     chart = {
       kind: "scenario-bar",
-      bars: [
-        { name: "当前计划工况（基准）", value: baseline, tone: "muted" },
-        { name: "测算工况", value: scenario, tone: compare ? "actual" : undefined },
-      ],
+      bars: [{ name: "测算工况", value: scenario, tone: "actual" }],
       unit: m.unit,
     };
   }
@@ -613,17 +601,12 @@ function scenarioForecast(m: ForecastMetric, input: ForecastInput, meta: Forecas
   return {
     headline,
     fields: [
-      { label: "预测值", value: `${fmt(scenario, d)} ${m.unit}`, tone: Math.abs(diffPct) > 5 ? "warn" : undefined },
+      { label: "预测值", value: `${fmt(scenario, d)} ${m.unit}` },
       { label: "预测区间", value: `${fmt(scenario * 0.97, d)} ～ ${fmt(scenario * 1.03, d)} ${m.unit}`, tone: "muted" },
-      ...(compare ? [
-        { label: "基准值（当前计划工况）", value: `${fmt(baseline, d)} ${m.unit}`, tone: "muted" as const },
-        { label: "情景变化", value: `${diff >= 0 ? "+" : ""}${fmt(diff, d)} ${m.unit}（${diff >= 0 ? "+" : ""}${fmt(diffPct, 1)}%）`, tone: diff > 0 ? ("warn" as const) : ("good" as const) },
-      ] : []),
     ],
     chart,
     conclusions: buildConclusions(m, model2(m, input), [
       `本次工况条件：${snapshot.join("、")}。`,
-      `基准条件：系统当前计划工况（${m.name}基准 ${fmt(baseline, d)} ${m.unit}）。`,
     ], [
       `建议对比其他工况组合（如调整设定值或运行时长），寻找更优的运行方案。`,
       `本测算结果仅用于情景分析，不回写生产计划或业务系统。`,

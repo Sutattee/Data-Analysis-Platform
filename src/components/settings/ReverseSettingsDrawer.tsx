@@ -1,13 +1,12 @@
 "use client";
 
 // 达标反推设置 - 右侧滑出窗口（指标管理列表操作入口）
-// 内容由 AI 生成，支持 AI 重新生成 / 新增 / 内联编辑 / 删除确认；仅支持配置目标值的指标开放
+// 支持手动新增 / 内联编辑 / 删除确认；仅支持配置目标值的指标开放
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { metricList } from "@/lib/mock-data/metric-management";
 import type { MetricManage } from "@/types";
 
 export function ReverseSettingsDrawer({
@@ -47,12 +46,6 @@ export function ReverseSettingsDrawer({
     onUpdate(next);
   }
 
-  // AI 生成：重置为指标配置的推荐内容
-  function regenItems() {
-    const recommend = metricList.find((x) => x.id === metric?.id)?.reverseItems ?? [];
-    commitUpdate([...recommend]);
-    toast("已按 AI 推荐内容重新生成", "success");
-  }
   function commitEdit() {
     if (editingIdx === null) return;
     const v = editingText.trim();
@@ -95,19 +88,10 @@ export function ReverseSettingsDrawer({
       >
         {metric && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-gray-400">
-                内容由 AI 生成，仅供参考。
-                <span className="ml-2">共 {items.length} 条</span>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={regenItems}>
-                  AI 生成
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setShowAdd(true)}>
-                  + 新增
-                </Button>
-              </div>
+            <div className="flex items-center justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setShowAdd(true)}>
+                + 新增
+              </Button>
             </div>
 
             <div className="overflow-hidden rounded-lg border border-gray-100">

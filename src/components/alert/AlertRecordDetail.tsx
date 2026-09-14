@@ -9,6 +9,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import { expenseAlertRecordById } from "@/lib/mock-data/expense-alerts";
 import { generateAnomalyReply } from "@/lib/mock-data/anomaly-ai";
 import type { AlertRecord } from "@/types";
 
@@ -24,13 +25,23 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 
 // 告警记录详情（/alert/records/[id] 与 /production/alert/records/[id] 共用）
 // basePath：面包屑与最近访问的返回路径（生产管理入口传 /production/alert/records）
-export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: string }) {
+// layout="expense"：费用口径字段（所属部门单值 + 预算执行率/计划执行进度/执行进度偏差三件套）
+export function AlertRecordDetail({
+  basePath = "/alert/records",
+  layout = "default",
+}: {
+  basePath?: string;
+  layout?: "default" | "expense";
+}) {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { state, addRecentVisit } = useApp();
   const isAdmin = state.user?.role === "管理员";
+  const isExpense = layout === "expense";
 
-  const original = ALERT_RECORDS.find((r) => r.id === params.id);
+  // 费用口径兜底：费用页「查看告警详情」按需生成的记录不在 ALERT_RECORDS（列表仅 30 条示例）
+  const original = ALERT_RECORDS.find((r) => r.id === params.id)
+    ?? (isExpense ? expenseAlertRecordById(params.id) : undefined);
   const [record, setRecord] = useState<AlertRecord | undefined>(original ? { ...original } : undefined);
 
   // 异常原因修正
@@ -52,6 +63,14 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
   useEffect(() => {
     if (isProduction) setFromMaterials(!!sessionStorage.getItem("anomaly-drawer-return"));
   }, [isProduction]);
+
+  // 费用口径：从费用页跳入时带 from 参数（须为本站路径），顶部展示「返回」按钮回来源费用详情页
+  const [returnTo, setReturnTo] = useState("");
+  useEffect(() => {
+    if (!isExpense) return;
+    const from = new URLSearchParams(window.location.search).get("from");
+    if (from && from.startsWith("/")) setReturnTo(from);
+  }, [isExpense]);
 
   // 记录最近访问（首页「告警记录」条目；创建人恒为"系统"）
   useEffect(() => {
@@ -141,18 +160,32 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
       {/* ===== 顶部固定：面包屑 + 标题 ===== */}
       <div className="flex-shrink-0">
         <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-2">
-          <Link href={basePath} className="hover:text-primary-600">告警记录</Link>
-          <span>/</span>
-          <span className="text-gray-600">告警记录详情</span>
+          {isExpense ? (
+            <>
+              <Link href="/expense/alert" className="hover:text-primary-600">告警中心</Link>
+              <span>/</span>
+              <span className="text-gray-600">告警记录详情</span>
+            </>
+          ) : (
+            <>
+              <Link href={basePath} className="hover:text-primary-600">告警记录</Link>
+              <span>/</span>
+              <span className="text-gray-600">告警记录详情</span>
+            </>
+          )}
         </div>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-2">
             <h1 className="text-xl font-bold text-gray-900">{record.title}</h1>
-            <p className="text-xs text-gray-400">告警编号：{record.id}</p>
           </div>
           {fromMaterials && (
             <Button variant="secondary" onClick={() => router.push("/production/materials")}>
               ← 返回辅料消耗
+            </Button>
+          )}
+          {returnTo && (
+            <Button variant="secondary" onClick={() => router.push(returnTo)}>
+              ← 返回
             </Button>
           )}
         </div>
@@ -166,20 +199,34 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
             <Field label="告警编号" value={record.id} />
             <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
             <Field label="业务域" value={record.domain} />
-            <Field label="告警对象" value={`${record.objectName}（${record.objectCode}）`} />
+            {/* 费用口径：所属部门 = 触发告警的那个部门 */}
+            {isExpense ? (
+              <Field label="所属部门" value={record.objectName} />
+            ) : (
+              <Field label="告警对象" value={`${record.objectName}（${record.objectCode}）`} />
+            )}
             <Field label="告警触发时间" value={record.triggerTime} />
           </div>
         </Card>
 
-        {/* 核心告警数据 */}
+        {/* 核心告警数据（费用口径：预算执行率 / 计划执行进度 / 执行进度偏差） */}
         <Card title="核心告警数据">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-            <Field label="指标名称" value={record.metricName} />
-            <Field label="告警值" value={record.valueLabel} />
-            <Field label="基准 / 阈值" value={record.baselineLabel} />
-            <Field label="偏离值" value={record.deviationValue} />
-            <Field label="偏离率" value={record.deviationRate} />
-          </div>
+          {isExpense ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Field label="指标名称" value={record.metricLabel ?? record.metricName} />
+              <Field label="预算执行率" value={record.executionRate} />
+              <Field label="计划执行进度" value={record.planProgress} />
+              <Field label="执行进度偏差" value={record.deviationLabel ?? record.deviationValue} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Field label="指标名称" value={record.metricName} />
+              <Field label="告警值" value={record.valueLabel} />
+              <Field label="基准 / 阈值" value={record.baselineLabel} />
+              <Field label="偏离值" value={record.deviationValue} />
+              <Field label="偏离率" value={record.deviationRate} />
+            </div>
+          )}
         </Card>
 
         {/* 判定依据 */}
@@ -190,9 +237,7 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
               value={
                 isAdmin ? (
                   <button
-                    onClick={() =>
-                      router.push(basePath.startsWith("/production") ? "/production/alert/management" : "/alert/management")
-                    }
+                    onClick={() => router.push(basePath.replace("/records", "/management"))}
                     className="text-primary-600 hover:text-primary-700 hover:underline"
                   >
                     {record.strategyName}
@@ -275,7 +320,8 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
           </div>
         </Card>
 
-        {/* 责任与处理情况 */}
+        {/* 责任与处理情况（费用口径不展示） */}
+        {!isExpense && (
         <Card title="责任与处理情况">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
             <Field label="接收人" value={record.receiver} />
@@ -299,6 +345,7 @@ export function AlertRecordDetail({ basePath = "/alert/records" }: { basePath?: 
             />
           </div>
         </Card>
+        )}
       </div>
 
       {/* AI辅助面板 */}

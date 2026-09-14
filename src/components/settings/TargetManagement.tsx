@@ -10,7 +10,6 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import {
-  activeTargetOf,
   disableTarget,
   formatTargetStandard,
   isTargetSupported,
@@ -56,8 +55,6 @@ export function TargetManagement({ metric }: { metric: MetricManage }) {
   const [disableTarget_, setDisableTarget_] = useState<MetricTargetVersion | null>(null);
   const [disableReason, setDisableReason] = useState("");
 
-  const active = activeTargetOf(metric.id);
-
   function reload() {
     setVersions(listTargets(metric.id));
   }
@@ -93,32 +90,8 @@ export function TargetManagement({ metric }: { metric: MetricManage }) {
 
   return (
     <div className="space-y-3">
-      {/* 当前生效目标 */}
-      {active ? (
-        <div className="rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-primary-700">当前生效目标</span>
-            <StatusBadge status={active.status} />
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="text-lg font-semibold text-gray-900">
-              {formatTargetStandard(active, metric.decimals)}
-            </span>
-            <span className="text-xs text-gray-500">
-              {active.version}｜{active.period}考核｜{active.effectiveStart} 至 {active.effectiveEnd}
-            </span>
-          </div>
-          {active.remark && <p className="mt-1 text-xs text-gray-400">{active.remark}</p>}
-        </div>
-      ) : (
-        <p className="text-sm text-gray-400">当前无生效中的目标版本</p>
-      )}
-
       {/* 历史版本列表 + 新增入口 */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">
-          历史版本永久保留（共 {versions.length} 个），编辑将生成新版本
-        </span>
+      <div className="flex items-center justify-end">
         <Button size="sm" onClick={() => setFormBase({ base: null })}>
           + 新增目标值
         </Button>

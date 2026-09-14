@@ -4,11 +4,12 @@ import type {
   AlertType,
   AlertDomain,
 } from "@/types";
+import { buildExpenseAlertRecords } from "./expense-alerts";
 
 // ========== 筛选项枚举 ==========
 export const ALERT_LEVELS: AlertLevel[] = ["提示", "关注", "预警", "告警", "危险"];
 export const ALERT_TYPES: AlertType[] = ["当前异常", "预测风险"];
-export const ALERT_DOMAINS: AlertDomain[] = ["生产管理", "工艺质量", "能源消耗"];
+export const ALERT_DOMAINS: AlertDomain[] = ["生产管理", "工艺质量", "能源消耗", "费用预算执行"];
 
 // ========== 等级优先级（数值越大越严重，用于默认排序） ==========
 export const LEVEL_PRIORITY: Record<AlertLevel, number> = {
@@ -57,12 +58,13 @@ export const ALERT_OBJECTS: AlertObject[] = [
   { code: "EM-04", name: "蒸汽能源网格", domain: "能源消耗", metric: "蒸汽管网损耗率", target: 8, unit: "%", low: false },
 ];
 
-// ========== 生产管理 · 辅料指标告警对象（全厂级，高于上限为异常） ==========
+// ========== 生产管理 · 辅料/生产指标告警对象（单耗类高于上限为异常，台时产量低于目标为异常） ==========
 export const MATERIAL_ALERT_OBJECTS: AlertObject[] = [
   { code: "MAT-01", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗盘纸量", target: 30, unit: "米/箱", low: false },
   { code: "MAT-02", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗商标纸（小盒）量", target: 2480, unit: "张/箱", low: false },
   { code: "MAT-03", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗烟叶量", target: 40.0, unit: "公斤/箱", low: false },
   { code: "MAT-04", name: "什邡卷烟厂", domain: "生产管理", metric: "单箱耗嘴棒量", target: 48000, unit: "支/箱", low: false },
+  { code: "MAT-05", name: "什邡卷烟厂", domain: "生产管理", metric: "台时产量", target: 1100, unit: "箱/台", low: true },
 ];
 
 // 辅料指标白名单：生产管理告警中心按此过滤（能源告警中心默认排除）
@@ -299,8 +301,12 @@ function buildProductionAlertRecords(): AlertRecord[] {
   });
 }
 
-// 全量告警记录：基础 56 条 + 生产辅料 16 条（AnomalyDrawer / 告警详情按 id 全局查找）
-export const ALERT_RECORDS: AlertRecord[] = [...BASE_ALERT_RECORDS, ...buildProductionAlertRecords()];
+// 全量告警记录：基础 56 条 + 生产辅料 16 条 + 费用预算执行 30 条（AnomalyDrawer / 告警详情按 id 全局查找）
+export const ALERT_RECORDS: AlertRecord[] = [
+  ...BASE_ALERT_RECORDS,
+  ...buildProductionAlertRecords(),
+  ...buildExpenseAlertRecords(),
+];
 
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========
 // 供「新建告警-指定对象」分层多选 与「告警记录/管理」级联筛选 共用

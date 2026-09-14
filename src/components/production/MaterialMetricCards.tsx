@@ -36,65 +36,72 @@ function CompareLine({
   );
 }
 
-// 顶部 5 张指标卡：白底，当前值突出显示，昨日口径；
-// 盘纸卡右上角为牌号单选下拉（默认「全部」），选择牌号后整卡切换为该牌号口径（实际值/历史均值/同比/环比）
-export function MaterialMetricCards() {
-  const [brand, setBrand] = useState<string>("全部"); // 盘纸卡牌号选择
+// 单张指标卡：白底，当前值突出显示；4 个单耗卡右上角为牌号单选下拉（默认「全部」），
+// 选择牌号后整卡切换为该牌号口径（实际值/目标值/历史均值/同比），单耗卡不展示环比；
+// 劳动生产率卡口径为「本月」并保留同比/环比
+function MaterialCardItem({ card }: { card: MaterialCard }) {
+  const [brand, setBrand] = useState<string>("全部"); // 本卡牌号选择（各卡独立）
+  const drillable = !!card.brandDetails; // 4 个单耗卡支持牌号下钻
+  const idx = drillable ? MATERIAL_BRANDS.indexOf(brand) : -1;
+  const detail = drillable && idx >= 0 && card.brandDetails ? card.brandDetails[idx] : undefined;
+  // 卡片展示口径：选择牌号后取该牌号明细，否则全口径
+  const shown: MaterialCard = detail
+    ? { ...card, value: detail.value, avg: detail.avg, yoy: detail.yoy, mom: detail.mom }
+    : card;
+  const periodLabel = card.key === "labor" ? "本月" : "昨日";
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      {materialCards.map((c) => {
-        const drillable = !!c.brandDetails; // 仅盘纸卡支持牌号下钻
-        const idx = drillable ? MATERIAL_BRANDS.indexOf(brand) : -1;
-        const detail = drillable && idx >= 0 && c.brandDetails ? c.brandDetails[idx] : undefined;
-        // 卡片展示口径：选择牌号后取该牌号明细，否则全口径
-        const shown: MaterialCard = detail
-          ? { ...c, value: detail.value, avg: detail.avg, yoy: detail.yoy, mom: detail.mom }
-          : c;
-        return (
-          <div
-            key={c.key}
-            className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md"
+    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="mb-1 flex items-center justify-between gap-1">
+        <span className="truncate text-xs text-gray-500">
+          {card.label}
+          {detail ? ` · ${brand}` : ""}
+        </span>
+        {drillable && (
+          <select
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            title="选择牌号查看明细"
+            className="flex-shrink-0 max-w-[76px] rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           >
-            <div className="mb-1 flex items-center justify-between gap-1">
-              <span className="truncate text-xs text-gray-500">
-                {c.label}
-                {detail ? ` · ${brand}` : ""}
-              </span>
-              {drillable && (
-                <select
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  title="选择牌号查看明细"
-                  className="flex-shrink-0 max-w-[76px] rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                >
-                  <option value="全部">全部</option>
-                  {MATERIAL_BRANDS.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="mb-1 flex items-baseline gap-1">
-              <span className="text-2xl font-bold text-gray-900">{fmtNum(shown.value, c.decimals)}</span>
-              <span className="text-sm text-gray-400">{c.unit}</span>
-              <span className="text-[10px] text-gray-300">昨日</span>
-            </div>
-            {shown.target !== undefined && <CompareLine label="目标值" base={shown.target} card={shown} />}
-            {shown.avg !== undefined && <CompareLine label="历史均值" base={shown.avg} card={shown} />}
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-              <span className="text-gray-900">
-                同比 <span className={arrowCls(shown.yoy, c.downGreen)}>{pctText(shown.yoy)}</span>
-              </span>
-              <span className="text-gray-900">
-                环比 <span className={arrowCls(shown.mom, c.downGreen)}>{pctText(shown.mom)}</span>
-              </span>
-            </div>
-          </div>
-        );
-      })}
+            <option value="全部">全部</option>
+            {MATERIAL_BRANDS.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className="mb-1 flex items-baseline gap-1">
+        <span className="text-2xl font-bold text-gray-900">{fmtNum(shown.value, card.decimals)}</span>
+        <span className="text-sm text-gray-400">{card.unit}</span>
+        <span className="text-[10px] text-gray-300">{periodLabel}</span>
+      </div>
+      {shown.target !== undefined && <CompareLine label="目标值" base={shown.target} card={shown} />}
+      {shown.avg !== undefined && <CompareLine label="历史均值" base={shown.avg} card={shown} />}
+      <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+        <span className="text-gray-900">
+          同比 <span className={arrowCls(shown.yoy, card.downGreen)}>{pctText(shown.yoy)}</span>
+        </span>
+        {/* 单耗卡不展示环比，仅劳动生产率保留 */}
+        {!drillable && (
+          <span className="text-gray-900">
+            环比 <span className={arrowCls(shown.mom, card.downGreen)}>{pctText(shown.mom)}</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 顶部 5 张指标卡（每卡自持牌号选择状态）
+export function MaterialMetricCards() {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      {materialCards.map((c) => (
+        <MaterialCardItem key={c.key} card={c} />
+      ))}
     </div>
   );
 }

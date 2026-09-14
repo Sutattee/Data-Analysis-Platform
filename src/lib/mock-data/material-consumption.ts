@@ -1,7 +1,13 @@
 // 辅料消耗（生产管理） — 模拟数据：确定性生成，数据锚点与能源总览一致（2026-08-09）
 // 指标：单箱耗盘纸量（米/箱）/ 单箱耗商标纸小盒量（张/箱）/ 单箱耗烟叶量（公斤/箱）/ 单箱耗嘴棒量（支/箱）
-import { GRADE_TO_LEVEL, type AnomalyDetail, type EvalGrade } from "./grid-forecast";
-import { genDaily, genMonthly, lastDays, type GenCfg, type HistPoint } from "./energy-overview";
+import {
+  GRADE_TO_LEVEL,
+  type AnomalyDetail,
+  type EvalGrade,
+  type MaterialAnomalyRows,
+  type MaterialBrandRow,
+} from "./grid-forecast";
+import { genDaily, genMonthly, lastDays, type HistPoint } from "./energy-overview";
 import { ALERT_RECORDS } from "./alerts";
 
 export const LATEST_ISO = "2026-08-09"; // 数据锚点（与能源总览 END_DATE 一致）
@@ -158,8 +164,13 @@ export const MATERIAL_META: Record<MaterialKey, MaterialMeta> = {
 };
 
 // 图表异常点 → 抽屉详情（口径同能源总览；关联同指标同等级的告警记录）
-// brand：盘纸牌号下钻口径时传入，异常标题体现牌号
-export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint, brand?: string): AnomalyDetail {
+// brand：牌号下钻口径时传入（异常标题体现牌号）；period：日/月档（决定异常明细数据数值口径）
+export function buildMaterialAnomaly(
+  key: MaterialKey,
+  pt: HistPoint,
+  brand?: string,
+  period?: "日" | "月"
+): AnomalyDetail {
   const meta = MATERIAL_META[key];
   const grade = pt.anomaly ?? "一般";
   const level = GRADE_TO_LEVEL[grade];
@@ -170,7 +181,7 @@ export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint, brand?: st
   const cause = pt.causeEmpty
     ? ""
     : `经分析，本次${meta.label}升至 ${value}，主要受${meta.summary}共同影响。\n首要原因是${meta.reasons[0]}；\n其次，${meta.reasons[1]}；\n此外，${meta.reasons[2]}。`;
-  // 关联告警记录：优先同指标同等级，退而取同指标第一条（供抽屉「查看告警记录详情」）
+  // 关联告警记录：优先同指标同等级，退而取同指标第一条（供抽屉「查看告警详情」）
   const recordId =
     ALERT_RECORDS.find((r) => r.metricName === meta.label && r.level === level)?.id ??
     ALERT_RECORDS.find((r) => r.metricName === meta.label)?.id;
@@ -188,33 +199,142 @@ export function buildMaterialAnomaly(key: MaterialKey, pt: HistPoint, brand?: st
     suggestion: meta.suggestion,
     level,
     recordId,
+    materialRows: period ? materialAnomalyRows(key, period) : undefined, // 异常明细数据（牌号→机台下钻）
   };
 }
 
 // ===== 牌号体系（下钻明细 / 预测算量共用）=====
 export const MATERIAL_BRANDS = ["牌号A", "牌号B", "牌号C", "牌号D"];
 
-// ===== 盘纸牌号下钻序列（各牌号确定性生成；日序列末端锚定指标卡各牌号昨日值）=====
-const BRAND_TIP_VALUES = [30.6, 29.4, 29.9, 28.8]; // 与 materialCards 盘纸卡 brandDetails[].value 一致
-const BRAND_TIP_DAILY: HistPoint[][] = MATERIAL_BRANDS.map((_, i) => {
-  const base = BRAND_TIP_VALUES[i];
-  const pts = genDaily({ base, avgBase: base + 0.3, seed: 51 + i * 5, decimals: 1, drift: 0, waveAmp: 0.014 });
-  pts[pts.length - 1].actual = base; // 末端锚定该牌号昨日值
-  return autoMark(pts, "avg");
-});
-const BRAND_TIP_MONTHLY: HistPoint[][] = MATERIAL_BRANDS.map((_, i) => {
-  const base = BRAND_TIP_VALUES[i];
-  return autoMark(
-    genMonthly({ base, avgBase: base + 0.3, seed: 61 + i * 5, decimals: 1, drift: 0, waveAmp: 0.02 }),
-    "avg"
-  );
-});
+// 牌号层异常标注规则与主序列一致（盘纸按历史均值、其余按目标值）
+const BRAND_MARK_RULE: Record<MaterialKey, "avg" | "target"> = {
+  tipPaper: "avg", boxLabel: "target", tobacco: "target", filterRod: "target",
+};
 
-// 盘纸牌号趋势取数（日=近 90 天；未知牌号回退全口径）
-export function tipPaperBrandView(brand: string, range: "日" | "月"): HistPoint[] {
+// ===== 各牌号下钻序列（4 指标 × 4 牌号确定性生成；日序列末端锚定指标卡各牌号昨日值）=====
+const BRAND_VALUES: Record<MaterialKey, number[]> = {
+  tipPaper: [30.6, 29.4, 29.9, 28.8],
+  boxLabel: [2540, 2485, 2505, 2455],
+  tobacco: [39.2, 38.3, 38.8, 37.9],
+  filterRod: [51200, 49500, 50300, 48800],
+};
+const BRAND_DECIMALS: Record<MaterialKey, number> = { tipPaper: 1, boxLabel: 0, tobacco: 1, filterRod: 0 };
+const BRAND_TARGET: Record<MaterialKey, number | undefined> = {
+  tipPaper: undefined, boxLabel: 2480, tobacco: 40.0, filterRod: 48000,
+};
+
+// 牌号序列确定性超线点注入值：target 口径 = max(基准, 目标)×1.05（保证超目标 ≥5%），
+// avg 口径 = 历史均值×1.04（保证超均值 ≥4%）；autoMark 自动定级
+function injectedActual(key: MaterialKey, base: number, avgOffset: number): number {
+  const v = BRAND_MARK_RULE[key] === "target"
+    ? Math.max(base, BRAND_TARGET[key] ?? base) * 1.05
+    : (base + avgOffset) * 1.04;
+  return Number(v.toFixed(BRAND_DECIMALS[key]));
+}
+
+// 单指标各牌号日序列（genDaily 参数随指标差异：均值偏移 / 波幅量级）
+// 并在末端 90 天窗口内注入确定性超线点（各牌号均有可下钻的异常点，位置随牌号错开）
+function buildBrandDaily(key: MaterialKey, i: number): HistPoint[] {
+  const base = BRAND_VALUES[key][i];
+  const avgOffset = key === "tipPaper" ? 0.3 : key === "tobacco" ? 0.4 : 25;
+  const pts = genDaily({
+    base,
+    avgBase: base + avgOffset,
+    target: BRAND_TARGET[key],
+    seed: 51 + i * 5 + Object.keys(BRAND_VALUES).indexOf(key) * 17,
+    decimals: BRAND_DECIMALS[key],
+    drift: 0,
+    waveAmp: 0.014,
+  });
+  pts[pts.length - 30 - i * 7].actual = injectedActual(key, base, avgOffset);
+  pts[pts.length - 1].actual = base; // 末端锚定该牌号昨日值
+  return autoMark(pts, BRAND_MARK_RULE[key]);
+}
+
+const BRAND_SERIES_DAILY: Record<MaterialKey, HistPoint[][]> = {
+  tipPaper: MATERIAL_BRANDS.map((_, i) => buildBrandDaily("tipPaper", i)),
+  boxLabel: MATERIAL_BRANDS.map((_, i) => buildBrandDaily("boxLabel", i)),
+  tobacco: MATERIAL_BRANDS.map((_, i) => buildBrandDaily("tobacco", i)),
+  filterRod: MATERIAL_BRANDS.map((_, i) => buildBrandDaily("filterRod", i)),
+};
+// 月序列构造 + 注入确定性超线点（保证月档异常点可见，位置随牌号错开）
+function buildBrandMonthly(key: MaterialKey, i: number): HistPoint[] {
+  const base = BRAND_VALUES[key][i];
+  const avgOffset = key === "tipPaper" ? 0.3 : key === "tobacco" ? 0.4 : key === "filterRod" ? 300 : 25;
+  const pts = genMonthly({
+    base,
+    avgBase: base + avgOffset,
+    target: BRAND_TARGET[key],
+    seed: 61 + i * 5 + Object.keys(BRAND_VALUES).indexOf(key) * 17,
+    decimals: BRAND_DECIMALS[key],
+    drift: 0,
+    waveAmp: 0.02,
+  });
+  pts[pts.length - 1 - (3 + i)].actual = injectedActual(key, base, avgOffset);
+  return autoMark(pts, BRAND_MARK_RULE[key]);
+}
+
+const BRAND_SERIES_MONTHLY: Record<MaterialKey, HistPoint[][]> = {
+  tipPaper: MATERIAL_BRANDS.map((_, i) => buildBrandMonthly("tipPaper", i)),
+  boxLabel: MATERIAL_BRANDS.map((_, i) => buildBrandMonthly("boxLabel", i)),
+  tobacco: MATERIAL_BRANDS.map((_, i) => buildBrandMonthly("tobacco", i)),
+  filterRod: MATERIAL_BRANDS.map((_, i) => buildBrandMonthly("filterRod", i)),
+};
+
+// 牌号趋势取数（日=近 90 天；未知牌号回退全口径；4 指标通用）
+export function brandSeriesView(key: MaterialKey, brand: string, range: "日" | "月"): HistPoint[] {
   const i = MATERIAL_BRANDS.indexOf(brand);
-  if (i < 0) return range === "日" ? materialDailyView("tipPaper") : MATERIAL_MONTHLY.tipPaper;
-  return range === "日" ? lastDays(BRAND_TIP_DAILY[i], 90) : BRAND_TIP_MONTHLY[i];
+  if (i < 0) return range === "日" ? materialDailyView(key) : MATERIAL_MONTHLY[key];
+  return range === "日" ? lastDays(BRAND_SERIES_DAILY[key][i], 90) : BRAND_SERIES_MONTHLY[key][i];
+}
+
+// ===== 异常明细数据（牌号层 → 机台层下钻；日/月档数值独立生成）=====
+// 机台池按车间（卷包：卷接/包装机组；制丝：制丝线）
+const MACHINES_BY_DEPT: Record<string, string[]> = {
+  卷包车间: ["卷接机1号", "卷接机2号", "卷接机3号", "包装机1号", "包装机2号", "包装机3号"],
+  制丝车间: ["制丝线1号", "制丝线2号"],
+};
+
+// 确定性伪随机（[0,1)；key/period/序号共同决定，保证日度与月度数值不同）
+function brandRnd(keyIdx: number, pIdx: number, n: number): number {
+  const x = Math.sin(keyIdx * 97.3 + pIdx * 31.7 + n * 13.7) * 10000;
+  return x - Math.floor(x);
+}
+
+// 异常明细：每指标 2~3 个异常牌号、每牌号 2~3 台异常机台；实际值超基线 1%~8%（仅异常行）；
+// 基线口径：盘纸 = 各牌号历史均值，其余 = 目标值（与趋势图异常标注口径一致）
+export function materialAnomalyRows(key: MaterialKey, period: "日" | "月"): MaterialAnomalyRows {
+  const meta = MATERIAL_META[key];
+  const keyIdx = (Object.keys(BRAND_VALUES) as MaterialKey[]).indexOf(key);
+  const pIdx = period === "日" ? 0 : 1;
+  const rnd = (n: number) => brandRnd(keyIdx, pIdx, n);
+  const d = BRAND_DECIMALS[key];
+  const round = (v: number) => Number(v.toFixed(d));
+  // 异常牌号（2~3 个，按 rnd 从 4 个牌号中不重复抽取）
+  const brandCount = 2 + Math.floor(rnd(0) * 2);
+  const order = [0, 1, 2, 3].sort((a, b) => rnd(10 + a) - rnd(10 + b));
+  const machines = MACHINES_BY_DEPT[meta.dept] ?? MACHINES_BY_DEPT["卷包车间"];
+  const rows: MaterialBrandRow[] = order.slice(0, brandCount).map((bi, rank) => {
+    // 牌号基线：盘纸取该牌号历史均值（与指标卡 brandDetails 一致），其余取目标值
+    const base = BRAND_MARK_RULE[key] === "avg"
+      ? (materialCards.find((c) => c.key === key)?.brandDetails?.[bi].avg ?? BRAND_VALUES[key][bi])
+      : (BRAND_TARGET[key] ?? BRAND_VALUES[key][bi]);
+    const actual = round(base * (1 + 0.01 + rnd(20 + rank) * 0.07)); // 超 1%~8%
+    // 异常机台（2~3 台，从车间机台池抽取）
+    const machineCount = Math.min(2 + Math.floor(rnd(40 + rank) * 2), machines.length);
+    const mOrder = machines.map((_, i) => i).sort((a, b) => rnd(60 + rank * 10 + a) - rnd(60 + rank * 10 + b));
+    return {
+      name: MATERIAL_BRANDS[bi],
+      actual,
+      base,
+      machines: mOrder.slice(0, machineCount).map((mi, mRank) => ({
+        name: machines[mi],
+        actual: round(base * (1 + 0.012 + rnd(80 + rank * 10 + mRank) * 0.078)), // 机台超 1.2%~9%
+        base,
+      })),
+    };
+  });
+  return { baseLabel: BRAND_MARK_RULE[key] === "avg" ? "历史均值" : "目标值", rows };
 }
 
 // ===== 顶部指标卡（昨日口径）=====
@@ -231,7 +351,7 @@ export interface MaterialCard {
   yoy: number; // 同比（%）
   mom: number; // 环比（%）
   downGreen: boolean; // true = 下降着绿色（单耗类）；false = 上升着绿色（生产率类）
-  brandDetails?: BrandDetail[]; // 各牌号昨日口径明细（与 MATERIAL_BRANDS 对齐，仅盘纸卡）
+  brandDetails?: BrandDetail[]; // 各牌号昨日口径明细（与 MATERIAL_BRANDS 对齐，4 个单耗卡）
 }
 
 // 牌号下钻明细：实际值 / 历史均值 / 同比 / 环比（昨日口径）
@@ -262,6 +382,12 @@ export const materialCards: MaterialCard[] = [
     target: 2480, avg: 2520,
     yoy: -2.7, mom: -0.9,
     downGreen: true,
+    brandDetails: [
+      { value: 2540, avg: 2560, yoy: -1.9, mom: 0.5 },
+      { value: 2485, avg: 2500, yoy: -2.5, mom: -0.7 },
+      { value: 2505, avg: 2520, yoy: -3.0, mom: 0.9 },
+      { value: 2455, avg: 2475, yoy: -3.6, mom: -1.2 },
+    ], // 支持下拉选择牌号查看明细
   },
   {
     key: "tobacco", label: "单箱耗烟叶量",
@@ -269,6 +395,12 @@ export const materialCards: MaterialCard[] = [
     target: 40.0, avg: 39.5,
     yoy: -4.2, mom: 1.3,
     downGreen: true,
+    brandDetails: [
+      { value: 39.2, avg: 39.6, yoy: -3.8, mom: 0.8 },
+      { value: 38.3, avg: 38.5, yoy: -4.4, mom: -0.6 },
+      { value: 38.8, avg: 39.2, yoy: -4.0, mom: 1.1 },
+      { value: 37.9, avg: 38.1, yoy: -4.7, mom: -0.9 },
+    ], // 支持下拉选择牌号查看明细
   },
   {
     key: "filterRod", label: "单箱耗嘴棒量",
@@ -276,6 +408,12 @@ export const materialCards: MaterialCard[] = [
     target: 48000, avg: 51000,
     yoy: -5.7, mom: 2.2,
     downGreen: true,
+    brandDetails: [
+      { value: 51200, avg: 51400, yoy: -5.1, mom: 1.4 },
+      { value: 49500, avg: 49800, yoy: -5.6, mom: -0.8 },
+      { value: 50300, avg: 50600, yoy: -5.3, mom: 1.0 },
+      { value: 48800, avg: 49100, yoy: -6.0, mom: -1.3 },
+    ], // 支持下拉选择牌号查看明细
   },
   {
     key: "labor", label: "在岗职工人均劳动生产率",

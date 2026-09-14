@@ -10,9 +10,9 @@ import {
   MATERIAL_BRANDS,
   MATERIAL_META,
   MATERIAL_MONTHLY,
+  brandSeriesView,
   buildMaterialAnomaly,
   materialDailyView,
-  tipPaperBrandView,
   type MaterialKey,
 } from "@/lib/mock-data/material-consumption";
 
@@ -21,8 +21,8 @@ type Range = "日" | "月";
 const NAME_MAP: Record<string, string> = { actual: "实际值", avg: "历史均值", target: "目标值" };
 
 // 辅料消耗趋势图（单指标）：实际值（蓝实线）/ 历史均值（蓝虚线）/ 目标值（橙虚线），支持日 / 月切换；
-// 盘纸支持牌号下拉下钻（全部牌号 / 牌号A~D）；
-// 异常偏差点（五色）：全部指标日/月粒度均展示；点击弹出异常详情抽屉
+// 4 个单耗指标均支持牌号下拉下钻（全部牌号 / 牌号A~D）；
+// 异常偏差点（五色）：全部指标日/月粒度均展示；点击弹出异常详情抽屉（含牌号→机台异常明细）
 export function MaterialTrendChart({
   seriesKey,
   onAnomaly,
@@ -31,16 +31,15 @@ export function MaterialTrendChart({
   onAnomaly: (d: AnomalyDetail) => void;
 }) {
   const [range, setRange] = useState<Range>("日");
-  const [brand, setBrand] = useState<string>("全部"); // 盘纸牌号下钻（其余指标不显示下拉）
+  const [brand, setBrand] = useState<string>("全部"); // 牌号下钻
   const meta = MATERIAL_META[seriesKey];
-  const isTip = seriesKey === "tipPaper";
-  const brandActive = isTip && brand !== "全部";
+  const brandActive = brand !== "全部";
   const hasTarget = MATERIAL_MONTHLY[seriesKey].some((p) => p.target !== undefined);
 
   const data = useMemo(
     () =>
       brandActive
-        ? tipPaperBrandView(brand, range)
+        ? brandSeriesView(seriesKey, brand, range)
         : range === "日"
           ? materialDailyView(seriesKey)
           : MATERIAL_MONTHLY[seriesKey],
@@ -50,30 +49,28 @@ export function MaterialTrendChart({
   function handleClick(e: any) {
     if (!e?.activeLabel) return;
     const pt = data.find((d) => d.date === e.activeLabel);
-    // 异常点支持点击查看异常详情
-    if (pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt, isTip ? brand : undefined));
+    // 异常点支持点击查看异常详情（period 随统计粒度，决定异常明细数据口径）
+    if (pt?.anomaly) onAnomaly(buildMaterialAnomaly(seriesKey, pt, brandActive ? brand : undefined, range));
   }
 
   return (
     <Card
       title={`${meta.label}趋势（${meta.unit}）`}
       headerRight={
-        // 牌号下钻下拉（仅盘纸）+ 统计粒度切换：标题右侧，与标题高度对齐
+        // 牌号下钻下拉 + 统计粒度切换：标题右侧，与标题高度对齐
         <div className="flex items-center gap-2">
-          {isTip && (
-            <select
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              className="px-2.5 py-1 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-            >
-              <option value="全部">全部牌号</option>
-              {MATERIAL_BRANDS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            className="px-2.5 py-1 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+          >
+            <option value="全部">全部牌号</option>
+            {MATERIAL_BRANDS.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
           <SegmentedControl
             options={[
               { value: "日", label: "日" },

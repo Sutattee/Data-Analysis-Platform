@@ -1,29 +1,22 @@
 "use client";
 
 // 指标值维护：维护无法通过业务系统自动获取、需人工填报的指标数据（如企业工业总产值）
-// 筛选（指标名称 / 统计对象 / 统计周期 / 数据类型）+ 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
+// 筛选（指标搜索 / 统计周期）+ 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { MetricValueFormDrawer } from "@/components/settings/MetricValueFormDrawer";
 import {
-  STAT_OBJECTS,
+  MAINTAINABLE_METRICS,
   listMetricValues,
   monthLabel,
   periodLabel,
   removeMetricValue,
 } from "@/lib/mock-data/metric-values";
-import { metricList } from "@/lib/mock-data/metric-management";
 import type { MetricValueRecord } from "@/types";
-
-// 数据类型徽标：当期值=default / 累计值=info 风
-function DataTypeBadge({ dataType }: { dataType: MetricValueRecord["dataType"] }) {
-  return <Badge variant={dataType === "累计值" ? "success" : "default"}>{dataType}</Badge>;
-}
 
 // 只读字段（查看弹窗用）
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -50,10 +43,8 @@ export default function MetricValuePage() {
   const [rows, setRows] = useState<MetricValueRecord[]>(() => listMetricValues());
 
   // 筛选条件
-  const [fMetric, setFMetric] = useState("all");
-  const [fObject, setFObject] = useState("all");
+  const [fKeyword, setFKeyword] = useState("");
   const [fMonth, setFMonth] = useState("");
-  const [fType, setFType] = useState("all");
 
   // 交互态
   const [loading, setLoading] = useState(true);
@@ -66,28 +57,28 @@ export default function MetricValuePage() {
     setLoading(true);
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
-  }, [fMetric, fObject, fMonth, fType]);
+  }, [fKeyword, fMonth]);
 
-  // 过滤：指标名称 / 统计对象 / 统计周期（记录周期覆盖所选月份）/ 数据类型
+  // 过滤：指标关键词（名称/编码模糊匹配）/ 统计周期（记录周期覆盖所选月份）
   const filtered = useMemo(() => {
+    const kw = fKeyword.trim().toLowerCase();
     return rows.filter((r) => {
-      if (fMetric !== "all" && r.metricId !== fMetric) return false;
-      if (fObject !== "all" && r.statObject !== fObject) return false;
-      if (fType !== "all" && r.dataType !== fType) return false;
+      if (kw) {
+        const code = (MAINTAINABLE_METRICS.find((m) => m.id === r.metricId)?.code ?? "").toLowerCase();
+        if (!r.metricName.toLowerCase().includes(kw) && !code.includes(kw)) return false;
+      }
       if (fMonth && !(r.periodStart <= fMonth && r.periodEnd >= fMonth)) return false;
       return true;
     });
-  }, [rows, fMetric, fObject, fMonth, fType]);
+  }, [rows, fKeyword, fMonth]);
 
   function reload() {
     setRows(listMetricValues());
   }
 
   function handleReset() {
-    setFMetric("all");
-    setFObject("all");
+    setFKeyword("");
     setFMonth("");
-    setFType("all");
   }
 
   function confirmDelete() {
@@ -100,7 +91,7 @@ export default function MetricValuePage() {
 
   // 指标小数位（列表指标值格式化用）
   const decimalsOf = (metricId: string) =>
-    metricList.find((m) => m.id === metricId)?.decimals ?? 2;
+    MAINTAINABLE_METRICS.find((m) => m.id === metricId)?.decimals ?? 2;
 
   const th = "text-left px-4 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
 
@@ -113,22 +104,14 @@ export default function MetricValuePage() {
       {/* 筛选区 + 新增按钮 */}
       <Card padding>
         <div className="flex flex-wrap items-center gap-2">
-          <select className={selectCls} value={fMetric} onChange={(e) => setFMetric(e.target.value)}>
-            <option value="all">指标名称：全部</option>
-            {metricList.map((m) => (
-              <option key={m.id} value={m.id}>
-                指标名称：{m.nameCn}
-              </option>
-            ))}
-          </select>
-          <select className={selectCls} value={fObject} onChange={(e) => setFObject(e.target.value)}>
-            <option value="all">统计对象：全部</option>
-            {STAT_OBJECTS.map((o) => (
-              <option key={o} value={o}>
-                统计对象：{o}
-              </option>
-            ))}
-          </select>
+          {/* 指标搜索框：按指标名称/编码模糊匹配 */}
+          <input
+            type="text"
+            className={`${selectCls} w-56`}
+            value={fKeyword}
+            onChange={(e) => setFKeyword(e.target.value)}
+            placeholder="搜索指标"
+          />
           <input
             type="month"
             className={selectCls}
@@ -137,11 +120,6 @@ export default function MetricValuePage() {
             title="筛选统计周期覆盖该月份的记录"
           />
           {fMonth && <span className="text-xs text-gray-400">{monthLabel(fMonth)}处于统计周期内</span>}
-          <select className={selectCls} value={fType} onChange={(e) => setFType(e.target.value)}>
-            <option value="all">数据类型：全部</option>
-            <option value="当期值">数据类型：当期值</option>
-            <option value="累计值">数据类型：累计值</option>
-          </select>
           <Button variant="secondary" onClick={handleReset}>
             重置
           </Button>
@@ -158,9 +136,7 @@ export default function MetricValuePage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className={th}>指标名称</th>
-                <th className={th}>统计对象</th>
                 <th className={th}>统计周期</th>
-                <th className={th}>数据类型</th>
                 <th className={th}>指标值</th>
                 <th className={th}>单位</th>
                 <th className={th}>数据来源</th>
@@ -172,13 +148,13 @@ export default function MetricValuePage() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
                     加载中…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
                     暂无符合条件的指标值记录
                   </td>
                 </tr>
@@ -186,11 +162,7 @@ export default function MetricValuePage() {
                 filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.metricName}</td>
-                    <td className="px-4 py-3 text-gray-600">{r.statObject}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">{periodLabel(r)}</td>
-                    <td className="px-4 py-3">
-                      <DataTypeBadge dataType={r.dataType} />
-                    </td>
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                       {fmtValue(r.value, decimalsOf(r.metricId))}
                     </td>
@@ -234,7 +206,7 @@ export default function MetricValuePage() {
         </div>
         {!loading && (
           <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
-            共 {filtered.length} 条；相同指标、统计对象、统计周期和数据类型不得重复；删除后的记录不再参与指标计算和数据分析
+            共 {filtered.length} 条；相同指标和统计周期不得重复；删除后的记录不再参与指标计算和数据分析
           </div>
         )}
       </Card>
@@ -257,9 +229,7 @@ export default function MetricValuePage() {
         {viewTarget && (
           <div className="space-y-2.5">
             <Field label="指标名称" value={viewTarget.metricName} />
-            <Field label="统计对象" value={viewTarget.statObject} />
             <Field label="统计周期" value={periodLabel(viewTarget)} />
-            <Field label="数据类型" value={<DataTypeBadge dataType={viewTarget.dataType} />} />
             <Field
               label="指标值"
               value={`${fmtValue(viewTarget.value, decimalsOf(viewTarget.metricId))} ${viewTarget.unit}`}

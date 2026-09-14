@@ -8,7 +8,12 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS, PRODUCTION_MATERIAL_METRICS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
-import type { AnomalyDetail, AnomalyGridRow } from "@/lib/mock-data/grid-forecast";
+import type {
+  AnomalyDetail,
+  AnomalyGridRow,
+  MaterialBrandRow,
+  MaterialAnomalyRows,
+} from "@/lib/mock-data/grid-forecast";
 import { AnomalyAiPanel } from "./AnomalyAiPanel";
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -119,6 +124,99 @@ function GridDetailBlock({
   );
 }
 
+// 异常明细数据（辅料消耗）：牌号层表格，点击牌号名称（蓝色 + >）下钻至机台层，「返回上级」回到牌号层；
+// 对比基线列名随口径：盘纸 = 历史均值，其余指标 = 目标值（baseLabel 给出）
+function MaterialDetailBlock({
+  materialRows,
+  drilled,
+  onDrill,
+}: {
+  materialRows: MaterialAnomalyRows;
+  drilled: MaterialBrandRow | null;
+  onDrill: (b: MaterialBrandRow | null) => void;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 text-xs font-semibold text-gray-500">异常明细数据</h4>
+      <div className="overflow-hidden rounded-lg border border-gray-100">
+        {!drilled ? (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500">
+                <th className="px-3 py-2 text-left font-medium">牌号名称</th>
+                <th className="px-3 py-2 text-right font-medium">实际值</th>
+                <th className="px-3 py-2 text-right font-medium">{materialRows.baseLabel}</th>
+                <th className="px-3 py-2 text-right font-medium">偏差率</th>
+                <th className="px-3 py-2 text-left font-medium">监测状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              {materialRows.rows.map((b) => {
+                // 偏差率 =（实际值 − 基线）÷ 基线 × 100%
+                const rate = ((b.actual - b.base) / b.base) * 100;
+                return (
+                  <tr key={b.name} className="border-t border-gray-50">
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onDrill(b)}
+                        className="font-medium text-primary-600 transition-colors hover:text-primary-700"
+                      >
+                        {b.name}&gt;
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-800">{b.actual.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{b.base.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-orange-500">+{rate.toFixed(1)}%</td>
+                    <td className="px-3 py-2 text-red-500">异常</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div>
+            {/* 机台层顶部：返回上级按钮 */}
+            <div className="border-b border-gray-50 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => onDrill(null)}
+                className="text-xs font-medium text-primary-600 transition-colors hover:text-primary-700"
+              >
+                ← 返回上级
+              </button>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 text-gray-500">
+                  <th className="px-3 py-2 text-left font-medium">机台名称</th>
+                  <th className="px-3 py-2 text-right font-medium">实际值</th>
+                  <th className="px-3 py-2 text-right font-medium">{materialRows.baseLabel}</th>
+                  <th className="px-3 py-2 text-right font-medium">偏差率</th>
+                  <th className="px-3 py-2 text-left font-medium">监测状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drilled.machines.map((m) => (
+                  <tr key={m.name} className="border-t border-gray-50">
+                    <td className="px-3 py-2 text-gray-800">{m.name}</td>
+                    <td className="px-3 py-2 text-right text-gray-800">{m.actual.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-gray-500">{m.base.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-orange-500">
+                      +{(((m.actual - m.base) / m.base) * 100).toFixed(1)}%
+                    </td>
+                    <td className="px-3 py-2 text-red-500">异常</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AnomalyDrawer({
   open,
   onClose,
@@ -155,8 +253,9 @@ export function AnomalyDrawer({
   const [aiFilledText, setAiFilledText] = useState<string | undefined>(undefined);
   // AI 辅助对话面板
   const [aiOpen, setAiOpen] = useState(false);
-  // 异常明细数据下钻：当前展开的网格（null = 网格层）
+  // 异常明细数据下钻：当前展开的网格（null = 网格层）/ 牌号（null = 牌号层）
   const [drillGrid, setDrillGrid] = useState<AnomalyGridRow | null>(null);
+  const [drillMaterial, setDrillMaterial] = useState<MaterialBrandRow | null>(null);
 
   // —— 处置建议编辑态 ——
   const [suggestionEditing, setSuggestionEditing] = useState(false);
@@ -174,6 +273,7 @@ export function AnomalyDrawer({
     setSuggestionDraft("");
     setSavedSuggestion(undefined);
     setDrillGrid(null);
+    setDrillMaterial(null);
   }, [detail]);
 
   const baseCause = detail?.cause ?? rec?.causeSummary;
@@ -242,7 +342,7 @@ export function AnomalyDrawer({
                 router.push(`${base}/${rec.id}`);
               }}
             >
-              查看告警记录详情
+              查看告警详情
             </Button>
           </div>
         ) : undefined
@@ -280,6 +380,15 @@ export function AnomalyDrawer({
           {/* 异常明细数据（网格层 → 设备层下钻；电耗类异常携带） */}
           {detail?.gridDetails && detail.gridDetails.length > 0 && (
             <GridDetailBlock rows={detail.gridDetails} drilled={drillGrid} onDrill={setDrillGrid} />
+          )}
+
+          {/* 异常明细数据（牌号层 → 机台层下钻；辅料消耗类异常携带，日/月档数值不同） */}
+          {detail?.materialRows && detail.materialRows.rows.length > 0 && (
+            <MaterialDetailBlock
+              materialRows={detail.materialRows}
+              drilled={drillMaterial}
+              onDrill={setDrillMaterial}
+            />
           )}
 
           {/* 异常原因（AI 综合分析，可补充 / 修正） */}

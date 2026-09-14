@@ -110,6 +110,46 @@ const ICON_MAP: Record<string, React.ReactNode> = {
     </svg>
   ),
 
+  // ===== 费用预算执行 / 生产管理板块 =====
+  // 业务构成：收据票据（锯齿底边 + 明细行）
+  "🧾": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#06B6D4" />
+      <path d="M6 4.5H14V15.5L12.7 14.6L11.4 15.5L10 14.6L8.6 15.5L7.3 14.6L6 15.5Z" fill="white" />
+      <rect x="8" y="7" width="4" height="1.2" rx="0.6" fill="#06B6D4" />
+      <rect x="8" y="9.5" width="4" height="1.2" rx="0.6" fill="#06B6D4" opacity="0.7" />
+      <rect x="8" y="12" width="2.5" height="1.2" rx="0.6" fill="#06B6D4" opacity="0.5" />
+    </svg>
+  ),
+  // 设备运行效率：八齿齿轮
+  "⚙️": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#6366F1" />
+      <g fill="white">
+        <rect x="9" y="3" width="2" height="3" rx="0.5" />
+        <rect x="9" y="14" width="2" height="3" rx="0.5" />
+        <rect x="3" y="9" width="3" height="2" rx="0.5" />
+        <rect x="14" y="9" width="3" height="2" rx="0.5" />
+        <rect x="9" y="3" width="2" height="3" rx="0.5" transform="rotate(45 10 10)" />
+        <rect x="9" y="3" width="2" height="3" rx="0.5" transform="rotate(135 10 10)" />
+        <rect x="9" y="3" width="2" height="3" rx="0.5" transform="rotate(225 10 10)" />
+        <rect x="9" y="3" width="2" height="3" rx="0.5" transform="rotate(315 10 10)" />
+      </g>
+      <circle cx="10" cy="10" r="4.2" fill="white" />
+      <circle cx="10" cy="10" r="1.8" fill="#6366F1" />
+    </svg>
+  ),
+  // 辅料消耗：绕线线轴（上下法兰 + 绕线纹理）
+  "🧵": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#F97316" />
+      <rect x="5.5" y="3.5" width="9" height="2.5" rx="1" fill="white" />
+      <rect x="5.5" y="14" width="9" height="2.5" rx="1" fill="white" />
+      <rect x="7" y="6" width="6" height="8" fill="white" opacity="0.9" />
+      <path d="M7 7.8H13M7 9.9H13M7 12H13" stroke="#F97316" strokeWidth="0.9" strokeLinecap="round" />
+    </svg>
+  ),
+
   // ===== 一级导航 =====
   "🏠": (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">

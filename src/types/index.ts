@@ -152,6 +152,7 @@ export interface User {
   nickname?: string; // 我的名称(昵称)
   alias?: string;    // 我的别名(备注名)
   email?: string;    // 邮箱
+  dept?: string;     // 所属部门（部门管理员账号绑定，业务构成页按此过滤）
 }
 
 // ========== 管理后台（原配置中心）==========
@@ -349,7 +350,7 @@ export type AlertLevel = "提示" | "关注" | "预警" | "告警" | "危险";
 export type AlertType = "当前异常" | "预测风险";
 
 // 业务领域
-export type AlertDomain = "生产管理" | "工艺质量" | "能源消耗";
+export type AlertDomain = "生产管理" | "工艺质量" | "能源消耗" | "费用预算执行";
 
 // 一条告警记录
 export interface AlertRecord {
@@ -367,6 +368,12 @@ export interface AlertRecord {
   baselineLabel: string;      // 基准 / 阈值
   deviationValue: string;     // 偏离值（带方向与单位，如 +220.47 kWh）
   deviationRate: string;      // 偏离率（带方向，如 +647.8%）
+  // —— 费用预算执行扩展（列表「数据指标/执行进度偏差」列与详情三件套）——
+  metricLabel?: string;       // 原始指标名（不带"-执行进度偏差"后缀，如「日常招待费」）
+  subjectPath?: string;       // 预算科目全路径（费用科目筛选用）
+  executionRate?: string;     // 预算执行率（如 "50.1%"）
+  planProgress?: string;      // 计划执行进度（如 "66.4%"）
+  deviationLabel?: string;    // 执行进度偏差（如 "+22pct"）
   confidenceRange?: string;   // 置信区间（仅预测风险）
   duration?: string;          // 持续时间（仅当前异常）
   forecastTime?: string;      // 预计越界时间（仅预测风险）
@@ -376,7 +383,7 @@ export interface AlertRecord {
   triggerCondition: string;   // 触发条件
   // —— 原因与处置建议 ——
   causeSummary?: string;      // 异常原因（空表示暂未识别到明确原因）
-  causeType?: "AI生成" | "人工补录"; // 原因类型（causeSummary 存在时有值）
+  causeType?: "AI生成" | "AI生成·人工修正" | "人工补录"; // 原因类型（causeSummary 存在时有值）
   suggestion?: string;        // 处置建议
   // —— 责任与处理情况 ——
   receiver: string;           // 接收人
@@ -388,7 +395,7 @@ export interface AlertRecord {
 }
 
 // ========== 告警管理（数据告警策略）==========
-export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间";
+export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间" | "处于区间";
 export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "历史均值" | "正常区间";
 export type AlertDetectCycle = "每小时" | "每日" | "每月";
 export type AlertScope = "全部适用对象" | "指定对象"; // 保留类型兼容；新表单固定为指定对象
@@ -477,7 +484,7 @@ export interface MetricValueRecord {
 }
 
 // ========== 目标值管理（指标详情内，版本化） ==========
-export type TargetPeriod = "月度" | "季度" | "年度";
+export type TargetPeriod = "日度" | "月度" | "季度" | "年度";
 
 // 判断方向（单值方向用 value；"处于目标区间"用 lower/upper）
 export type TargetDirection = "<" | "≤" | ">" | "≥" | "=" | "处于目标区间";
@@ -664,8 +671,8 @@ export interface ObjectRelation {
 }
 
 // ========== 首页最近访问 ==========
-// 所属板块（首页三板块：生产管理 / 工艺质量 / 能源消耗）
-export type VisitBoard = "生产管理" | "工艺质量" | "能源消耗";
+// 所属板块（首页板块：生产管理 / 工艺质量 / 能源消耗 / 费用预算执行）
+export type VisitBoard = "生产管理" | "工艺质量" | "能源消耗" | "费用预算执行";
 
 // 内容类型（对应不同的打开方式）
 export type VisitContentType =

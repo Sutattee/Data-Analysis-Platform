@@ -25,15 +25,24 @@ const ENERGY_NAV: NavItem[] = [
 // 一级导航（顶部横向）
 export const PRIMARY_NAV: NavItem[] = [
   { label: "首页",       href: "/home",         icon: "🏠" },
+  { label: "费用预算执行", href: "/expense", icon: "💰", children: [
+    { label: "费用总览", href: "/expense/overview", icon: "📊" },
+    { label: "费用分析", href: "/expense/analysis", icon: "📈", children: [
+      { label: "全部费用", href: "/expense/analysis/all", icon: "🗂️" },
+      { label: "运营成本", href: "/expense/analysis/operating-cost", icon: "🏭" },
+      { label: "可控费用", href: "/expense/analysis/per-box-cost", icon: "📦" },
+    ]},
+    { label: "业务构成", href: "/expense/business-composition", icon: "🧾" },
+    { label: "告警中心", href: "/expense/alert", icon: "⚠️", children: [
+      { label: "告警记录", href: "/expense/alert/records",    icon: "📋" },
+      { label: "告警管理", href: "/expense/alert/management", icon: "🛠️" },
+    ]},
+  ], matchPrefixes: ["/expense"] },
   { label: "智能驾驶舱", href: "/cockpit",      icon: "🛰️" },
   { label: "生产管理",   href: "/production",   icon: "🏭", children: [
     { label: "设备运行效率", href: "/production/equipment-efficiency", icon: "⚙️" },
     { label: "辅料消耗", href: "/production/materials", icon: "🧵" },
     { label: "预测分析", href: "/production/forecast",  icon: "📈" },
-    { label: "重大事件", href: "/production/major-events", icon: "🗓️", children: [
-      { label: "事件列表", href: "/production/major-events/events",  icon: "📋" },
-      { label: "事件报告", href: "/production/major-events/reports", icon: "📚" },
-    ]},
     { label: "告警中心", href: "/production/alert", icon: "⚠️", children: [
       { label: "告警记录", href: "/production/alert/records",    icon: "📋" },
       { label: "告警管理", href: "/production/alert/management", icon: "🛠️" },
@@ -102,6 +111,13 @@ export const DEFAULT_USER = {
   alias: "",
   email: "admin@yongshan.com",
 };
+
+// 部门管理员演示账号（业务构成页按 dept 过滤本部门预算指标）
+export const DEPT_USERS = [
+  { id: "u2", username: "bangong", password: "123456", phone: "13800000002", role: "部门管理员", nickname: "厂部办公室管理员", alias: "", email: "bangong@yongshan.com", dept: "厂部办公室" },
+  { id: "u3", username: "caiwu",   password: "123456", phone: "13800000003", role: "部门管理员", nickname: "财务科管理员",   alias: "", email: "caiwu@yongshan.com",   dept: "财务科" },
+  { id: "u4", username: "juanbao", password: "123456", phone: "13800000004", role: "部门管理员", nickname: "卷包车间管理员", alias: "", email: "juanbao@yongshan.com", dept: "卷包车间" },
+];
 
 // 主题色
 export const PRIMARY_COLOR = "#2563eb";

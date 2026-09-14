@@ -28,6 +28,24 @@ export interface AnomalyGridRow {
   devices: AnomalyDeviceRow[]; // 设备层明细（下钻展示）
 }
 
+// 异常明细数据（辅料消耗类异常：牌号层行，点击牌号名称可下钻至机台层）
+// base 口径：盘纸 = 历史均值，其余指标 = 目标值（baseLabel 随口径给出）
+export interface MaterialMachineRow {
+  name: string; // 机台名称
+  actual: number; // 实际值（按指标单位）
+  base: number; // 对比基线（历史均值 / 目标值，与牌号层同口径）
+}
+export interface MaterialBrandRow {
+  name: string; // 牌号名称
+  actual: number; // 实际值（按指标单位）
+  base: number; // 对比基线（历史均值 / 目标值）
+  machines: MaterialMachineRow[]; // 机台层明细（下钻展示）
+}
+export interface MaterialAnomalyRows {
+  baseLabel: "历史均值" | "目标值"; // 明细表对比基线列名
+  rows: MaterialBrandRow[];
+}
+
 // 异常详情（抽屉展示，可由告警记录或趋势异常点构造）
 export interface AnomalyDetail {
   title: string;
@@ -44,9 +62,10 @@ export interface AnomalyDetail {
   causeType?: "AI生成" | "人工补录"; // 原因类型（cause 存在时有值）
   suggestion?: string;
   dept?: string; // 部门 / 车间（能源总览等页面构造的异常携带）
-  recordId?: string; // 存在时抽屉显示「查看告警记录详情」
+  recordId?: string; // 存在时抽屉显示「查看告警详情」
   level?: AlertLevel; // 告警等级（与告警记录页一致）
   gridDetails?: AnomalyGridRow[]; // 异常明细数据（网格层，可下钻至设备层；电耗类异常携带）
+  materialRows?: MaterialAnomalyRows; // 异常明细数据（牌号层，可下钻至机台层；辅料消耗类异常携带）
 }
 
 export const GRADE_STYLE: Record<EvalGrade, { color: string; soft: string; text: string }> = {
@@ -58,23 +77,15 @@ export const GRADE_STYLE: Record<EvalGrade, { color: string; soft: string; text:
   危险: { color: "#b91c1c", soft: "bg-red-100", text: "text-red-800" },
 };
 
-// 告警等级五色（趋势图异常点与图例统一使用）：提示蓝灰 / 关注黄 / 预警橙 / 告警红 / 危险深红
-export const ALERT_LEVEL_COLOR: Record<AlertLevel, string> = {
-  提示: "#64748b",
-  关注: "#eab308",
-  预警: "#f97316",
-  告警: "#ef4444",
-  危险: "#b91c1c",
-};
+// 告警等级五色与等级优先级迁至零依赖的 alert-levels.ts（避免 mock-data 循环依赖），此处 re-export 保持既有引用兼容
+export { ALERT_LEVEL_COLOR, LEVEL_RANK } from "./alert-levels";
+import { LEVEL_RANK } from "./alert-levels";
 
 export const FORECAST_STATUS_STYLE: Record<ForecastStatus, { color: string; soft: string; text: string }> = {
   预计达标: { color: "#16a34a", soft: "bg-green-50", text: "text-green-700" },
   存在超标风险: { color: "#f97316", soft: "bg-orange-50", text: "text-orange-700" },
   预计超标: { color: "#ef4444", soft: "bg-red-50", text: "text-red-700" },
 };
-
-// 等级优先级（用于异常排序）
-export const LEVEL_RANK: Record<AlertLevel, number> = { 提示: 1, 关注: 2, 预警: 3, 告警: 4, 危险: 5 };
 
 // 越低越好的指标评级：ratio = value/target
 export function gradeOfLowerBetter(value: number, target: number): EvalGrade {

@@ -9,17 +9,12 @@ const LEVEL_STYLE: Record<AlertLevel, string> = {
   关注: "bg-yellow-100 text-yellow-700", // 黄色
   预警: "bg-orange-100 text-orange-700", // 橙色
   告警: "bg-red-100 text-red-700",       // 红色
-  危险: "bg-red-700 text-white",         // 深红 + 危险图标
+  危险: "bg-red-700 text-white",         // 深红
 };
 
-// 等级标签（危险档附带危险图标）
+// 等级标签
 export function AlertLevelBadge({ level }: { level: AlertLevel }) {
-  return (
-    <span className={`${TAG_BASE} ${LEVEL_STYLE[level]}`}>
-      {level === "危险" && <span aria-hidden>⚠️</span>}
-      {level}
-    </span>
-  );
+  return <span className={`${TAG_BASE} ${LEVEL_STYLE[level]}`}>{level}</span>;
 }
 
 // 网格监测状态：正常 = 绿色普通标签，其余五级复用告警等级配色

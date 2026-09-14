@@ -11,6 +11,9 @@ import type {
 import { metricList } from "./metric-management";
 import { activeTargetOf } from "./metric-targets";
 import { PRODUCTION_MATERIAL_METRICS } from "./alerts";
+import {
+  EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseDeptsOfMetric, expenseMetricDefOf,
+} from "./expense-alerts";
 import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
@@ -27,6 +30,7 @@ export const OPERATOR_BASELINE_MAP: Record<AlertOperator, AlertBaselineType[]> =
   "≠": ["目标值", "基准值", "上限", "下限", "历史均值"],
   "=": ["目标值", "基准值", "上限", "下限", "历史均值"],
   "超出正常区间": ["正常区间"],
+  "处于区间": ["正常区间"], // 仅费用口径表单使用（落入选定区间即触发）
 };
 export const ALERT_DETECT_CYCLES: AlertDetectCycle[] = ["每小时", "每日", "每月"];
 export const ALERT_SCOPE_OPTIONS: AlertScope[] = ["全部适用对象", "指定对象"]; // 保留常量供历史数据展示
@@ -46,7 +50,10 @@ export const FORECAST_METRIC_OPTIONS: string[] = [
 ];
 
 // 指标定义（id + 单位），供触发条件按指标带出单位 / 带入目标值
+// 费用预算执行告警指标（如「日常差旅费-执行进度偏差」）单位固定 pct
 export function metricDefOf(name: string): { id: string; unit: string } | undefined {
+  const expense = expenseMetricDefOf(name);
+  if (expense) return expense;
   const m = metricList.find((x) => x.nameCn === name);
   return m ? { id: m.id, unit: m.unit } : undefined;
 }
@@ -70,6 +77,7 @@ export const METRIC_HISTORICAL_AVG: Record<string, string> = {
   生产效率: "94.3",
   烘丝机出口水分偏差: "0.32",
   百小时停机断料率: "4.15",
+  台时产量: "1085",
 };
 
 // 最新历史均值（基准类型=历史均值时系统自动带入，不支持编辑；无数据返回空串）
@@ -123,6 +131,17 @@ function joinUnit(unit: string): string {
 }
 
 export function formatCondition(c: AlertCondition): string {
+  // 费用口径：区间类（处于区间 / 超出正常区间）数值拆分各自紧跟 pct（如 处于区间 15 pct - 20 pct）；单值比较直接 `> 20 pct`
+  if (EXPENSE_ALERT_METRIC_NAMES.has(c.metric)) {
+    const name = c.metric.endsWith(EXPENSE_ALERT_METRIC_SUFFIX)
+      ? c.metric.slice(0, -EXPENSE_ALERT_METRIC_SUFFIX.length)
+      : c.metric;
+    if (c.operator === "处于区间" || c.operator === "超出正常区间") {
+      const [lo = "", hi = ""] = c.baselineValue.split("～");
+      return `${name} 执行进度偏差 ${c.operator} ${lo} pct - ${hi} pct`;
+    }
+    return `${name} 执行进度偏差 ${c.operator} ${c.baselineValue} pct`;
+  }
   const unit = metricDefOf(c.metric)?.unit ?? "";
   let base: string;
   if (c.baselineType === "正常区间") {
@@ -146,6 +165,7 @@ export function formatConditions(s: { conditions: AlertCondition[]; relation: "�
 // 根据数据指标推断业务域（无需用户填写，映射自指标管理的业务域）
 export function domainOfMetric(metric: string): AlertDomain {
   if (!metric) return "生产管理";
+  if (EXPENSE_ALERT_METRIC_NAMES.has(metric)) return "费用预算执行";
   const domain = metricList.find((m) => m.nameCn === metric)?.domain;
   if (domain === "能源管理") return "能源消耗";
   if (domain === "质量管理" || domain === "工艺质量") return "工艺质量";
@@ -897,6 +917,72 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
     repeatAlert: false,
     enabled: true,
     updatedAt: "2026-05-27 14:20",
+  },
+  // ========== 费用预算执行 · 执行进度偏差策略（告警对象=指标关联部门，自动带入） ==========
+  {
+    id: "AS-041",
+    name: "日常差旅费执行进度偏差告警策略",
+    description: "日常差旅费执行进度偏差超出 ±3pct 正常区间即告警",
+    type: "当前异常",
+    domain: "费用预算执行",
+    scope: "指定对象",
+    objects: expenseDeptsOfMetric(`日常差旅费${EXPENSE_ALERT_METRIC_SUFFIX}`),
+    conditions: [
+      { metric: `日常差旅费${EXPENSE_ALERT_METRIC_SUFFIX}`, operator: "超出正常区间", baselineType: "正常区间", baselineValue: "-3～+3" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每月",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["张伟", "李强"],
+    repeatAlert: true,
+    repeatCount: 3,
+    repeatInterval: 10,
+    enabled: true,
+    updatedAt: "2026-07-28 09:30",
+  },
+  {
+    id: "AS-042",
+    name: "外购电费执行进度偏差预警策略",
+    description: "外购电费执行进度偏差偏离 5-10pct 区间预警关注",
+    type: "当前异常",
+    domain: "费用预算执行",
+    scope: "指定对象",
+    objects: expenseDeptsOfMetric(`外购电费${EXPENSE_ALERT_METRIC_SUFFIX}`),
+    conditions: [
+      { metric: `外购电费${EXPENSE_ALERT_METRIC_SUFFIX}`, operator: "超出正常区间", baselineType: "正常区间", baselineValue: "-3～+3" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每月",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["王芳"],
+    repeatAlert: false,
+    enabled: true,
+    updatedAt: "2026-07-23 11:05",
+  },
+  {
+    id: "AS-043",
+    name: "日常办公用品执行进度偏差提示策略",
+    description: "日常办公用品执行进度偏差超出 ±3pct 提示（停用示例）",
+    type: "当前异常",
+    domain: "费用预算执行",
+    scope: "指定对象",
+    objects: expenseDeptsOfMetric(`日常办公用品${EXPENSE_ALERT_METRIC_SUFFIX}`),
+    conditions: [
+      { metric: `日常办公用品${EXPENSE_ALERT_METRIC_SUFFIX}`, operator: "超出正常区间", baselineType: "正常区间", baselineValue: "-3～+3" },
+    ],
+    relation: "且",
+    level: "提示",
+    detectCycle: "每月",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["陈静"],
+    repeatAlert: false,
+    enabled: false,
+    updatedAt: "2026-07-16 15:45",
   },
 ] as AlertStrategy[]).map((s) => ({ ...s, notifyTemplate: defaultNotifyTemplate() }));
 

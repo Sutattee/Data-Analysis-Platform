@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from "react";
 import { User, QaMessage, RecentVisit } from "@/types";
-import { DEFAULT_USER } from "@/lib/constants";
+import { DEFAULT_USER, DEPT_USERS } from "@/lib/constants";
 import { getLocal, setLocal } from "@/lib/utils";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 
@@ -295,6 +295,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // 模拟登录验证
     if (username === DEFAULT_USER.username && password === DEFAULT_USER.password) {
       dispatch({ type: "LOGIN", payload: { id: "u1", username: DEFAULT_USER.username, password: "", phone: DEFAULT_USER.phone, role: DEFAULT_USER.role, nickname: DEFAULT_USER.nickname, alias: DEFAULT_USER.alias, email: DEFAULT_USER.email } });
+      return true;
+    }
+    // 部门管理员演示账号（业务构成页按 dept 过滤）
+    const deptUser = DEPT_USERS.find((u) => u.username === username && u.password === password);
+    if (deptUser) {
+      const { password: _pw, ...rest } = deptUser;
+      dispatch({ type: "LOGIN", payload: { ...rest, password: "" } });
       return true;
     }
     const savedUser = getLocal<User | null>("app_user", null);

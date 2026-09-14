@@ -1,4 +1,8 @@
 import type { MetricValueRecord } from "@/types";
+import { metricList } from "./metric-management";
+
+// 可维护指标值口径：排除「在岗职工平均人数」（该指标无需人工维护指标值）
+export const MAINTAINABLE_METRICS = metricList.filter((m) => m.id !== "m19");
 
 /**
  * 指标值维护 —— 模拟数据 + 会话级 store（刷新还原）。
@@ -62,37 +66,6 @@ let records: MetricValueRecord[] = [
     createdAt: "2026-08-05 09:20",
   },
   {
-    id: "mv-004",
-    metricId: "m19",
-    metricName: "在岗职工平均人数",
-    statObject: "什邡卷烟厂",
-    periodStart: "2026-01",
-    periodEnd: "2026-08",
-    dataType: "累计值",
-    value: 1200,
-    unit: "人",
-    source: "人力资源部手工填报",
-    remark: "含劳务派遣 32 人",
-    createdBy: "苏恒",
-    createdAt: "2026-09-01 11:00",
-  },
-  {
-    id: "mv-005",
-    metricId: "m19",
-    metricName: "在岗职工平均人数",
-    statObject: "什邡卷烟厂",
-    periodStart: "2026-08",
-    periodEnd: "2026-08",
-    dataType: "当期值",
-    value: 1205,
-    unit: "人",
-    source: "人力资源部手工填报",
-    createdBy: "苏恒",
-    createdAt: "2026-09-01 11:05",
-    updatedBy: "苏恒",
-    updatedAt: "2026-09-01 16:40",
-  },
-  {
     id: "mv-006",
     metricId: "m18",
     metricName: "工业总产值",
@@ -105,21 +78,6 @@ let records: MetricValueRecord[] = [
     source: "卷包车间月末快报",
     createdBy: "王五",
     createdAt: "2026-09-03 09:15",
-  },
-  {
-    id: "mv-007",
-    metricId: "m19",
-    metricName: "在岗职工平均人数",
-    statObject: "动力车间",
-    periodStart: "2026-08",
-    periodEnd: "2026-08",
-    dataType: "当期值",
-    value: 86,
-    unit: "人",
-    source: "动力车间手工填报",
-    remark: "8月新增调岗 2 人",
-    createdBy: "李四",
-    createdAt: "2026-09-03 10:00",
   },
   {
     id: "mv-008",

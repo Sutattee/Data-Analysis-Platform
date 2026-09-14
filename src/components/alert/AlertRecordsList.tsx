@@ -17,6 +17,7 @@ import {
   EMPTY_ORG_FILTER,
   type OrgFilter,
 } from "@/lib/mock-data/alerts";
+import { EXPENSE_ALERT_METRIC_NAMES } from "@/lib/mock-data/expense-alerts";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
 import type { AlertRecord } from "@/types";
 
@@ -44,16 +45,20 @@ const dateCls = selectCls;
 type Phase = "loading" | "success" | "error";
 type SortMode = "default" | "time_desc" | "time_asc";
 
-// metrics：指标白名单。传入 → 仅展示白名单指标的记录（生产管理告警中心）；
-// 不传 → 展示全部并排除生产辅料记录（能源告警中心维持原有口径）
-export function AlertRecordsList({ metrics }: { metrics?: string[] }) {
+// metrics：指标白名单。传入 → 仅展示白名单指标的记录（生产管理/费用预算执行告警中心）；
+// 不传 → 展示全部并排除生产辅料与费用预算执行记录（能源告警中心维持原有口径）
+// basePath：详情跳转前缀（费用预算执行传 /expense/alert/records；缺省按 metrics 二分保持兼容）
+export function AlertRecordsList({ metrics, basePath }: { metrics?: string[]; basePath?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const detailBase = basePath ?? (metrics ? "/production/alert/records" : "/alert/records");
 
   // 全量告警记录（当前异常 + 预测风险均展示），等级等筛选在 sorted 中进行
   const [records, setRecords] = useState<AlertRecord[]>(() =>
     ALERT_RECORDS.filter((r) =>
-      metrics ? metrics.includes(r.metricName) : !PRODUCTION_MATERIAL_METRICS.includes(r.metricName)
+      metrics
+        ? metrics.includes(r.metricName)
+        : !PRODUCTION_MATERIAL_METRICS.includes(r.metricName) && !EXPENSE_ALERT_METRIC_NAMES.has(r.metricName)
     ).map((r) => ({ ...r }))
   );
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/date）
@@ -258,7 +263,7 @@ export function AlertRecordsList({ metrics }: { metrics?: string[] }) {
                     <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
-                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`${metrics ? "/production/alert/records" : "/alert/records"}/${r.id}`)}>
+                      <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`${detailBase}/${r.id}`)}>
                         查看
                       </Button>
                     </td>
