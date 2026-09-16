@@ -308,6 +308,23 @@ export const ALERT_RECORDS: AlertRecord[] = [
   ...buildExpenseAlertRecords(),
 ];
 
+// ========== 告警处理状态（会话级覆盖 store，刷新还原） ==========
+// 详情页「确认」后标记已处理：不改动 ALERT_RECORDS 原始数据，列表/详情初始化时应用覆盖；
+// 预置记录自带 handledBy/handledAt 的保持原值（覆盖优先级低于预置处理字段）
+const HANDLED_OVERRIDES = new Map<string, { by: string; at: string }>();
+
+// 确认处理：写入会话级覆盖（处理人 / 处理时间）
+export function confirmAlertHandled(id: string, by: string, at: string): void {
+  HANDLED_OVERRIDES.set(id, { by, at });
+}
+
+// 应用处理覆盖：返回带会话确认信息的记录副本（预置 handledBy 优先，不被覆盖）
+export function applyHandledOverride(r: AlertRecord): AlertRecord {
+  const ov = HANDLED_OVERRIDES.get(r.id);
+  if (!ov || r.handledBy) return r;
+  return { ...r, handledBy: ov.by, handledAt: ov.at };
+}
+
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========
 // 供「新建告警-指定对象」分层多选 与「告警记录/管理」级联筛选 共用
 export interface OrgNode {

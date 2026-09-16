@@ -30,6 +30,25 @@ export function SettingsSidebar() {
   return (
     <nav className="flex-1 overflow-auto py-3">
       {SETTINGS_NAV.map((group) => {
+        // 单项目分组：平铺为一级链接直达，无需折叠展开下级目录（如「归因配置」）
+        if (group.items.length === 1) {
+          const item = group.items[0];
+          const active = pathname === item.href;
+          return (
+            <div key={group.group} className="mb-2">
+              <Link
+                href={item.href}
+                className={`block px-4 py-2 text-sm font-medium rounded transition-colors ${
+                  active
+                    ? "bg-primary-50 text-primary-700"
+                    : "text-gray-700 hover:bg-slate-200/60"
+                }`}
+              >
+                {group.group}
+              </Link>
+            </div>
+          );
+        }
         const isOpen = expanded.has(group.group);
         return (
           <div key={group.group} className="mb-2">

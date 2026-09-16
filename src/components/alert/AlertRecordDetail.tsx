@@ -7,8 +7,9 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
+import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
-import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import { ALERT_RECORDS, applyHandledOverride, confirmAlertHandled } from "@/lib/mock-data/alerts";
 import { expenseAlertRecordById } from "@/lib/mock-data/expense-alerts";
 import { generateAnomalyReply } from "@/lib/mock-data/anomaly-ai";
 import type { AlertRecord } from "@/types";
@@ -35,14 +36,18 @@ export function AlertRecordDetail({
 }) {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
   const { state, addRecentVisit } = useApp();
   const isAdmin = state.user?.role === "管理员";
   const isExpense = layout === "expense";
 
-  // 费用口径兜底：费用页「查看告警详情」按需生成的记录不在 ALERT_RECORDS（列表仅 30 条示例）
+  // 费用口径兜底：费用页「查看告警详情」按需生成的记录不在 ALERT_RECORDS（列表仅 30 条示例）；
+  // 应用会话内「确认」处理覆盖（预置 handledBy 优先）
   const original = ALERT_RECORDS.find((r) => r.id === params.id)
     ?? (isExpense ? expenseAlertRecordById(params.id) : undefined);
-  const [record, setRecord] = useState<AlertRecord | undefined>(original ? { ...original } : undefined);
+  const [record, setRecord] = useState<AlertRecord | undefined>(
+    original ? { ...applyHandledOverride(original) } : undefined
+  );
 
   // 异常原因修正
   const [causeEditing, setCauseEditing] = useState(false);
@@ -153,6 +158,17 @@ export function AlertRecordDetail({
   function saveSuggestion() {
     setRecord((prev) => prev ? { ...prev, suggestion: suggestionDraft.trim() } : prev);
     setSuggestionEditing(false);
+  }
+
+  // 处理情况「确认」（费用口径）：状态置为已处理，处理人记为周婷（模拟数据），时间取当前
+  function handleConfirm() {
+    if (!record || record.handledBy) return;
+    const now = new Date();
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    confirmAlertHandled(record.id, "周婷", at);
+    setRecord((prev) => (prev ? { ...prev, handledBy: "周婷", handledAt: at } : prev));
+    toast("告警已处理", "success");
   }
 
   return (
@@ -320,6 +336,23 @@ export function AlertRecordDetail({
           </div>
         </Card>
 
+        {/* 处理情况（费用口径：处理人 + 状态；底部「确认」后置为已处理） */}
+        {isExpense && (
+          <Card title="处理情况">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Field label="处理人" value={record.handledBy} />
+              <Field
+                label="状态"
+                value={
+                  <span className={record.handledBy ? "text-green-600" : "text-gray-900"}>
+                    {record.handledBy ? "已处理" : "未处理"}
+                  </span>
+                }
+              />
+            </div>
+          </Card>
+        )}
+
         {/* 责任与处理情况（费用口径不展示） */}
         {!isExpense && (
         <Card title="责任与处理情况">
@@ -347,6 +380,13 @@ export function AlertRecordDetail({
         </Card>
         )}
       </div>
+
+      {/* 底部「确认已处理」按钮（费用口径：未处理时展示，居中；点击后状态置为已处理并提示） */}
+      {isExpense && !record.handledBy && (
+        <div className="flex-shrink-0 flex justify-center">
+          <Button onClick={handleConfirm}>确认已处理</Button>
+        </div>
+      )}
 
       {/* AI辅助面板 */}
       <Drawer

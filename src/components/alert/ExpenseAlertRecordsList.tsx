@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
-import { ALERT_RECORDS, ALERT_LEVELS, sortAlerts } from "@/lib/mock-data/alerts";
+import { ALERT_RECORDS, ALERT_LEVELS, sortAlerts, applyHandledOverride } from "@/lib/mock-data/alerts";
 import { EXPENSE_ALERT_METRIC_NAMES } from "@/lib/mock-data/expense-alerts";
 import { DEPT_STATS } from "@/lib/mock-data/expense-indicators";
 import { EXPENSE_NODES } from "@/lib/mock-data/expense-overview";
@@ -45,9 +45,9 @@ type SortMode = "default" | "time_desc" | "time_asc";
 export function ExpenseAlertRecordsList({ basePath = "/expense/alert/records" }: { basePath?: string }) {
   const router = useRouter();
 
-  // 费用口径告警记录（仅"执行进度偏差"类指标）
+  // 费用口径告警记录（仅"执行进度偏差"类指标；应用会话内「确认」处理覆盖）
   const [records] = useState<AlertRecord[]>(() =>
-    ALERT_RECORDS.filter((r) => EXPENSE_ALERT_METRIC_NAMES.has(r.metricName)).map((r) => ({ ...r }))
+    ALERT_RECORDS.filter((r) => EXPENSE_ALERT_METRIC_NAMES.has(r.metricName)).map((r) => ({ ...applyHandledOverride(r) }))
   );
   const [filter, setFilter] = useState<ExpenseAlertFilter>(EMPTY_FILTER); // 输入态
   const [applied, setApplied] = useState<ExpenseAlertFilter>(EMPTY_FILTER); // 应用态
@@ -240,6 +240,7 @@ export function ExpenseAlertRecordsList({ basePath = "/expense/alert/records" }:
                       <span className="text-gray-400">{sortMode === "time_desc" ? "↓" : sortMode === "time_asc" ? "↑" : "↕"}</span>
                     </span>
                   </th>
+                  <th className="text-left px-4 py-3">状态</th>
                   <th className="text-right px-4 py-3 sticky right-0 bg-gray-50 z-10">操作</th>
                 </tr>
               </thead>
@@ -260,6 +261,12 @@ export function ExpenseAlertRecordsList({ basePath = "/expense/alert/records" }:
                     <td className="px-4 py-3 text-gray-600">{r.metricLabel ?? r.metricName}</td>
                     <td className="px-4 py-3 text-gray-600 font-mono">{r.deviationLabel ?? r.deviationValue}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>
+                    {/* 状态：已处理绿 / 未处理黑 */}
+                    <td className="px-4 py-3">
+                      <span className={r.handledBy ? "text-green-600" : "text-gray-900"}>
+                        {r.handledBy ? "已处理" : "未处理"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => router.push(`${basePath}/${r.id}`)}>
                         查看

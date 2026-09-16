@@ -1,21 +1,31 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import {
-  EXPENSE_HEALTH, OPERATING_COST, PER_BOX_COST, expenseDataOf, operatingCostOf,
+  OPERATING_COST, PER_BOX_COST, expenseDataOf, healthOf,
   type ExpenseSummary,
 } from "@/lib/mock-data/expense-overview";
-import { perBoxCostOf } from "@/lib/mock-data/controllable-cost";
 import { ALERT_LEVEL_COLOR } from "@/lib/mock-data/grid-forecast";
 import type { AlertLevel } from "@/types";
 
-// 带左侧色条的卡片外壳（左侧细条统一主题蓝）
-function CardShell({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+// 指标卡键（点击切换下方趋势图）：health 健康度 / executed 累计执行金额 / rate 预算执行率 /
+// deviation 执行进度偏差 / operating 运营成本 / perbox 单箱可控费用
+export type MetricCardKey = "health" | "executed" | "rate" | "deviation" | "operating" | "perbox";
+
+// 带左侧色条的卡片外壳（左侧细条统一主题蓝；active = 当前选中卡，高亮边框）
+function CardShell({
+  children, onClick, active,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+}) {
   return (
     <div
       onClick={onClick}
-      className={`relative overflow-hidden rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${onClick ? "cursor-pointer" : ""}`}
+      className={`relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+        active ? "border-primary-300 ring-1 ring-primary-200" : "border-gray-100"
+      } ${onClick ? "cursor-pointer" : ""}`}
     >
       <div className="absolute bottom-0 left-0 top-0 w-1 bg-primary-600" />
       <div className="pl-2">{children}</div>
@@ -92,37 +102,43 @@ function TrendText({ label, v }: { label: string; v: number }) {
   );
 }
 
-// 费用总览顶部 6 张核心指标卡（卡 2/3/5/6 随科目筛选联动，卡 1 健康度固定口径）
-export function ExpenseOverviewCards({ subjectId }: { subjectId: string }) {
-  const router = useRouter();
+// 费用总览顶部 6 张核心指标卡：点击切换下方趋势图；
+// 卡 1/2/3/4 随科目筛选联动，卡 5/6（运营成本/单箱可控费用）为全口径固定数值
+export function ExpenseOverviewCards({
+  subjectId, active, onSelect,
+}: {
+  subjectId: string;
+  active: MetricCardKey;
+  onSelect: (key: MetricCardKey) => void;
+}) {
   const s = expenseDataOf(subjectId);
-  const perBox = perBoxCostOf(subjectId); // null = 该科目范围无可控费用（展示 —）
+  const health = healthOf(subjectId);
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      {/* 1. 总体健康度评分：半圆仪表盘（带刻度）+ 分数 + 等级 */}
-      <CardShell>
+      {/* 1. 总体健康度评分：半圆仪表盘（带刻度）+ 分数 + 等级（随科目联动） */}
+      <CardShell onClick={() => onSelect("health")} active={active === "health"}>
         <div className="mb-0.5 text-xs text-gray-500">总体健康度评分</div>
         <div className="flex justify-center">
-          <HealthGauge score={EXPENSE_HEALTH.score} color={EXPENSE_HEALTH.grade.color} />
+          <HealthGauge score={health.score} color={health.grade.color} />
         </div>
         {/* 等级徽标 + 分数上移嵌入表盘开口区（圆心附近），压缩卡片高度、减少行内留白 */}
         <div className="-mt-9 flex flex-col items-center">
           <span
             className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded-full text-white"
-            style={{ backgroundColor: EXPENSE_HEALTH.grade.color }}
+            style={{ backgroundColor: health.grade.color }}
           >
-            {EXPENSE_HEALTH.grade.label}
+            {health.grade.label}
           </span>
           <div className="mt-0.5 flex items-baseline gap-1">
-            <span className="text-2xl font-bold leading-none text-gray-900">{EXPENSE_HEALTH.score}</span>
+            <span className="text-2xl font-bold leading-none text-gray-900">{health.score}</span>
             <span className="text-xs text-gray-500">分</span>
           </div>
         </div>
       </CardShell>
 
-      {/* 2. 累计执行金额（联动） */}
-      <CardShell>
+      {/* 2. 累计执行金额（联动，点击展示月度执行趋势图） */}
+      <CardShell onClick={() => onSelect("executed")} active={active === "executed"}>
         <div className="mb-1 truncate text-xs text-gray-500">累计执行金额</div>
         <div className="text-2xl font-bold text-gray-900">
           ¥{fmt(s.executed)}
@@ -134,7 +150,7 @@ export function ExpenseOverviewCards({ subjectId }: { subjectId: string }) {
       </CardShell>
 
       {/* 3. 预算执行率（联动，右上角状态标签） */}
-      <CardShell>
+      <CardShell onClick={() => onSelect("rate")} active={active === "rate"}>
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">预算执行率</span>
           <StatusTag status={s.status} level={s.level} />
@@ -148,7 +164,7 @@ export function ExpenseOverviewCards({ subjectId }: { subjectId: string }) {
       </CardShell>
 
       {/* 4. 执行进度偏差（联动，数值颜色跟随等级） */}
-      <CardShell>
+      <CardShell onClick={() => onSelect("deviation")} active={active === "deviation"}>
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">执行进度偏差</span>
           {s.level ? <AlertLevelBadge level={s.level} /> : <span className="text-xs text-green-600">正常</span>}
@@ -167,44 +183,30 @@ export function ExpenseOverviewCards({ subjectId }: { subjectId: string }) {
         <div className="mt-0.5 truncate text-xs text-gray-400">{s.path}</div>
       </CardShell>
 
-      {/* 5. 运营成本（随科目联动，点击跳转费用分析-运营成本） */}
-      <CardShell onClick={() => router.push("/expense/analysis/operating-cost")}>
-        <div className="mb-1 flex items-center justify-between gap-1">
-          <span className="truncate text-xs text-gray-500">运营成本</span>
-          <span className="text-[10px] text-gray-300">点击查看 ↗</span>
-        </div>
+      {/* 5. 运营成本（全口径固定，不随科目筛选联动） */}
+      <CardShell onClick={() => onSelect("operating")} active={active === "operating"}>
+        <div className="mb-1 truncate text-xs text-gray-500">运营成本</div>
         <div className="text-2xl font-bold text-gray-900">
-          ¥{fmt(operatingCostOf(subjectId))}
+          ¥{fmt(OPERATING_COST.value)}
           <span className="text-xs font-normal text-gray-500">万元</span>
         </div>
         <div className="mt-2 truncate text-xs text-gray-500">
           <TrendText label="同比" v={OPERATING_COST.yoy} />｜<TrendText label="环比" v={OPERATING_COST.mom} />
         </div>
-        <div className="mt-0.5 truncate text-xs text-gray-400">{s.path}</div>
       </CardShell>
 
-      {/* 6. 单箱可控费用（随科目联动，点击跳转费用分析-单箱可控费用） */}
-      <CardShell onClick={() => router.push("/expense/analysis/per-box-cost")}>
-        <div className="mb-1 flex items-center justify-between gap-1">
-          <span className="truncate text-xs text-gray-500">单箱可控费用</span>
-          <span className="text-[10px] text-gray-300">点击查看 ↗</span>
-        </div>
+      {/* 6. 单箱可控费用（全口径固定，不随科目筛选联动；展示目标值） */}
+      <CardShell onClick={() => onSelect("perbox")} active={active === "perbox"}>
+        <div className="mb-1 truncate text-xs text-gray-500">单箱可控费用</div>
         <div className="text-2xl font-bold text-gray-900">
-          {perBox === null ? "—" : (
-            <>
-              {fmt(perBox)}
-              <span className="text-xs font-normal text-gray-500">元/箱</span>
-            </>
-          )}
+          {fmt(PER_BOX_COST.value)}
+          <span className="text-xs font-normal text-gray-500">元/箱</span>
         </div>
-        <div className="mt-2 truncate text-xs text-gray-500">
-          {perBox === null ? (
-            <>该科目暂无可控费用</>
-          ) : (
-            <><TrendText label="同比" v={PER_BOX_COST.yoy} />｜<TrendText label="环比" v={PER_BOX_COST.mom} /></>
-          )}
+        <div className="mt-2 truncate text-xs text-gray-500">目标值：{fmt(PER_BOX_COST.target)}</div>
+        <div className="mt-0.5 truncate text-xs text-gray-500">
+          <TrendText label="同比" v={PER_BOX_COST.yoy} />｜<TrendText label="环比" v={PER_BOX_COST.mom} />
         </div>
-        <div className="mt-0.5 truncate text-xs text-gray-400">{s.path}</div>
+        <div className="mt-0.5 truncate text-xs text-gray-400">全部可控费用</div>
       </CardShell>
     </div>
   );

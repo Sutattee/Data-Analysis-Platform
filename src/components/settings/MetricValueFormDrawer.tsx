@@ -1,19 +1,18 @@
 "use client";
 
-// 指标值维护 - 新增/编辑表单抽屉
-// 规则：单位随指标自动带出（只读）；起止月份同月 = 当期值、跨月 = 累计值（数据类型系统按周期推断）；
-// 相同指标+周期判重；保存二次确认并记录操作人/时间
-import { useEffect, useMemo, useState } from "react";
+// 指标值维护 - 新增/编辑表单抽屉（月度值口径）
+// 规则：指标固定「工业总产值」只读；数据月份年月选择器单选（每条记录对应一个自然月）；
+// 单位随指标配置带出（只读）；相同数据月份判重；保存二次确认并记录操作人/时间
+import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
-import { MAINTAINABLE_METRICS, isMetricValueDuplicated, monthLabel, saveMetricValue } from "@/lib/mock-data/metric-values";
+import {
+  FIXED_METRIC, isMetricValueDuplicated, monthLabel, saveMetricValue,
+} from "@/lib/mock-data/metric-values";
 import type { MetricValueRecord } from "@/types";
-
-// 数据类型（界面不再单独维护，按统计周期推断：起止同月 = 当期值，跨月 = 累计值）
-type DataType = MetricValueRecord["dataType"];
 
 function formatNow(): string {
   const d = new Date();
@@ -22,35 +21,18 @@ function formatNow(): string {
 }
 
 interface FormState {
-  metricId: string;
-  statObject: string;    // 隐藏口径：编辑带出原值，新增默认全厂（统计对象字段已从界面移除）
-  dataType: DataType;    // 隐藏口径：按起止月份推断（同月=当期值，跨月=累计值）
-  periodStart: string; // YYYY-MM
-  periodEnd: string; // YYYY-MM（当期值 = periodStart）
+  month: string; // YYYY-MM 数据月份
   value: string; // 输入态，保存时转数值
   source: string;
   remark: string;
 }
 
-const EMPTY: FormState = {
-  metricId: "",
-  statObject: "什邡卷烟厂",
-  dataType: "当期值",
-  periodStart: "",
-  periodEnd: "",
-  value: "",
-  source: "",
-  remark: "",
-};
+const EMPTY: FormState = { month: "", value: "", source: "", remark: "" };
 
 function toFormState(r: MetricValueRecord | null): FormState {
   if (!r) return { ...EMPTY };
   return {
-    metricId: r.metricId,
-    statObject: r.statObject,
-    dataType: r.dataType,
-    periodStart: r.periodStart,
-    periodEnd: r.periodEnd,
+    month: r.month,
     value: String(r.value),
     source: r.source ?? "",
     remark: r.remark ?? "",
@@ -60,6 +42,9 @@ function toFormState(r: MetricValueRecord | null): FormState {
 const labelCls = "text-sm font-medium text-gray-700 mb-1";
 const inputCls =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
+// 只读展示（灰底）：固定指标名称 / 单位
+const readonlyCls =
+  "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 bg-gray-50";
 
 export function MetricValueFormDrawer({
   open,
@@ -88,12 +73,6 @@ export function MetricValueFormDrawer({
     }
   }, [open, baseRecord]);
 
-  // 单位随指标自动带出（只读）
-  const metric = useMemo(() => MAINTAINABLE_METRICS.find((m) => m.id === form.metricId), [form.metricId]);
-  const unit = metric?.unit ?? "";
-  // 数据类型按统计周期推断：起止同月 = 当期值，跨月 = 累计值
-  const inferredType: DataType = form.periodStart && form.periodStart === form.periodEnd ? "当期值" : "累计值";
-
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((errs) => {
@@ -103,22 +82,9 @@ export function MetricValueFormDrawer({
     });
   }
 
-  function switchMetric(id: string) {
-    setForm((f) => ({ ...f, metricId: id }));
-    setErrors((errs) => {
-      const next = { ...errs };
-      delete next.metricId;
-      return next;
-    });
-  }
-
   function validate(): boolean {
     const errs: Record<string, string> = {};
-    if (!form.metricId) errs.metricId = "请选择指标名称";
-    if (!form.periodStart) errs.periodStart = "请选择起始月份";
-    if (!form.periodEnd) errs.periodEnd = "请选择结束月份";
-    if (form.periodStart && form.periodEnd && form.periodEnd < form.periodStart)
-      errs.periodEnd = "结束月份不能早于起始月份";
+    if (!form.month) errs.month = "请选择数据月份";
     const v = form.value.trim();
     if (!v) errs.value = "请输入指标值";
     else if (!Number.isFinite(Number(v))) errs.value = "指标值仅允许输入有效数值";
@@ -131,26 +97,18 @@ export function MetricValueFormDrawer({
   // 轻量 diff：编辑时找出被修改的字段中文名（二次确认摘要）
   function diffFields(r: MetricValueRecord): string[] {
     const names: string[] = [];
-    if (r.metricId !== form.metricId) names.push("指标名称");
-    if (r.periodStart !== form.periodStart || r.periodEnd !== form.periodEnd) names.push("统计周期");
+    if (r.month !== form.month) names.push("数据月份");
     if (String(r.value) !== form.value.trim()) names.push("指标值");
     if ((r.source ?? "") !== form.source.trim()) names.push("数据来源");
     if ((r.remark ?? "") !== form.remark.trim()) names.push("备注");
     return names;
   }
 
-  // 校验 + 判重 → 二次确认
+  // 校验 + 月份判重 → 二次确认
   function handleSubmit() {
     if (!validate()) return;
-    const payload = {
-      metricId: form.metricId,
-      statObject: form.statObject,
-      periodStart: form.periodStart,
-      periodEnd: form.periodEnd,
-      dataType: inferredType,
-    };
-    if (isMetricValueDuplicated(payload, baseRecord?.id)) {
-      toast("相同指标、统计对象、统计周期和数据类型已存在记录，不得重复维护", "warning");
+    if (isMetricValueDuplicated({ month: form.month }, baseRecord?.id)) {
+      toast(`${monthLabel(form.month)}数据已存在，请编辑原记录。`, "warning");
       return;
     }
     setSummary(baseRecord ? diffFields(baseRecord) : []);
@@ -161,14 +119,8 @@ export function MetricValueFormDrawer({
     const saved = saveMetricValue(
       {
         id: baseRecord?.id,
-        metricId: form.metricId,
-        metricName: metric?.nameCn ?? form.metricId,
-        statObject: form.statObject,
-        periodStart: form.periodStart,
-        periodEnd: form.periodEnd,
-        dataType: inferredType,
+        month: form.month,
         value: Number(form.value.trim()),
-        unit,
         source: form.source.trim() || undefined,
         remark: form.remark.trim() || undefined,
       },
@@ -197,58 +149,30 @@ export function MetricValueFormDrawer({
         }
       >
         <div className="space-y-5">
-          {/* 指标名称（从指标管理中选择；单位随指标带出） */}
+          {/* 指标名称（固定指标，只读展示） */}
+          <div>
+            <label className={labelCls}>指标名称</label>
+            <div className={readonlyCls} title="本页固定维护工业总产值指标">
+              {FIXED_METRIC.nameCn}
+            </div>
+          </div>
+
+          {/* 数据月份（年月选择器，单月） */}
           <div>
             <label className={labelCls}>
-              指标名称 <span className="text-red-500">*</span>
+              数据月份 <span className="text-red-500">*</span>
             </label>
-            <select className={inputCls} value={form.metricId} onChange={(e) => switchMetric(e.target.value)}>
-              <option value="">请选择指标</option>
-              {MAINTAINABLE_METRICS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nameCn}
-                </option>
-              ))}
-            </select>
-            {errors.metricId && <p className="mt-1 text-xs text-red-500">{errors.metricId}</p>}
-            <p className="mt-1 text-xs text-gray-400">仅可选择指标管理中已登记的指标</p>
+            <input
+              type="month"
+              className={inputCls}
+              value={form.month}
+              onChange={(e) => set("month", e.target.value)}
+            />
+            {errors.month && <p className="mt-1 text-xs text-red-500">{errors.month}</p>}
+            <p className="mt-1 text-xs text-gray-400">每条记录对应一个自然月，年度由所选月份自动识别</p>
           </div>
 
-          {/* 统计周期（月份范围选择器；起止同月 = 当期值，跨月 = 累计值） */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>
-                起始月份 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="month"
-                className={inputCls}
-                value={form.periodStart}
-                onChange={(e) => set("periodStart", e.target.value)}
-              />
-              {errors.periodStart && <p className="mt-1 text-xs text-red-500">{errors.periodStart}</p>}
-            </div>
-            <div>
-              <label className={labelCls}>
-                结束月份 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="month"
-                className={inputCls}
-                value={form.periodEnd}
-                onChange={(e) => set("periodEnd", e.target.value)}
-              />
-              {errors.periodEnd && <p className="mt-1 text-xs text-red-500">{errors.periodEnd}</p>}
-            </div>
-          </div>
-          {(form.periodStart || form.periodEnd) && (
-            <p className="-mt-3 text-xs text-gray-400">
-              统计周期：{form.periodStart ? monthLabel(form.periodStart) : "—"}—
-              {form.periodEnd ? monthLabel(form.periodEnd) : "—"}（{inferredType}）
-            </p>
-          )}
-
-          {/* 指标值 + 单位（只读带出） */}
+          {/* 指标值 + 单位（随指标配置带出，只读） */}
           <div className="grid grid-cols-[1fr_120px] gap-4">
             <div>
               <label className={labelCls}>
@@ -257,14 +181,14 @@ export function MetricValueFormDrawer({
               <Input
                 value={form.value}
                 onChange={(e) => set("value", e.target.value)}
-                placeholder="如：12,580.00"
+                placeholder="如：1,580.00"
                 error={errors.value}
               />
             </div>
             <div>
               <label className={labelCls}>单位</label>
-              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-500 bg-gray-50 truncate" title="单位随所选指标自动带出">
-                {unit || "—"}
+              <div className={`${readonlyCls} truncate`} title="单位根据指标配置自动带出，不允许修改">
+                {FIXED_METRIC.unit}
               </div>
             </div>
           </div>
@@ -303,7 +227,7 @@ export function MetricValueFormDrawer({
           </div>
 
           <p className="text-xs text-gray-400 leading-relaxed">
-            说明：相同指标和统计周期不得重复维护；保存与删除均需二次确认并记录操作人及操作时间。
+            说明：相同数据月份只能存在一条有效记录，不得重复新增；保存与删除均需二次确认并记录操作人及操作时间。
           </p>
         </div>
       </Drawer>
@@ -319,8 +243,7 @@ export function MetricValueFormDrawer({
               </>
             ) : (
               <>
-                确认新增指标值记录
-                {metric ? <>「{metric.nameCn}」</> : null}？
+                确认新增 {monthLabel(form.month)} 的{FIXED_METRIC.nameCn}指标值？
               </>
             )}
             保存后将记录操作人及操作时间。

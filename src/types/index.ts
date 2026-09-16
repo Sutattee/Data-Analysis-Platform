@@ -464,15 +464,12 @@ export interface MetricManage {
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }
 
-// ========== 指标值维护（人工填报指标数据） ==========
+// ========== 指标值维护（人工填报指标数据，月度值口径） ==========
 export interface MetricValueRecord {
   id: string;                 // mv-001 递增
-  metricId: string;           // 关联指标管理（如 m18）
+  metricId: string;           // 关联指标管理（固定 m18 工业总产值）
   metricName: string;         // 指标名称快照
-  statObject: string;         // 统计对象（企业/部门）
-  periodStart: string;        // 起始月 YYYY-MM
-  periodEnd: string;          // 结束月 YYYY-MM（当期值 = periodStart）
-  dataType: "当期值" | "累计值";
+  month: string;              // 数据月份 YYYY-MM（每条记录对应一个自然月）
   value: number;              // 指标值
   unit: string;               // 单位（随指标自动带出）
   source?: string;            // 数据来源（选填）

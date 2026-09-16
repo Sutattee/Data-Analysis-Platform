@@ -28,8 +28,8 @@ export const PRIMARY_NAV: NavItem[] = [
   { label: "费用预算执行", href: "/expense", icon: "💰", children: [
     { label: "费用总览", href: "/expense/overview", icon: "📊" },
     { label: "费用分析", href: "/expense/analysis", icon: "📈", children: [
-      { label: "全部费用", href: "/expense/analysis/all", icon: "🗂️" },
-      { label: "运营成本", href: "/expense/analysis/operating-cost", icon: "🏭" },
+      { label: "费用科目", href: "/expense/analysis/all", icon: "🗂️" },
+      { label: "部门费用", href: "/expense/analysis/operating-cost", icon: "🏭" },
       { label: "可控费用", href: "/expense/analysis/per-box-cost", icon: "📦" },
     ]},
     { label: "业务构成", href: "/expense/business-composition", icon: "🧾" },
@@ -84,9 +84,7 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
   {
     group: "归因配置",
     items: [
-      { label: "能源管理", href: "/settings/attribution/energy" },
-      { label: "生产管理", href: "/settings/attribution/production" },
-      { label: "工艺质量", href: "/settings/attribution/quality" },
+      { label: "归因配置", href: "/settings/attribution" },
     ],
   },
 ];

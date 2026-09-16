@@ -1,7 +1,7 @@
 "use client";
 
-// 指标值维护：维护无法通过业务系统自动获取、需人工填报的指标数据（如企业工业总产值）
-// 筛选（指标搜索 / 统计周期）+ 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
+// 指标值维护：固定维护「工业总产值」的月度值（无法通过业务系统自动获取、需人工填报）
+// 筛选（数据月份）+ 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -10,10 +10,9 @@ import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { MetricValueFormDrawer } from "@/components/settings/MetricValueFormDrawer";
 import {
-  MAINTAINABLE_METRICS,
+  FIXED_METRIC,
   listMetricValues,
   monthLabel,
-  periodLabel,
   removeMetricValue,
 } from "@/lib/mock-data/metric-values";
 import type { MetricValueRecord } from "@/types";
@@ -42,8 +41,7 @@ export default function MetricValuePage() {
 
   const [rows, setRows] = useState<MetricValueRecord[]>(() => listMetricValues());
 
-  // 筛选条件
-  const [fKeyword, setFKeyword] = useState("");
+  // 筛选条件（数据月份，精确匹配）
   const [fMonth, setFMonth] = useState("");
 
   // 交互态
@@ -57,27 +55,19 @@ export default function MetricValuePage() {
     setLoading(true);
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
-  }, [fKeyword, fMonth]);
+  }, [fMonth]);
 
-  // 过滤：指标关键词（名称/编码模糊匹配）/ 统计周期（记录周期覆盖所选月份）
-  const filtered = useMemo(() => {
-    const kw = fKeyword.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (kw) {
-        const code = (MAINTAINABLE_METRICS.find((m) => m.id === r.metricId)?.code ?? "").toLowerCase();
-        if (!r.metricName.toLowerCase().includes(kw) && !code.includes(kw)) return false;
-      }
-      if (fMonth && !(r.periodStart <= fMonth && r.periodEnd >= fMonth)) return false;
-      return true;
-    });
-  }, [rows, fKeyword, fMonth]);
+  // 过滤：数据月份（记录月份精确匹配所选月份）
+  const filtered = useMemo(
+    () => rows.filter((r) => !fMonth || r.month === fMonth),
+    [rows, fMonth]
+  );
 
   function reload() {
     setRows(listMetricValues());
   }
 
   function handleReset() {
-    setFKeyword("");
     setFMonth("");
   }
 
@@ -88,10 +78,6 @@ export default function MetricValuePage() {
     reload();
     toast("记录已删除，不再参与指标计算和数据分析", "success");
   }
-
-  // 指标小数位（列表指标值格式化用）
-  const decimalsOf = (metricId: string) =>
-    MAINTAINABLE_METRICS.find((m) => m.id === metricId)?.decimals ?? 2;
 
   const th = "text-left px-4 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
 
@@ -104,22 +90,15 @@ export default function MetricValuePage() {
       {/* 筛选区 + 新增按钮 */}
       <Card padding>
         <div className="flex flex-wrap items-center gap-2">
-          {/* 指标搜索框：按指标名称/编码模糊匹配 */}
-          <input
-            type="text"
-            className={`${selectCls} w-56`}
-            value={fKeyword}
-            onChange={(e) => setFKeyword(e.target.value)}
-            placeholder="搜索指标"
-          />
+          {/* 数据月份筛选：精确匹配该月记录 */}
           <input
             type="month"
             className={selectCls}
             value={fMonth}
             onChange={(e) => setFMonth(e.target.value)}
-            title="筛选统计周期覆盖该月份的记录"
+            title="筛选数据月份为该月份的记录"
           />
-          {fMonth && <span className="text-xs text-gray-400">{monthLabel(fMonth)}处于统计周期内</span>}
+          {fMonth && <span className="text-xs text-gray-400">数据月份：{monthLabel(fMonth)}</span>}
           <Button variant="secondary" onClick={handleReset}>
             重置
           </Button>
@@ -136,7 +115,7 @@ export default function MetricValuePage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className={th}>指标名称</th>
-                <th className={th}>统计周期</th>
+                <th className={th}>数据月份</th>
                 <th className={th}>指标值</th>
                 <th className={th}>单位</th>
                 <th className={th}>数据来源</th>
@@ -162,9 +141,9 @@ export default function MetricValuePage() {
                 filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{r.metricName}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{periodLabel(r)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{monthLabel(r.month)}</td>
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                      {fmtValue(r.value, decimalsOf(r.metricId))}
+                      {fmtValue(r.value, FIXED_METRIC.decimals)}
                     </td>
                     <td className="px-4 py-3 text-gray-600">{r.unit}</td>
                     <td className="px-4 py-3 max-w-[160px] truncate text-gray-600" title={r.source}>
@@ -206,7 +185,7 @@ export default function MetricValuePage() {
         </div>
         {!loading && (
           <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
-            共 {filtered.length} 条；相同指标和统计周期不得重复；删除后的记录不再参与指标计算和数据分析
+            共 {filtered.length} 条；相同数据月份仅保留一条有效记录；删除后的记录不再参与指标计算和数据分析
           </div>
         )}
       </Card>
@@ -229,10 +208,10 @@ export default function MetricValuePage() {
         {viewTarget && (
           <div className="space-y-2.5">
             <Field label="指标名称" value={viewTarget.metricName} />
-            <Field label="统计周期" value={periodLabel(viewTarget)} />
+            <Field label="数据月份" value={monthLabel(viewTarget.month)} />
             <Field
               label="指标值"
-              value={`${fmtValue(viewTarget.value, decimalsOf(viewTarget.metricId))} ${viewTarget.unit}`}
+              value={`${fmtValue(viewTarget.value, FIXED_METRIC.decimals)} ${viewTarget.unit}`}
             />
             <Field label="数据来源" value={viewTarget.source} />
             {viewTarget.remark && <Field label="备注" value={viewTarget.remark} />}
@@ -257,7 +236,7 @@ export default function MetricValuePage() {
       >
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-gray-600">
-            确认删除「{deleteTarget?.metricName}（{deleteTarget ? periodLabel(deleteTarget) : ""}，{deleteTarget?.dataType}）」？
+            确认删除「{deleteTarget?.metricName}（{deleteTarget ? monthLabel(deleteTarget.month) : ""}）」？
             删除后的记录不再参与指标计算和数据分析，且不可恢复。
           </p>
           <div className="flex justify-end gap-2 pt-1">

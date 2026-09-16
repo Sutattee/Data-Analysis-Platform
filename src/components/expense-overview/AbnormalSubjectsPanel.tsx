@@ -22,7 +22,7 @@ function AbnormalRow({ item }: { item: AbnormalSubject }) {
             <AlertLevelBadge level={item.level} />
             <button
               type="button"
-              onClick={() => router.push(`/expense/analysis/all?tab=subject&subject=${item.id}`)}
+              onClick={() => router.push(`/expense/analysis/all?subject=${item.id}`)}
               className="rounded-md border border-primary-200 px-2 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
             >
               查看

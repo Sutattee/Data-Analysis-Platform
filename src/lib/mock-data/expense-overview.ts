@@ -174,8 +174,8 @@ export const EXPENSE_PERIOD = {
   frequency: "按月更新",
 };
 
-export const OPERATING_COST = { value: 15652, yoy: 4.2, mom: 1.6 };   // 运营成本（万元，全厂；yoy 同比 / mom 环比 %）
-export const PER_BOX_COST = { value: 4089, yoy: -0.8, mom: -0.4 };    // 单箱可控费用（元/箱）
+export const OPERATING_COST = { value: 15652, yoy: 4.2, mom: -0.4 };  // 运营成本（万元，全口径固定；yoy 同比 / mom 环比 %）
+export const PER_BOX_COST = { value: 408, target: 300, yoy: -0.8, mom: 1.8 }; // 单箱可控费用（元/箱，全口径固定；target 目标值）
 
 // 运营成本（随科目筛选联动：按所选科目子树执行金额占全厂比例折算；同比/环比为全厂口径）
 export function operatingCostOf(subjectId: string): number {
@@ -335,7 +335,10 @@ export function expenseDataOf(id: string): ExpenseSummary {
   if (override) {
     const executed = round((budget * override.rate) / 100);
     const deviation = round(override.rate - override.planProgress, 1);
-    const oActual = plan.map((p) => round((p * override.rate) / 100));
+    // 月度实际按计划形状分摊累计执行额（Σ1-8月 = executed，与执行率/卡片口径一致）
+    const oActual = plan.map((p, m) =>
+      m < ACTUAL_MONTHS ? round((executed * p) / cumPlan[ACTUAL_MONTHS - 1]) : 0
+    );
     return {
       id: node.id, name: node.name, path: node.path,
       budget, executed, rate: override.rate, planProgress: override.planProgress, deviation,
@@ -343,7 +346,12 @@ export function expenseDataOf(id: string): ExpenseSummary {
       monthly: MONTH_LABELS.map((month, m) => ({
         month, plan: plan[m],
         actual: m < ACTUAL_MONTHS ? oActual[m] : null,
-        cumRate: m < ACTUAL_MONTHS ? round((sum(oActual.slice(0, m + 1)) / budget) * 100, 1) : null,
+        // 8 月累计与卡片执行率精确对齐（消除分摊取整漂移）
+        cumRate: m === ACTUAL_MONTHS - 1
+          ? override.rate
+          : m < ACTUAL_MONTHS
+            ? round((sum(oActual.slice(0, m + 1)) / budget) * 100, 1)
+            : null,
       })),
       level: override.level, status: expenseStatus(deviation),
     };
@@ -425,10 +433,170 @@ export function trendInterpretation(s: ExpenseSummary): string {
   return `${s.path} 2026 年度预算 ${s.budget.toLocaleString()} 万元，截至 8 月末累计执行 ${s.executed.toLocaleString()} 万元，预算执行率 ${s.rate}%，计划执行进度 ${s.planProgress}%，${tone}。月度看，${topMonth.month}执行强度最高（${topMonth.actual?.toLocaleString()} 万元）。${risk}`;
 }
 
-/* ---------------- 总体健康度（固定锚定 85 分良好） ---------------- */
+/* ---------------- 总体健康度（"全部费用"固定锚定 85 分良好；科目按偏差分档） ---------------- */
 
 export const EXPENSE_HEALTH = {
   score: 85,
   grade: healthGradeOf(85),
   note: "基于预算执行率、执行进度偏差、异常科目占比等综合计算",
 };
+
+// 健康度评分：按执行进度偏差绝对值分档 + path 哈希抖动（演示用，五档在科目间全覆盖）
+export function healthScoreOf(deviation: number, seed: string): number {
+  const a = Math.abs(deviation);
+  const j = (m: number) => hash(seed) % m;
+  if (a <= 2) return 92 + j(7);   // 92-98 优秀
+  if (a <= 5) return 82 + j(7);   // 82-88 良好
+  if (a <= 10) return 73 + j(6);  // 73-78 一般
+  if (a <= 15) return 63 + j(5);  // 63-67 预警
+  if (a <= 25) return 48 + j(9);  // 48-56 危险
+  return 36 + j(9);               // 36-44 危险
+}
+
+// 科目健康度（卡片展示）：全部费用固定 85 分良好；科目按当前执行进度偏差分档
+export function healthOf(subjectId: string): { score: number; grade: { label: string; color: string } } {
+  if (subjectId === "all") return { score: EXPENSE_HEALTH.score, grade: EXPENSE_HEALTH.grade };
+  const s = expenseDataOf(subjectId);
+  const score = healthScoreOf(s.deviation, s.path);
+  return { score, grade: healthGradeOf(score) };
+}
+
+/* ---------------- 指标卡趋势序列（1-8 月实际 + 9-12 月预测；8 月点带实际值连虚线） ---------------- */
+
+export interface TrendPoint {
+  month: string;
+  value: number | null;         // 实际值（1-8 月）
+  forecastValue: number | null; // 预测值（9-12 月；8 月点带实际值使虚线连出）
+  gradeLabel?: string;          // 健康度等级标签（健康度趋势用）
+  gradeColor?: string;          // 健康度等级颜色
+}
+
+// 月度累计执行率趋势：1-8 月实际累计执行率；9-12 月预测 = (累计实际 + 预测期各月预算计划) ÷ 年度预算
+export function rateTrendOf(s: ExpenseSummary): TrendPoint[] {
+  let acc = s.monthly.reduce((t, m) => t + (m.actual ?? 0), 0);
+  return s.monthly.map((m, i) => {
+    const isLastActual = s.monthly[i + 1]?.actual === null || i === s.monthly.length - 1;
+    if (m.actual !== null) {
+      return { month: m.month, value: m.cumRate, forecastValue: isLastActual ? m.cumRate : null };
+    }
+    acc += m.plan; // 预测口径：按预算计划执行
+    return { month: m.month, value: null, forecastValue: round((acc / s.budget) * 100, 1) };
+  });
+}
+
+// 月度执行进度偏差趋势：当月累计执行率 − 累计计划进度；9-12 月按预算计划执行 → 偏差维持 8 月水平
+export function deviationTrendOf(s: ExpenseSummary): TrendPoint[] {
+  let cumA = 0;
+  let cumP = 0;
+  let dev8: number | null = null;
+  return s.monthly.map((m, i) => {
+    const isLastActual = s.monthly[i + 1]?.actual === null || i === s.monthly.length - 1;
+    cumP += m.plan;
+    if (m.actual !== null) {
+      cumA += m.actual;
+      const dev = round(((cumA - cumP) / s.budget) * 100, 1);
+      dev8 = dev;
+      return { month: m.month, value: dev, forecastValue: isLastActual ? dev : null };
+    }
+    return { month: m.month, value: null, forecastValue: dev8 };
+  });
+}
+
+// 健康度月度趋势：全部费用预设序列（8 月锚定 85）；科目按各月累计偏差分档（种子固定，序列平滑），
+// 9-12 月预测 = 8 月评分恒定（按预算计划执行，偏差与评分均维持）
+export function healthTrendOf(subjectId: string): TrendPoint[] {
+  const last = ACTUAL_MONTHS - 1;
+  if (subjectId === "all") {
+    const actual = [96, 95, 93, 91, 90, 88, 86, 85];
+    const forecast = [84, 84, 83, 83];
+    return MONTH_LABELS.map((month, m) => {
+      const v = m < ACTUAL_MONTHS ? actual[m] : forecast[m - ACTUAL_MONTHS];
+      const g = healthGradeOf(v);
+      return {
+        month,
+        value: m < ACTUAL_MONTHS ? v : null,
+        forecastValue: m >= last ? v : null,
+        gradeLabel: g.label,
+        gradeColor: g.color,
+      };
+    });
+  }
+  const s = expenseDataOf(subjectId);
+  return deviationTrendOf(s).map((p, i) => {
+    const dev = p.value ?? p.forecastValue ?? 0;
+    const score = healthScoreOf(dev, s.path);
+    const g = healthGradeOf(score);
+    return {
+      month: p.month,
+      value: i <= last ? score : null,
+      forecastValue: i >= last ? score : null,
+      gradeLabel: g.label,
+      gradeColor: g.color,
+    };
+  });
+}
+
+// 运营成本月度趋势（全口径固定，随科目筛选不联动）：1-8 月实际执行 / 9-12 月预测 = 预算计划
+export const OPERATING_COST_MONTHLY: TrendPoint[] = TOTAL_MONTHLY.map((m, i) => {
+  const v = m.actual ?? m.plan;
+  return { month: m.month, value: i <= ACTUAL_MONTHS - 1 ? v : null, forecastValue: i >= ACTUAL_MONTHS - 1 ? v : null };
+});
+
+// 单箱可控费用月度趋势（全口径固定，随科目筛选不联动）：8 月锚定 408，9-12 月预测延续月均降幅
+export const PER_BOX_MONTHLY: TrendPoint[] = (() => {
+  const actual = [431, 428, 426, 423, 421, 418, 412, 408];
+  const forecast = [405, 402, 399, 396];
+  const last = ACTUAL_MONTHS - 1;
+  return MONTH_LABELS.map((month, m) => {
+    const v = m < ACTUAL_MONTHS ? actual[m] : forecast[m - ACTUAL_MONTHS];
+    return { month, value: m < ACTUAL_MONTHS ? v : null, forecastValue: m >= last ? v : null };
+  });
+})();
+
+/* ---------------- 各趋势图 AI 数据解读（300 字内） ---------------- */
+
+export function healthTrendInterpretation(subjectId: string): string {
+  const h = healthOf(subjectId);
+  const pts = healthTrendOf(subjectId);
+  const actual = pts.filter((p) => p.value !== null);
+  const first = actual[0];
+  const worst = [...actual].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))[0];
+  const yearEnd = pts[pts.length - 1];
+  const yScore = yearEnd.forecastValue ?? 0;
+  const yGrade = healthGradeOf(yScore);
+  const drop = (first.value ?? 0) - (h.score);
+  return `${expenseDataOf(subjectId).path}健康度评分 1 月 ${first.value} 分，8 月 ${h.score} 分（${h.grade.label}），年内累计变动 ${drop >= 0 ? "+" : ""}${drop} 分，最低为 ${worst.month}（${worst.value} 分，${worst.gradeLabel}）。若 9-12 月按预算计划执行，预计年末评分约 ${yScore} 分（${yGrade.label}）。评分主要受执行进度偏差驱动，建议对偏差扩大月份的支出节奏进行回溯分析，压降超计划科目，推动评分回到「良好」及以上区间。`;
+}
+
+export function rateTrendInterpretation(s: ExpenseSummary): string {
+  const pts = rateTrendOf(s);
+  const yearEnd = pts[pts.length - 1].forecastValue ?? 0;
+  const over = pts.find((p) => p.value === null && (p.forecastValue ?? 0) > 100);
+  const overTxt = over
+    ? `若 9-12 月按预算计划执行，累计执行率将于 ${over.month} 越过 100% 预算线，年末预计达 ${yearEnd}%，存在超预算风险，建议提前严控 ${over.month}前后的支出节奏并启动预算调剂`
+    : `若 9-12 月按预算计划执行，年末累计执行率预计 ${yearEnd}%，仍在年度预算内，建议按月跟踪执行节奏，防止年末集中突击执行`;
+  return `${s.path}预算执行率由 1 月 ${pts[0].value}% 逐月升至 8 月 ${s.rate}%，计划执行进度 ${s.planProgress}%，执行进度偏差 ${s.deviation > 0 ? "+" : ""}${s.deviation}pct，${s.deviation > 3 ? "整体超计划执行" : s.deviation < -3 ? "整体执行偏慢" : "执行节奏与计划基本匹配"}。${overTxt}。`;
+}
+
+export function deviationTrendInterpretation(s: ExpenseSummary): string {
+  const pts = deviationTrendOf(s);
+  const actual = pts.filter((p) => p.value !== null);
+  const peak = [...actual].sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0];
+  const dev1 = actual[0].value ?? 0;
+  const dev8 = actual[actual.length - 1].value ?? 0;
+  return `${s.path}执行进度偏差 1 月 ${dev1 > 0 ? "+" : ""}${dev1}pct，8 月 ${dev8 > 0 ? "+" : ""}${dev8}pct，${Math.abs(dev8) >= Math.abs(dev1) ? "偏差整体呈扩大态势" : "偏差较年初有所收窄"}，峰值出现在 ${peak.month}（${(peak.value ?? 0) > 0 ? "+" : ""}${peak.value}pct）。若 9-12 月按预算计划执行，偏差将维持 ${dev8 > 0 ? "+" : ""}${dev8}pct 至年末。建议重点核查偏差贡献最大的科目与大额支出事项，滚动纠偏，避免年末预算失控或执行不足。`;
+}
+
+export function operatingCostInterpretation(): string {
+  const actualSum = TOTAL_MONTHLY.reduce((t, m) => t + (m.actual ?? 0), 0);
+  const planRest = TOTAL_MONTHLY.filter((m) => m.actual === null).reduce((t, m) => t + m.plan, 0);
+  const peak = [...TOTAL_MONTHLY].sort((a, b) => (b.actual ?? 0) - (a.actual ?? 0))[0];
+  return `2026 年运营成本（全部费用口径）1-8 月累计 ${actualSum.toLocaleString()} 万元，${peak.month}执行强度最高（${peak.actual?.toLocaleString()} 万元），同比 +${OPERATING_COST.yoy}%、环比 ${OPERATING_COST.mom}%。9-12 月按预算计划预计执行 ${planRest.toLocaleString()} 万元，全年预计 ${OPERATING_COST.value.toLocaleString()} 万元。年内支出呈「前低后高、年中集中」节奏，建议关注 6-7 月集中执行的延续影响，均衡第四季度支出安排，防范年末预算超支。`;
+}
+
+export function perBoxInterpretation(): string {
+  const cur = PER_BOX_COST.value;
+  const gap = cur - PER_BOX_COST.target;
+  const drop = PER_BOX_MONTHLY[0].value ?? 0;
+  return `单箱可控费用由 1 月 ${drop} 元/箱逐月降至 8 月 ${cur} 元/箱，累计下降 ${drop - cur} 元（${round(((drop - cur) / drop) * 100, 1)}%），月均降幅约 ${round((drop - cur) / (ACTUAL_MONTHS - 1), 1)} 元；同比 ${PER_BOX_COST.yoy}%、环比 +${PER_BOX_COST.mom}%。当前较目标值 ${PER_BOX_COST.target} 元/箱仍高 ${gap} 元（${round((gap / PER_BOX_COST.target) * 100, 1)}%），按当前降幅节奏年末预计约 ${PER_BOX_MONTHLY[11].forecastValue} 元/箱，仍高于目标。建议聚焦占比高的可控费用项目逐项压降，强化月度目标达成跟踪，缩小与目标值的差距。`;
+}

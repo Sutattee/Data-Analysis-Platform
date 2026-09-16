@@ -48,7 +48,6 @@ function MaterialCardItem({ card }: { card: MaterialCard }) {
   const shown: MaterialCard = detail
     ? { ...card, value: detail.value, avg: detail.avg, yoy: detail.yoy, mom: detail.mom }
     : card;
-  const periodLabel = card.key === "labor" ? "本月" : "昨日";
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
@@ -76,7 +75,8 @@ function MaterialCardItem({ card }: { card: MaterialCard }) {
       <div className="mb-1 flex items-baseline gap-1">
         <span className="text-2xl font-bold text-gray-900">{fmtNum(shown.value, card.decimals)}</span>
         <span className="text-sm text-gray-400">{card.unit}</span>
-        <span className="text-[10px] text-gray-300">{periodLabel}</span>
+        {/* 劳动生产率卡口径为「本月」，单耗卡不展示周期文字 */}
+        {card.key === "labor" && <span className="text-[10px] text-gray-300">本月</span>}
       </div>
       {shown.target !== undefined && <CompareLine label="目标值" base={shown.target} card={shown} />}
       {shown.avg !== undefined && <CompareLine label="历史均值" base={shown.avg} card={shown} />}

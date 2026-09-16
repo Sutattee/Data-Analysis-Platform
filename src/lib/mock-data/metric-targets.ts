@@ -18,16 +18,17 @@ import type { MetricTargetVersion, TargetPeriod } from "@/types";
 export const TODAY = "2026-08-17";
 
 // 开放目标值配置的指标（其余指标不支持配置）
-export const SUPPORTED_TARGET_METRICS = ["m1", "m4", "m5", "m7", "m17"];
+export const SUPPORTED_TARGET_METRICS = ["m1", "m4", "m5", "m7", "m17", "m21"];
 
 // 默认支持的考核周期（未单独配置的指标适用）
 export const SUPPORTED_TARGET_PERIODS: TargetPeriod[] = ["月度", "季度", "年度"];
 
-// 物料单耗类指标（烟叶/嘴棒/商标纸）：考核周期支持日度、月度
+// 物料单耗/费用类指标（烟叶/嘴棒/商标纸/单箱可控费用）：考核周期支持日度、月度
 const METRIC_SUPPORTED_PERIODS: Record<string, TargetPeriod[]> = {
   m4: ["日度", "月度"],
   m5: ["日度", "月度"],
   m17: ["日度", "月度"],
+  m21: ["日度", "月度"],
 };
 
 // 指标支持的考核周期选项（表单下拉用）
@@ -312,6 +313,46 @@ let targets: MetricTargetVersion[] = [
     createdAt: "2025-12-22 11:00",
     createdBy: "李四",
     basis: "2026年度物料消耗考核目标（部门预算分解）",
+    remark: "",
+  },
+
+  // ===== m21 单箱可控费用（元/箱，整数；日度/月度双序列） =====
+  {
+    id: "tv-m21-1",
+    version: "V1",
+    metricId: "m21",
+    metricName: "单箱可控费用",
+    period: "日度",
+    direction: "≤",
+    value: 300,
+    unit: "元/箱",
+    effectiveStart: "2026-01-01",
+    effectiveEnd: "2026-12-31",
+    enabled: true,
+    status: "生效中",
+    effectiveTime: "2026-01-01",
+    createdAt: "2025-12-20 09:00",
+    createdBy: "李四",
+    basis: "2026年度费用压降目标（控费专项方案）",
+    remark: "日度管控口径",
+  },
+  {
+    id: "tv-m21-2",
+    version: "V1",
+    metricId: "m21",
+    metricName: "单箱可控费用",
+    period: "月度",
+    direction: "≤",
+    value: 300,
+    unit: "元/箱",
+    effectiveStart: "2026-01-01",
+    effectiveEnd: "2026-12-31",
+    enabled: true,
+    status: "生效中",
+    effectiveTime: "2026-01-01",
+    createdAt: "2025-12-20 09:05",
+    createdBy: "李四",
+    basis: "2026年度费用压降考核目标（部门预算分解）",
     remark: "",
   },
 ];
