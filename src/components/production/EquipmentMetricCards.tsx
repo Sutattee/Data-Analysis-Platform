@@ -67,7 +67,6 @@ export function EquipmentMetricCards() {
             <div className="mb-1 flex items-baseline gap-1">
               <span className="text-2xl font-bold text-gray-900">{fmtNum(c.value, c.decimals)}</span>
               <span className="text-sm text-gray-400">{c.unit}</span>
-              <span className="text-[10px] text-gray-300">昨日</span>
             </div>
             {c.target !== undefined && <CompareLine label="目标值" base={c.target} card={c} />}
             {c.avg !== undefined && <CompareLine label="历史均值" base={c.avg} card={c} />}

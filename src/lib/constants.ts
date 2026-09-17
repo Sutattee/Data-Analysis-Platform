@@ -37,6 +37,7 @@ export const PRIMARY_NAV: NavItem[] = [
       { label: "告警记录", href: "/expense/alert/records",    icon: "📋" },
       { label: "告警管理", href: "/expense/alert/management", icon: "🛠️" },
     ]},
+    { label: "智能问数", href: "/expense/qa", icon: "💬" },
   ], matchPrefixes: ["/expense"] },
   { label: "智能驾驶舱", href: "/cockpit",      icon: "🛰️" },
   { label: "生产管理",   href: "/production",   icon: "🏭", children: [

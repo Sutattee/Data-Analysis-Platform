@@ -19,15 +19,15 @@ function CompletionTooltip({ active, payload }: any) {
   );
 }
 
-// 机台日计划产量月度完成率：16 台机组全量横向条形图（按完成率降序，条侧直接标注完成率）；
+// 月度机台日计划产量完成率：16 台机组全量横向条形图（按完成率降序，条侧直接标注完成率）；
 // 移入展示该机组当月完成日期 / 未完成日期 / 月度完成率
 export function CompletionRateChart() {
   const data = useMemo(() => [...UNIT_COMPLETION].sort((a, b) => b.rate - a.rate), []);
 
   return (
     <Card
-      title="机台日计划产量月度完成率（%）"
-      headerRight={<span className="text-xs text-gray-400">统计范围：8月1日—8月9日</span>}
+      title="月度机台日计划产量完成率（%）"
+      headerRight={<span className="text-xs text-gray-400">统计范围：本月</span>}
     >
       <ResponsiveContainer width="100%" height={440}>
         <BarChart data={data} layout="vertical" margin={{ top: 8, right: 48, left: 12, bottom: 0 }}>

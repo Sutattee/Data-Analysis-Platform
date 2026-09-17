@@ -20,6 +20,10 @@ export const TODAY = "2026-08-17";
 // 开放目标值配置的指标（其余指标不支持配置）
 export const SUPPORTED_TARGET_METRICS = ["m1", "m4", "m5", "m7", "m17", "m21"];
 
+// 开放「达标反推设置」的指标（仅 单箱综合能耗 / 单位产量碳排放量；
+// 物料单耗/费用类指标——烟叶/嘴棒/商标纸/单箱可控费用——只支持目标值管理，不支持反推）
+export const REVERSE_SUPPORTED_METRICS = ["m1", "m7"];
+
 // 默认支持的考核周期（未单独配置的指标适用）
 export const SUPPORTED_TARGET_PERIODS: TargetPeriod[] = ["月度", "季度", "年度"];
 
@@ -366,6 +370,11 @@ function versionNum(v: string): number {
 // 判断指标是否开放目标值配置
 export function isTargetSupported(metricId: string): boolean {
   return SUPPORTED_TARGET_METRICS.includes(metricId);
+}
+
+// 判断指标是否开放「达标反推设置」
+export function isReverseSupported(metricId: string): boolean {
+  return REVERSE_SUPPORTED_METRICS.includes(metricId);
 }
 
 // 某指标的目标值版本列表（最新版本在前）

@@ -13,7 +13,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import { ReverseSettingsDrawer } from "@/components/settings/ReverseSettingsDrawer";
 import { metricList } from "@/lib/mock-data/metric-management";
-import { isTargetSupported } from "@/lib/mock-data/metric-targets";
+import { isTargetSupported, isReverseSupported } from "@/lib/mock-data/metric-targets";
 import type { MetricManage } from "@/types";
 
 // 只读字段
@@ -177,26 +177,27 @@ export default function MetricManagementPage() {
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="inline-flex gap-1">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
-                      {/* 仅 单箱综合能耗 / 单位产量碳排放量 支持目标值管理与达标反推设置 */}
+                      {/* 目标值管理：6 个考核指标开放；达标反推设置：仅 单箱综合能耗 / 单位产量碳排放量 支持
+                          （物料单耗/费用类——烟叶/嘴棒/商标纸/单箱可控费用——只支持目标值管理） */}
                       {isTargetSupported(m.id) && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
-                            onClick={() => router.push(`/settings/metric-management/${m.id}/targets`)}
-                          >
-                            目标值管理
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
-                            onClick={() => setReverseMetric(m)}
-                          >
-                            达标反推设置
-                          </Button>
-                        </>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+                          onClick={() => router.push(`/settings/metric-management/${m.id}/targets`)}
+                        >
+                          目标值管理
+                        </Button>
+                      )}
+                      {isReverseSupported(m.id) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+                          onClick={() => setReverseMetric(m)}
+                        >
+                          达标反推设置
+                        </Button>
                       )}
                       <Button
                         variant="ghost"
