@@ -30,7 +30,7 @@ function diagDate(s?: string): string {
 }
 
 // 诊断记录：全部缺陷代码历次人工诊断记录（只读）；
-// 筛选区为草稿态，点「查询」提交生效；表头列筛选即时联动，统计行与列表随筛选联动
+// 筛选区为草稿态，点「查询」提交生效；表头列筛选即时联动
 export default function DiagnosisRecordsPage() {
   const defaultRange = periodRange(1);
   // 草稿态（筛选区控件绑定）与应用态（驱动数据）分离，查询按钮提交
@@ -63,15 +63,6 @@ export default function DiagnosisRecordsPage() {
       (head.causeType === "all" || d.causeType === head.causeType) &&
       (head.diagnoser === "all" || d.diagnoser === head.diagnoser)
   );
-
-  // 统计行：随全部筛选联动
-  const stats = {
-    total: rows.length,
-    device: rows.filter((d) => d.causeType === "设备").length,
-    material: rows.filter((d) => d.causeType === "材料").length,
-    operation: rows.filter((d) => d.causeType === "操作").length,
-    machines: new Set(rows.filter((d) => d.machine !== "-").map((d) => d.machine)).size,
-  };
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -139,12 +130,12 @@ export default function DiagnosisRecordsPage() {
       <Card>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
           <label className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">缺陷代码</span>
+            <span className="text-xs text-gray-500">缺陷名称</span>
             <div className="w-64">
               <SearchSelect
                 options={[
                   { value: "all", label: "全部" },
-                  ...DEFECT_CATALOG.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` })),
+                  ...DEFECT_CATALOG.map((c) => ({ value: c.code, label: `${c.name}  ${c.code}` })),
                 ]}
                 value={draftCode}
                 onChange={setDraftCode}
@@ -165,39 +156,20 @@ export default function DiagnosisRecordsPage() {
         </div>
       </Card>
 
-      {/* 统计行：随筛选联动 */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-gray-100 bg-white px-5 py-3 text-sm shadow-sm">
-        <span className="text-gray-500">
-          总记录数 <span className="font-semibold text-gray-900">{stats.total}</span> 条
-        </span>
-        <span className="text-gray-500">
-          判定为设备 <span className="font-semibold text-gray-900">{stats.device}</span> 条
-        </span>
-        <span className="text-gray-500">
-          判定为材料 <span className="font-semibold text-gray-900">{stats.material}</span> 条
-        </span>
-        <span className="text-gray-500">
-          判定为操作 <span className="font-semibold text-gray-900">{stats.operation}</span> 条
-        </span>
-        <span className="text-gray-500">
-          涉及机台 <span className="font-semibold text-gray-900">{stats.machines}</span>
-        </span>
-      </div>
-
       {/* 记录列表：表头 5 列支持筛选 */}
       <Card padding={false}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr className="border-b border-gray-100">
-                <th className={th}>缺陷代码</th>
-                <th className={th}>缺陷名称</th>
                 <FilterTh
                   label="缺陷部位"
                   value={head.part}
                   options={uniqValues((d) => catalogOf(d.code)?.part ?? "")}
                   onChange={(v) => setHead((h) => ({ ...h, part: v }))}
                 />
+                <th className={th}>缺陷名称</th>
+                <th className={th}>缺陷代码</th>
                 <FilterTh
                   label="工序"
                   value={head.process}
@@ -232,9 +204,9 @@ export default function DiagnosisRecordsPage() {
               ) : (
                 pageRows.map((d) => (
                   <tr key={d.id} className="transition-colors hover:bg-gray-50">
-                    <td className="px-3 py-2.5 whitespace-nowrap font-mono text-xs text-gray-700">{d.code}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">{catalogOf(d.code)?.name ?? "—"}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{catalogOf(d.code)?.part ?? "—"}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">{catalogOf(d.code)?.name ?? "—"}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap font-mono text-xs text-gray-700">{d.code}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{d.process}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{d.post}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{d.causeType}</td>

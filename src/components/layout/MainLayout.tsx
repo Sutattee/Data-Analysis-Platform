@@ -67,7 +67,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             D
           </div>
           <span className="hidden whitespace-nowrap text-sm font-semibold text-gray-800 md:inline">
-            什邡卷烟厂产质耗KPI分析平台
+            工厂产质耗KPI分析平台
           </span>
         </div>
 
