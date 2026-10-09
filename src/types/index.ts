@@ -516,33 +516,26 @@ export interface MetricTargetVersion {
   disableReason?: string;        // 停用原因
 }
 
-// ========== 折标系数管理（能源折标准煤系数 / 能源碳排放因子，版本化） ==========
-export type CoeffEnergyType = "电" | "蒸汽" | "天然气";
-
-export type CoeffType = "折标准煤系数" | "能源碳排放因子";
+// ========== 折标系数管理（能源折标准煤系数，版本化） ==========
+export type CoeffEnergyType = "电（一类碳排放）" | "天然气（二类碳排放）" | "蒸汽";
 
 export type CoeffStatus = "待生效" | "生效中" | "已失效";
 
-// 折标系数版本：统一维护能源折标准煤系数与碳排放因子，版本化永久保留不可删除
+// 折标煤系数版本：按能源类型维护，版本化永久保留不可删除
 export interface CoefficientVersion {
   id: string;
-  version: string;               // 版本号 V1、V2…（同能源+系数类型+能源来源下系统递增）
+  version: string;               // 版本号 V1、V2…（同能源类型下系统递增）
   energyType: CoeffEnergyType;   // 能源类型
-  coeffType: CoeffType;          // 系数类型
-  energySource: "外购" | "自制"; // 能源来源（蒸汽区分外购/自制，其余固定外购）
-  baseAmount: number;            // 换算基准量（>0，默认 1）
-  baseUnit: string;              // 原始单位（kWh / t / GJ / m³，按能源类型约束）
-  value: number;                 // 换算值（>0，支持小数）
-  resultUnit: string;            // 结果单位（kgce / tce 或 kgCO₂e / tCO₂e）
+  value: number;                 // 折标煤系数（>0，支持小数；单位 kgce/能源计量单位）
   effectiveStart: string;        // 生效周期开始 YYYY-MM-DD
   effectiveEnd: string;          // 生效周期结束 YYYY-MM-DD
-  enabled: boolean;              // 是否启用
-  status: CoeffStatus;           // 状态
+  enabled: boolean;              // 是否启用（是否参与业务计算）
+  status: CoeffStatus;           // 状态（待生效 / 生效中 / 已失效，按周期与启用开关推导）
   basis: string;                 // 来源依据（国家标准 / 政府公告 / 公司内部文件，必填）
-  remark?: string;               // 备注（核算口径说明）
+  remark?: string;               // 备注（≤200 字）
   createdAt: string;             // 创建时间 YYYY-MM-DD HH:mm
   createdBy: string;             // 创建人
-  changeNote?: string;           // 变更说明（编辑生成新版本时必填，≤200 字）
+  changeNote?: string;           // 变更说明（编辑生成新版本时系统记录）
   replacedAt?: string;           // 被新版本替代时间
   disabledAt?: string;           // 停用时间
   disabledBy?: string;           // 停用操作人

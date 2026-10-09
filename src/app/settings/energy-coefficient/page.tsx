@@ -1,7 +1,7 @@
 "use client";
 
-// 折标系数管理：统一维护能源折标准煤系数 / 能源碳排放因子及其历史版本
-// 筛选（能源类型 / 系数类型 / 状态 / 生效日期）+ 系数列表 + 新增/编辑抽屉 + 查看/停用弹窗
+// 折标系数管理：按能源类型维护折标煤系数及其历史版本
+// 筛选（能源类型 / 状态 / 生效日期）+ 右上角新增按钮 + 系数列表 + 新增/编辑抽屉 + 查看/停用弹窗
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -11,10 +11,9 @@ import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { CoefficientFormDrawer } from "@/components/settings/CoefficientFormDrawer";
 import {
-  COEFF_TYPES,
   ENERGY_TYPES,
+  ENERGY_UNITS,
   disableCoefficient,
-  formatExpression,
   listCoefficients,
 } from "@/lib/mock-data/energy-coefficients";
 import type { CoeffStatus, CoefficientVersion } from "@/types";
@@ -36,6 +35,14 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
+// 创建时间展示：2026-01-05 10:30 → 2026/1/5 10:30
+function formatCreatedAt(iso: string): string {
+  const [d, t] = iso.split(" ");
+  if (!d) return iso;
+  const [y, m, day] = d.split("-");
+  return `${y}/${Number(m)}/${Number(day)}${t ? ` ${t}` : ""}`;
+}
+
 function formatNow(): string {
   const d = new Date();
   const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -52,9 +59,8 @@ export default function EnergyCoefficientPage() {
 
   const [rows, setRows] = useState<CoefficientVersion[]>(() => listCoefficients());
 
-  // 筛选条件
+  // 筛选条件：能源类型 / 状态 / 生效日期
   const [fEnergy, setFEnergy] = useState("all");
-  const [fType, setFType] = useState("all");
   const [fStatus, setFStatus] = useState("all");
   const [fDate, setFDate] = useState("");
 
@@ -70,18 +76,17 @@ export default function EnergyCoefficientPage() {
     setLoading(true);
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
-  }, [fEnergy, fType, fStatus, fDate]);
+  }, [fEnergy, fStatus, fDate]);
 
-  // 过滤：能源类型 / 系数类型 / 状态 / 生效日期（该日期落于生效周期内）
+  // 过滤：能源类型 / 状态 / 生效日期（该日期落于生效周期内）
   const filtered = useMemo(() => {
     return rows.filter((c) => {
       if (fEnergy !== "all" && c.energyType !== fEnergy) return false;
-      if (fType !== "all" && c.coeffType !== fType) return false;
       if (fStatus !== "all" && c.status !== fStatus) return false;
       if (fDate && !(c.effectiveStart <= fDate && c.effectiveEnd >= fDate)) return false;
       return true;
     });
-  }, [rows, fEnergy, fType, fStatus, fDate]);
+  }, [rows, fEnergy, fStatus, fDate]);
 
   function reload() {
     setRows(listCoefficients());
@@ -89,7 +94,6 @@ export default function EnergyCoefficientPage() {
 
   function handleReset() {
     setFEnergy("all");
-    setFType("all");
     setFStatus("all");
     setFDate("");
   }
@@ -120,11 +124,13 @@ export default function EnergyCoefficientPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      {/* 标题行 + 右上角新增按钮 */}
+      <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">折标系数管理</h1>
+        <Button onClick={() => setFormBase({ base: null })}>+ 新增系数</Button>
       </div>
 
-      {/* 筛选区 + 新增按钮 */}
+      {/* 筛选区 */}
       <Card padding>
         <div className="flex flex-wrap items-center gap-2">
           <select className={selectCls} value={fEnergy} onChange={(e) => setFEnergy(e.target.value)}>
@@ -132,14 +138,6 @@ export default function EnergyCoefficientPage() {
             {ENERGY_TYPES.map((t) => (
               <option key={t} value={t}>
                 能源类型：{t}
-              </option>
-            ))}
-          </select>
-          <select className={selectCls} value={fType} onChange={(e) => setFType(e.target.value)}>
-            <option value="all">系数类型：全部</option>
-            {COEFF_TYPES.map((t) => (
-              <option key={t} value={t}>
-                系数类型：{t}
               </option>
             ))}
           </select>
@@ -156,14 +154,9 @@ export default function EnergyCoefficientPage() {
             onChange={(e) => setFDate(e.target.value)}
             title="筛选该日期处于生效周期内的版本"
           />
-          {fDate && (
-            <span className="text-xs text-gray-400">生效日期 {fDate} 处于生效周期内</span>
-          )}
+          {fDate && <span className="text-xs text-gray-400">生效日期 {fDate} 处于生效周期内</span>}
           <Button variant="secondary" onClick={handleReset}>
             重置
-          </Button>
-          <Button className="ml-auto" onClick={() => setFormBase({ base: null })}>
-            + 新增系数
           </Button>
         </div>
       </Card>
@@ -175,9 +168,7 @@ export default function EnergyCoefficientPage() {
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
                 <th className={th}>能源类型</th>
-                <th className={th}>系数类型</th>
-                <th className={th}>能源来源</th>
-                <th className={th}>换算关系</th>
+                <th className={th}>折标煤系数</th>
                 <th className={th}>生效周期</th>
                 <th className={th}>状态</th>
                 <th className={th}>版本号</th>
@@ -188,13 +179,13 @@ export default function EnergyCoefficientPage() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
                     加载中…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
                     暂无符合条件的系数
                   </td>
                 </tr>
@@ -202,18 +193,18 @@ export default function EnergyCoefficientPage() {
                 filtered.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-800">{c.energyType}</td>
-                    <td className="px-4 py-3 text-gray-600">{c.coeffType}</td>
-                    <td className="px-4 py-3 text-gray-600">{c.energySource}</td>
-                    <td className="px-4 py-3 text-gray-800">{formatExpression(c)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-800">
+                      1 {ENERGY_UNITS[c.energyType]} = {c.value} kgce
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">
-                      {c.effectiveStart} 至 {c.effectiveEnd}
+                      {c.effectiveStart}至{c.effectiveEnd}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={c.status} />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-600">{c.version}</td>
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                      {c.createdAt}
+                      {formatCreatedAt(c.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="inline-flex gap-1">
@@ -248,7 +239,7 @@ export default function EnergyCoefficientPage() {
         </div>
         {!loading && (
           <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
-            共 {filtered.length} 条；历史版本永久保留，编辑将生成新版本；能耗 / 碳排放计算按统计日期自动匹配当时生效的系数
+            共 {filtered.length} 条
           </div>
         )}
       </Card>
@@ -261,7 +252,7 @@ export default function EnergyCoefficientPage() {
         onSaved={reload}
       />
 
-      {/* 版本详情查看弹窗 */}
+      {/* 版本详情查看弹窗（来源依据 / 创建人等不在列表展示，在详情展示） */}
       <Modal
         open={viewTarget !== null}
         onClose={() => setViewTarget(null)}
@@ -270,13 +261,20 @@ export default function EnergyCoefficientPage() {
         {viewTarget && (
           <div className="space-y-2.5">
             <Field label="能源类型" value={viewTarget.energyType} />
-            <Field label="系数类型" value={viewTarget.coeffType} />
-            <Field label="能源来源" value={viewTarget.energySource} />
-            <Field label="换算关系" value={formatExpression(viewTarget)} />
-            <Field label="生效周期" value={`${viewTarget.effectiveStart} 至 ${viewTarget.effectiveEnd}`} />
+            <Field
+              label="折标煤系数"
+              value={
+                <span>
+                  {viewTarget.value} kgce/{ENERGY_UNITS[viewTarget.energyType]}（1{" "}
+                  {ENERGY_UNITS[viewTarget.energyType]} = {viewTarget.value} kgce）
+                </span>
+              }
+            />
+            <Field label="生效周期" value={`${viewTarget.effectiveStart}至${viewTarget.effectiveEnd}`} />
             <Field label="状态" value={<StatusBadge status={viewTarget.status} />} />
             <Field label="版本号" value={viewTarget.version} />
-            <Field label="创建信息" value={`${viewTarget.createdAt}（${viewTarget.createdBy}）`} />
+            <Field label="创建时间" value={formatCreatedAt(viewTarget.createdAt)} />
+            <Field label="创建人" value={viewTarget.createdBy} />
             <Field label="来源依据" value={viewTarget.basis} />
             {viewTarget.remark && <Field label="备注" value={viewTarget.remark} />}
             {viewTarget.changeNote && <Field label="变更说明" value={viewTarget.changeNote} />}
@@ -300,7 +298,7 @@ export default function EnergyCoefficientPage() {
       >
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-gray-600">
-            停用后该版本立即置为「已失效」，不生成新版本；如需恢复，请新增版本。能耗 / 碳排放计算将不再匹配该版本。
+            停用后该版本立即置为「已失效」，不生成新版本；如需恢复，请新增版本。能耗计算将不再匹配该版本。
           </p>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">

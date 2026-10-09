@@ -50,7 +50,21 @@ export const PRIMARY_NAV: NavItem[] = [
     ]},
     { label: "智能问数", href: "/production/qa", icon: "💬" },
   ], matchPrefixes: ["/production"] },
-  { label: "工艺质量",   href: "/quality",      icon: "✅" },
+  { label: "工艺质量",   href: "/quality",      icon: "✅", children: [
+    { label: "总览", href: "/quality/overview", icon: "📊" },
+    { label: "质量风险预测", href: "/quality/forecast", icon: "📈", children: [
+      { label: "稳定性预测", href: "/quality/forecast/stability", icon: "📉" },
+      { label: "缺陷预测",   href: "/quality/forecast/defect",    icon: "🔮" },
+    ]},
+    { label: "工艺参数推荐", href: "/quality/parameter-recommend", icon: "🎚️" },
+    { label: "告警中心", href: "/quality/alert", icon: "⚠️" },
+    { label: "诊断", href: "/quality/diagnosis", icon: "🩺", children: [
+      { label: "缺陷诊断",   href: "/quality/diagnosis/defect",   icon: "🔍" },
+      { label: "稳定性诊断", href: "/quality/diagnosis/stability", icon: "📐" },
+      { label: "诊断记录",   href: "/quality/diagnosis/records",   icon: "📋" },
+    ]},
+    { label: "智能问数", href: "/quality/qa", icon: "💬" },
+  ], matchPrefixes: ["/quality"] },
   {
     label: "能源消耗",
     href: "/energy",

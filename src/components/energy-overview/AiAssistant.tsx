@@ -25,7 +25,18 @@ const headerBtnCls = (active?: boolean) =>
     active ? "bg-primary-50 font-medium text-primary-600" : "text-gray-500 hover:bg-primary-50 hover:text-primary-600"
   }`;
 
-export function AiAssistant({ children }: { children: React.ReactNode }) {
+// questions / inputPlaceholder：页面级定制推荐问题与输入框提示文字（透传 ChatPanel）
+export function AiAssistant({
+  children,
+  questions,
+  inputPlaceholder,
+  welcomeText,
+}: {
+  children: React.ReactNode;
+  questions?: string[];
+  inputPlaceholder?: string;
+  welcomeText?: string;
+}) {
   const { state, toggleFavorite } = useApp();
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false); // 首次打开后面板常驻挂载（收起不销毁会话）
@@ -137,7 +148,14 @@ export function AiAssistant({ children }: { children: React.ReactNode }) {
           {/* 内容区：对话（常驻挂载保留会话）+ 历史/收藏覆盖视图 */}
           <div className="relative min-h-0 flex-1">
             <div className={chatHidden ? "hidden" : "flex h-full flex-col"}>
-              <ChatPanel key={chatKey} compact welcomeText={WELCOME_TEXT} initialQuery={chatInitialQuery} />
+              <ChatPanel
+                key={chatKey}
+                compact
+                welcomeText={welcomeText ?? WELCOME_TEXT}
+                initialQuery={chatInitialQuery}
+                questions={questions}
+                inputPlaceholder={inputPlaceholder}
+              />
             </div>
 
             {/* 历史问数记录（面板内视图，点击提问可继续对话） */}

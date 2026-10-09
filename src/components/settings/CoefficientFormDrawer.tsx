@@ -1,7 +1,7 @@
 "use client";
 
 // 折标系数 - 新增/编辑表单抽屉（编辑 = 基于原版本生成新版本，原记录永久保留）
-// 表单底部实时展示完整换算关系表达式预览；保存前检测同序列周期冲突
+// 系数单位随能源类型自动带出（kgce/kWh 等）；保存前检测同能源类型周期冲突
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
@@ -9,47 +9,34 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import {
-  BASE_UNITS,
-  COEFF_TYPES,
   ENERGY_TYPES,
-  RESULT_UNITS,
+  ENERGY_UNITS,
   hasPeriodConflict,
   nextVersionOf,
-  previewExpression,
   saveCoefficient,
 } from "@/lib/mock-data/energy-coefficients";
-import type { CoeffEnergyType, CoefficientVersion, CoeffType } from "@/types";
+import type { CoeffEnergyType, CoefficientVersion } from "@/types";
 
 // 表单态（数字输入用字符串，便于校验）
 interface CoeffFormState {
   energyType: CoeffEnergyType;
-  coeffType: CoeffType;
-  energySource: "外购" | "自制";
-  baseAmount: string;
-  baseUnit: string;
-  value: string;
-  resultUnit: string;
+  value: string; // 折标煤系数
   effectiveStart: string;
   effectiveEnd: string;
   enabled: boolean;
   basis: string;
-  changeNote: string;
+  remark: string;
 }
 
 function toFormState(c: CoefficientVersion | null): CoeffFormState {
   return {
-    energyType: c?.energyType ?? "电",
-    coeffType: c?.coeffType ?? "折标准煤系数",
-    energySource: c?.energySource ?? "外购",
-    baseAmount: c ? String(c.baseAmount) : "1",
-    baseUnit: c?.baseUnit ?? "kWh",
+    energyType: c?.energyType ?? "电（一类碳排放）",
     value: c ? String(c.value) : "",
-    resultUnit: c?.resultUnit ?? "kgce",
     effectiveStart: c?.effectiveStart ?? "",
     effectiveEnd: c?.effectiveEnd ?? "",
     enabled: c?.enabled ?? true,
     basis: c?.basis ?? "",
-    changeNote: "",
+    remark: c?.remark ?? "",
   };
 }
 
@@ -103,43 +90,12 @@ export function CoefficientFormDrawer({
     });
   }
 
-  // 切换能源类型：联动原始单位（不在可选列表时重置为第一项）与能源来源（非蒸汽固定外购）
-  function switchEnergyType(t: CoeffEnergyType) {
-    setForm((f) => {
-      const units = BASE_UNITS[t];
-      return {
-        ...f,
-        energyType: t,
-        baseUnit: units.includes(f.baseUnit) ? f.baseUnit : units[0],
-        energySource: t === "蒸汽" ? f.energySource : "外购",
-      };
-    });
-    setErrors({});
-  }
-
-  // 切换系数类型：联动结果单位
-  function switchCoeffType(t: CoeffType) {
-    setForm((f) => {
-      const units = RESULT_UNITS[t];
-      return {
-        ...f,
-        coeffType: t,
-        resultUnit: units.includes(f.resultUnit) ? f.resultUnit : units[0],
-      };
-    });
-    setErrors({});
-  }
-
-  function validate(): { baseAmount: number; value: number } | null {
+  function validate(): number | null {
     const errs: Record<string, string> = {};
 
-    const baseAmount = Number(form.baseAmount);
-    if (!form.baseAmount.trim() || !Number.isFinite(baseAmount) || baseAmount <= 0) {
-      errs.baseAmount = "换算基准量必须为大于 0 的数字";
-    }
     const value = Number(form.value);
     if (!form.value.trim() || !Number.isFinite(value) || value <= 0) {
-      errs.value = "换算值必须为大于 0 的数字（支持小数）";
+      errs.value = "折标煤系数必须为大于 0 的数字（支持小数）";
     }
     if (!form.effectiveStart) errs.effectiveStart = "请选择生效开始日期";
     if (!form.effectiveEnd) errs.effectiveEnd = "请选择生效结束日期";
@@ -148,49 +104,36 @@ export function CoefficientFormDrawer({
     }
     if (!form.basis.trim()) errs.basis = "请填写来源依据（国家标准 / 政府公告 / 公司内部文件）";
     else if (form.basis.length > 200) errs.basis = "来源依据不能超过 200 字";
-    if (isEdit && !form.changeNote.trim()) errs.changeNote = "编辑生成新版本时必须填写变更说明";
-    if (form.changeNote.length > 200) errs.changeNote = "变更说明不能超过 200 字";
+    if (form.remark.length > 200) errs.remark = "备注不能超过 200 字";
 
     setErrors(errs);
     if (Object.keys(errs).length) return null;
-    return { baseAmount, value };
+    return value;
   }
 
-  // 校验通过后：检测同序列周期冲突 → 有冲突先确认，无冲突直接保存
+  // 校验通过后：检测同能源类型周期冲突 → 有冲突先确认，无冲突直接保存
   function handleSave() {
-    const nums = validate();
-    if (!nums) return;
-    const hit = hasPeriodConflict(
-      form.energyType,
-      form.coeffType,
-      form.energySource,
-      form.effectiveStart,
-      form.effectiveEnd,
-      baseVersion?.id
-    );
+    const value = validate();
+    if (value === null) return;
+    const hit = hasPeriodConflict(form.energyType, form.effectiveStart, form.effectiveEnd, baseVersion?.id);
     if (hit) {
       setConflict(hit);
       return;
     }
-    doSave(nums);
+    doSave(value);
   }
 
-  function doSave(nums: { baseAmount: number; value: number }) {
+  function doSave(value: number) {
     setSaving(true);
     saveCoefficient(
       {
         energyType: form.energyType,
-        coeffType: form.coeffType,
-        energySource: form.energySource,
-        baseAmount: nums.baseAmount,
-        baseUnit: form.baseUnit,
-        value: nums.value,
-        resultUnit: form.resultUnit,
+        value,
         effectiveStart: form.effectiveStart,
         effectiveEnd: form.effectiveEnd,
         enabled: form.enabled,
         basis: form.basis.trim(),
-        changeNote: form.changeNote.trim() || undefined,
+        remark: form.remark.trim() || undefined,
         baseVersionId: baseVersion?.id,
       },
       { user: currentUser, now: formatNow() }
@@ -202,16 +145,15 @@ export function CoefficientFormDrawer({
     onSaved();
   }
 
-  // 即将生成的版本号（随序列联动，以保存时系统生成为准）
-  const nextVersion = nextVersionOf(form.energyType, form.coeffType, form.energySource);
-  // 实时表达式预览（填写完整后显示）
-  const baseAmountNum = Number(form.baseAmount);
+  // 即将生成的版本号（随能源类型联动，以保存时系统生成为准）
+  const nextVersion = nextVersionOf(form.energyType);
+  // 系数单位（随能源类型自动带出）
+  const unit = ENERGY_UNITS[form.energyType];
+  // 1 kWh = 已填系数 kgce（灰色换算提示）
   const valueNum = Number(form.value);
-  const previewReady =
-    Number.isFinite(baseAmountNum) &&
-    baseAmountNum > 0 &&
-    Number.isFinite(valueNum) &&
-    valueNum > 0;
+  const conversionTip = `1 ${unit} = ${
+    form.value.trim() && Number.isFinite(valueNum) && valueNum > 0 ? valueNum : "已填系数"
+  } kgce`;
 
   return (
     <>
@@ -232,7 +174,7 @@ export function CoefficientFormDrawer({
         }
       >
         <div className="space-y-5">
-          {/* 能源类型 + 系数类型（单选按钮） */}
+          {/* 能源类型 + 版本号（系统生成，只读） */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>
@@ -241,7 +183,7 @@ export function CoefficientFormDrawer({
               <select
                 className={inputCls}
                 value={form.energyType}
-                onChange={(e) => switchEnergyType(e.target.value as CoeffEnergyType)}
+                onChange={(e) => set("energyType", e.target.value as CoeffEnergyType)}
               >
                 {ENERGY_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -251,137 +193,39 @@ export function CoefficientFormDrawer({
               </select>
             </div>
             <div>
-              <label className={labelCls}>
-                系数类型 <span className="text-red-500">*</span>
-              </label>
-              <div className="flex h-[38px] items-center gap-4">
-                {COEFF_TYPES.map((t) => (
-                  <label key={t} className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      className="accent-primary-600"
-                      checked={form.coeffType === t}
-                      onChange={() => switchCoeffType(t)}
-                    />
-                    {t}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 能源来源（蒸汽区分外购/自制，其余固定外购） */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className={labelCls}>
-                能源来源 <span className="text-red-500">*</span>
-              </label>
-              {form.energyType === "蒸汽" ? (
-                <select
-                  className={inputCls}
-                  value={form.energySource}
-                  onChange={(e) => set("energySource", e.target.value as "外购" | "自制")}
-                >
-                  <option value="外购">外购</option>
-                  <option value="自制">自制</option>
-                </select>
-              ) : (
-                <div className={readonlyCls}>外购</div>
-              )}
-            </div>
-            {/* 版本号（系统生成，只读） */}
-            <div>
               <label className={labelCls}>版本号</label>
               <div className={readonlyCls}>
                 {nextVersion}
                 {isEdit && <span className="ml-1 text-xs">（新）</span>}
               </div>
             </div>
-            {/* 状态（保存后系统推导，只读） */}
-            <div>
-              <label className={labelCls}>状态</label>
-              <div className={readonlyCls}>保存后按生效周期自动判定</div>
-            </div>
           </div>
 
-          {/* 换算关系：基准量 + 原始单位 + 换算值 + 结果单位 */}
+          {/* 折标煤系数：单位随能源类型自动带出，下方灰色换算提示 */}
           <div>
-            <label className={labelCls}>换算关系</label>
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  className={`${inputCls} ${errors.baseAmount ? "border-red-400 focus:ring-red-400" : ""}`}
-                  value={form.baseAmount}
-                  onChange={(e) => set("baseAmount", e.target.value)}
-                  placeholder="基准量"
-                />
-                <p className="mt-0.5 text-center text-xs text-gray-400">换算基准量</p>
-              </div>
-              <div>
-                <select
-                  className={inputCls}
-                  value={form.baseUnit}
-                  onChange={(e) => set("baseUnit", e.target.value)}
-                >
-                  {BASE_UNITS[form.energyType].map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-0.5 text-center text-xs text-gray-400">原始单位</p>
-              </div>
-              <div>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  className={`${inputCls} ${errors.value ? "border-red-400 focus:ring-red-400" : ""}`}
-                  value={form.value}
-                  onChange={(e) => set("value", e.target.value)}
-                  placeholder="换算值"
-                />
-                <p className="mt-0.5 text-center text-xs text-gray-400">换算值</p>
-              </div>
-              <div>
-                <select
-                  className={inputCls}
-                  value={form.resultUnit}
-                  onChange={(e) => set("resultUnit", e.target.value)}
-                >
-                  {RESULT_UNITS[form.coeffType].map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-0.5 text-center text-xs text-gray-400">结果单位</p>
-              </div>
+            <label className={labelCls}>
+              折标煤系数 <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.0001"
+                className={`${inputCls} ${errors.value ? "border-red-400 focus:ring-red-400" : ""}`}
+                value={form.value}
+                onChange={(e) => set("value", e.target.value)}
+                placeholder="请输入"
+              />
+              <span className="flex-shrink-0 text-sm text-gray-500">kgce/{unit}</span>
             </div>
-            {(errors.baseAmount || errors.value) && (
-              <p className="mt-1 text-xs text-red-500">{errors.baseAmount ?? errors.value}</p>
+            {errors.value ? (
+              <p className="mt-1 text-xs text-red-500">{errors.value}</p>
+            ) : (
+              <p className="mt-1 text-xs text-gray-400">{conversionTip}</p>
             )}
-            {/* 实时完整表达式预览 */}
-            <div className="mt-2 rounded-lg border border-primary-100 bg-primary-50/60 px-3 py-2">
-              <span className="text-xs text-primary-700">表达式预览：</span>
-              <span className="ml-1 text-sm font-medium text-gray-800">
-                {previewReady
-                  ? previewExpression(
-                      form.energyType,
-                      baseAmountNum,
-                      form.baseUnit,
-                      valueNum,
-                      form.resultUnit
-                    )
-                  : "—（填写换算基准量与换算值后显示）"}
-              </span>
-            </div>
           </div>
 
-          {/* 生效周期 + 是否启用 */}
+          {/* 生效周期：起止日期（起始不得晚于结束） */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>
@@ -407,20 +251,33 @@ export function CoefficientFormDrawer({
                 value={form.effectiveEnd}
                 onChange={(e) => set("effectiveEnd", e.target.value)}
               />
-              {errors.effectiveEnd ? (
+              {errors.effectiveEnd && (
                 <p className="mt-1 text-xs text-red-500">{errors.effectiveEnd}</p>
-              ) : (
-                <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    checked={form.enabled}
-                    onChange={(e) => set("enabled", e.target.checked)}
-                  />
-                  是否启用（保存后立即按生效周期参与状态判断）
-                </label>
               )}
             </div>
+          </div>
+
+          {/* 是否启用：开关（默认开启） */}
+          <div className="flex items-center justify-between">
+            <div>
+              <label className={labelCls}>
+                是否启用 <span className="text-red-500">*</span>
+              </label>
+            </div>
+            <button
+              type="button"
+              onClick={() => set("enabled", !form.enabled)}
+              className={`inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                form.enabled ? "bg-primary-600" : "bg-gray-300"
+              }`}
+              title={form.enabled ? "点击关闭" : "点击开启"}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  form.enabled ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
           </div>
 
           {/* 来源依据（必填） */}
@@ -433,7 +290,7 @@ export function CoefficientFormDrawer({
               className={`${inputCls} ${errors.basis ? "border-red-400 focus:ring-red-400" : ""}`}
               value={form.basis}
               onChange={(e) => set("basis", e.target.value)}
-              placeholder="如国家标准 GB/T 2589-2020 / 政府公告 / 公司内部文件名称"
+              placeholder="填写国家标准、政府公告或公司内部文件"
             />
             <div className="mt-1 flex justify-between">
               {errors.basis ? <p className="text-xs text-red-500">{errors.basis}</p> : <span />}
@@ -441,36 +298,23 @@ export function CoefficientFormDrawer({
             </div>
           </div>
 
-          {/* 变更说明（编辑生成新版本时必填） */}
-          {isEdit && (
-            <div>
-              <label className={labelCls}>
-                变更说明 <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={3}
-                maxLength={200}
-                className={`${textareaCls} ${errors.changeNote ? "border-red-400 focus:ring-red-400" : ""}`}
-                value={form.changeNote}
-                onChange={(e) => set("changeNote", e.target.value)}
-                placeholder="说明本次相对原版本的变更内容与原因"
-              />
-              <div className="mt-1 flex justify-between">
-                {errors.changeNote ? (
-                  <p className="text-xs text-red-500">{errors.changeNote}</p>
-                ) : (
-                  <span />
-                )}
-                <span className="text-xs text-gray-400">{form.changeNote.length}/200</span>
-              </div>
+          {/* 备注（选填，≤200 字） */}
+          <div>
+            <label className={labelCls}>备注</label>
+            <textarea
+              rows={3}
+              maxLength={200}
+              className={`${textareaCls} ${errors.remark ? "border-red-400 focus:ring-red-400" : ""}`}
+              value={form.remark}
+              onChange={(e) => set("remark", e.target.value)}
+              placeholder="补充说明（选填，不超过 200 字）"
+            />
+            <div className="mt-1 flex justify-between">
+              {errors.remark ? <p className="text-xs text-red-500">{errors.remark}</p> : <span />}
+              <span className="text-xs text-gray-400">{form.remark.length}/200</span>
             </div>
-          )}
-
-          {/* 系统生成只读信息 */}
-          <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-400">
-            创建时间 / 创建人 由系统自动生成；版本号在同「能源类型 + 系数类型 + 能源来源」序列下自动递增，
-            编辑将生成新版本（原版本永久保留），新版本到达生效时间后自动替代旧版本。
           </div>
+
         </div>
       </Drawer>
 
@@ -478,9 +322,9 @@ export function CoefficientFormDrawer({
       <Modal open={conflict !== null} onClose={() => setConflict(null)} title="生效周期冲突确认" size="sm">
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-gray-600">
-            检测到同序列（{form.energyType} · {form.coeffType} · {form.energySource}）下版本{" "}
+            检测到同能源类型（{form.energyType}）下版本{" "}
             <span className="font-medium text-gray-800">{conflict?.version}</span>
-            （{conflict?.effectiveStart} 至 {conflict?.effectiveEnd}，{conflict?.status}）与本次设置的生效周期重叠。
+            （{conflict?.effectiveStart}至{conflict?.effectiveEnd}，{conflict?.status}）与本次设置的生效周期重叠。
             保存后，新版本到达生效时间将自动替代该版本（旧版本置为已失效并记录替代时间）。是否继续保存？
           </p>
           <div className="flex justify-end gap-2 pt-1">
@@ -489,8 +333,8 @@ export function CoefficientFormDrawer({
             </Button>
             <Button
               onClick={() => {
-                const nums = validate();
-                if (nums) doSave(nums);
+                const value = validate();
+                if (value !== null) doSave(value);
               }}
             >
               确认保存

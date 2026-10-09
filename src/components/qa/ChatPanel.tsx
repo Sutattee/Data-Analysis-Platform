@@ -55,16 +55,22 @@ function detectVisitBoard(text: string): VisitBoard {
 // compact：嵌入侧滑窗等窄容器时使用（压缩欢迎模式排版，交互能力不变）
 // welcomeText：自定义欢迎语（如能耗三页 AI 助手传入业务化开场白，仅欢迎模式展示）
 // suppressHistory：案例演示模式（不计入业务问数历史、热门问题统计）
+// questions：页面级 AI 助手传入的定制推荐问题（由本页数据情况生成，默认用全局推荐）
+// inputPlaceholder：定制输入框提示文字（如「问一句本页数据」）
 export function ChatPanel({
   initialQuery,
   compact = false,
   welcomeText,
   suppressHistory = false,
+  questions,
+  inputPlaceholder,
 }: {
   initialQuery?: string;
   compact?: boolean;
   welcomeText?: string;
   suppressHistory?: boolean;
+  questions?: string[];
+  inputPlaceholder?: string;
 }) {
   const { toggleFavorite, addHistory, isFavorited, addRecentVisit, state } = useApp();
 
@@ -441,7 +447,7 @@ export function ChatPanel({
                 sendMessage(input);
               }
             }}
-            placeholder="请输入您的问题，例如：今天产量是多少？"
+            placeholder={inputPlaceholder ?? "请输入您的问题，例如：今天产量是多少？"}
             disabled={loading}
             rows={6}
             className="w-full pl-4 pr-12 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 resize-none transition-all duration-200"
@@ -558,10 +564,10 @@ export function ChatPanel({
                 )}
               </div>
 
-              {/* 推荐问题 */}
+              {/* 推荐问题（页面级定制优先） */}
               <p className="text-sm font-medium text-gray-600 mb-3">推荐问题</p>
               <div className="flex flex-wrap gap-2 mb-6">
-                {RECOMMENDED_QUESTIONS.map((q) => (
+                {(questions ?? RECOMMENDED_QUESTIONS).map((q) => (
                   <button
                     key={q}
                     onClick={() => sendMessage(q)}
