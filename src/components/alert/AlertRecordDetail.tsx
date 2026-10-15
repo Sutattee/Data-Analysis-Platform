@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS, applyHandledOverride, confirmAlertHandled } from "@/lib/mock-data/alerts";
 import { expenseAlertRecordById } from "@/lib/mock-data/expense-alerts";
+import { qualityDetailFieldsOf, qualityCycleUnitOf, TYPE_DISPLAY } from "@/lib/mock-data/quality-alerts";
 import { generateAnomalyReply } from "@/lib/mock-data/anomaly-ai";
 import type { AlertRecord } from "@/types";
 
@@ -27,12 +28,13 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 // 告警记录详情（/alert/records/[id] 与 /production/alert/records/[id] 共用）
 // basePath：面包屑与最近访问的返回路径（生产管理入口传 /production/alert/records）
 // layout="expense"：费用口径字段（所属部门单值 + 预算执行率/计划执行进度/执行进度偏差三件套）
+// layout="quality"：工艺质量口径字段（批次按告警类型区分展示 + 预测型预测窗口 + 处理情况卡与底部确认）
 export function AlertRecordDetail({
   basePath = "/alert/records",
   layout = "default",
 }: {
   basePath?: string;
-  layout?: "default" | "expense";
+  layout?: "default" | "expense" | "quality";
 }) {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -40,6 +42,7 @@ export function AlertRecordDetail({
   const { state, addRecentVisit } = useApp();
   const isAdmin = state.user?.role === "管理员";
   const isExpense = layout === "expense";
+  const isQuality = layout === "quality";
 
   // 费用口径兜底：费用页「查看告警详情」按需生成的记录不在 ALERT_RECORDS（列表仅 30 条示例）；
   // 应用会话内「确认」处理覆盖（预置 handledBy 优先）
@@ -160,14 +163,15 @@ export function AlertRecordDetail({
     setSuggestionEditing(false);
   }
 
-  // 处理情况「确认」（费用口径）：状态置为已处理，处理人记为周婷（模拟数据），时间取当前
-  function handleConfirm() {
+  // 处理情况「确认」（质量口径 = 确认为异常/判为偶发双按钮，确认结果随按钮记录；费用口径 = 确认已处理）：
+  // 状态置为已处理，处理人记为周婷（模拟数据），确认时间取当前
+  function handleConfirm(result?: string) {
     if (!record || record.handledBy) return;
     const now = new Date();
     const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
     const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    confirmAlertHandled(record.id, "周婷", at);
-    setRecord((prev) => (prev ? { ...prev, handledBy: "周婷", handledAt: at } : prev));
+    confirmAlertHandled(record.id, "周婷", at, result);
+    setRecord((prev) => (prev ? { ...prev, handledBy: "周婷", handledAt: at, handleResult: result } : prev));
     toast("告警已处理", "success");
   }
 
@@ -176,9 +180,9 @@ export function AlertRecordDetail({
       {/* ===== 顶部固定：面包屑 + 标题 ===== */}
       <div className="flex-shrink-0">
         <div className="flex items-center gap-1.5 text-sm text-gray-400 mb-2">
-          {isExpense ? (
+          {isExpense || isQuality ? (
             <>
-              <Link href="/expense/alert" className="hover:text-primary-600">告警中心</Link>
+              <Link href={isExpense ? "/expense/alert" : "/quality/alert"} className="hover:text-primary-600">告警中心</Link>
               <span>/</span>
               <span className="text-gray-600">告警记录详情</span>
             </>
@@ -211,18 +215,43 @@ export function AlertRecordDetail({
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4">
         {/* 基本信息 */}
         <Card title="基本信息">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
-            <Field label="告警编号" value={record.id} />
-            <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
-            <Field label="业务域" value={record.domain} />
-            {/* 费用口径：所属部门 = 触发告警的那个部门 */}
-            {isExpense ? (
-              <Field label="所属部门" value={record.objectName} />
-            ) : (
-              <Field label="告警对象" value={`${record.objectName}（${record.objectCode}）`} />
-            )}
-            <Field label="告警触发时间" value={record.triggerTime} />
-          </div>
+          {isQuality ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
+              <Field label="告警类型" value={TYPE_DISPLAY[record.type]} />
+              <Field label="业务域" value={record.domain} />
+              {/* 扩展字段按指标展示（批次/机台/班组/牌号的支持组合因指标而异，机台 = 告警对象）；
+                  批次值由数据层按类型生成：实测「第 2417 批」/ 预测「第 2418 批（3个批次后）」 */}
+              {qualityDetailFieldsOf(record.metricName).map((f) => {
+                if (f === "machine") return <Field key={f} label="机台" value={record.objectName} />;
+                if (f === "batch") return <Field key={f} label="批次" value={record.batch} />;
+                if (f === "shift") return <Field key={f} label="班组" value={record.shift} />;
+                return <Field key={f} label="牌号" value={record.brand} />;
+              })}
+              {/* 班次（白班/夜班，班周期指标按触发时间推定；批次/月度指标无 → 不展示） */}
+              {record.shiftLabel && <Field label="班次" value={record.shiftLabel} />}
+              {/* 来源工序（SF 稳定性指标关联；结果类指标无 → 不展示） */}
+              {record.process && <Field label="工序" value={record.process} />}
+              {/* 工艺质量口径：预测风险型记录展示预测窗口（如「未来10个批次」）；实测异常不展示 */}
+              {isQuality && record.type === "预测风险" && (
+                <Field label="预测窗口" value={record.forecastWindow} />
+              )}
+              <Field label="告警触发时间" value={record.triggerTime} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <Field label="告警编号" value={record.id} />
+              <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
+              <Field label="业务域" value={record.domain} />
+              {/* 费用口径：所属部门 = 触发告警的那个部门 */}
+              {isExpense ? (
+                <Field label="所属部门" value={record.objectName} />
+              ) : (
+                <Field label="告警对象" value={`${record.objectName}（${record.objectCode}）`} />
+              )}
+              <Field label="告警触发时间" value={record.triggerTime} />
+            </div>
+          )}
         </Card>
 
         {/* 核心告警数据（费用口径：预算执行率 / 计划执行进度 / 执行进度偏差） */}
@@ -264,6 +293,10 @@ export function AlertRecordDetail({
               }
             />
             <Field label="触发条件" value={record.triggerCondition} />
+            {/* 工艺质量口径：飘移类记录展示连续同向偏离（如「3个批次」，单位随指标周期） */}
+            {isQuality && record.consecutiveShifts != null && (
+              <Field label="连续同向偏离" value={`${record.consecutiveShifts}个${qualityCycleUnitOf(record.metricName)}`} />
+            )}
           </div>
         </Card>
 
@@ -295,7 +328,11 @@ export function AlertRecordDetail({
                 </div>
               ) : (
                 <p className="text-sm text-gray-800 break-words">
-                  {record.causeSummary || <span className="text-gray-400">暂未识别到明确原因</span>}
+                  {record.causeSummary || (
+                    <span className="text-gray-400">
+                      {isQuality ? "当前数据不足，暂无法确定异常原因" : "暂未识别到明确原因"}
+                    </span>
+                  )}
                 </p>
               )}
               {record.causeSummary && !causeEditing && (
@@ -336,8 +373,8 @@ export function AlertRecordDetail({
           </div>
         </Card>
 
-        {/* 处理情况（费用口径：处理人 + 状态；底部「确认」后置为已处理） */}
-        {isExpense && (
+        {/* 处理情况（费用/质量口径：处理人 + 状态；质量另含确认结果与确认时间；底部按钮确认后置为已处理） */}
+        {(isExpense || isQuality) && (
           <Card title="处理情况">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
               <Field label="处理人" value={record.handledBy} />
@@ -349,12 +386,14 @@ export function AlertRecordDetail({
                   </span>
                 }
               />
+              {isQuality && <Field label="确认结果" value={record.handleResult} />}
+              {isQuality && <Field label="确认时间" value={record.handledAt} />}
             </div>
           </Card>
         )}
 
-        {/* 责任与处理情况（费用口径不展示） */}
-        {!isExpense && (
+        {/* 责任与处理情况（费用/质量口径不展示，质量已在处理情况卡内） */}
+        {!isExpense && !isQuality && (
         <Card title="责任与处理情况">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
             <Field label="接收人" value={record.receiver} />
@@ -381,10 +420,18 @@ export function AlertRecordDetail({
         )}
       </div>
 
-      {/* 底部「确认已处理」按钮（费用口径：未处理时展示，居中；点击后状态置为已处理并提示） */}
-      {isExpense && !record.handledBy && (
-        <div className="flex-shrink-0 flex justify-center">
-          <Button onClick={handleConfirm}>确认已处理</Button>
+      {/* 底部处理按钮（未处理时展示，居中）：质量口径 =「确认为异常」「判为偶发」双按钮，确认结果随按钮记录；
+          费用口径 =「确认已处理」；点击后状态置为已处理并提示 */}
+      {(isExpense || isQuality) && !record.handledBy && (
+        <div className="flex-shrink-0 flex justify-center gap-3">
+          {isQuality ? (
+            <>
+              <Button onClick={() => handleConfirm("确认为异常")}>确认为异常</Button>
+              <Button onClick={() => handleConfirm("判为偶发")}>判为偶发</Button>
+            </>
+          ) : (
+            <Button onClick={() => handleConfirm()}>确认已处理</Button>
+          )}
         </div>
       )}
 

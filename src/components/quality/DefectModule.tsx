@@ -193,8 +193,8 @@ export function DefectModule() {
               <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr className="text-left text-gray-500">
                   <th className="px-2.5 py-2 font-medium whitespace-nowrap">缺陷名称</th>
-                  <th className="px-2.5 py-2 font-medium whitespace-nowrap">代码</th>
-                  <th className="px-2.5 py-2 font-medium whitespace-nowrap">班次</th>
+                  <th className="px-2.5 py-2 font-medium whitespace-nowrap">批次</th>
+                  <th className="px-2.5 py-2 font-medium whitespace-nowrap">机台</th>
                   <th className="px-2.5 py-2 font-medium whitespace-nowrap">日期</th>
                 </tr>
               </thead>
@@ -202,8 +202,8 @@ export function DefectModule() {
                 {EMERGING_DEFECTS.map((d) => (
                   <tr key={d.id} className="bg-white transition-colors hover:bg-gray-50">
                     <td className="px-2.5 py-2 whitespace-nowrap text-gray-800">{d.name}</td>
-                    <td className="px-2.5 py-2 font-mono text-[10px] whitespace-nowrap text-gray-500">{d.code}</td>
-                    <td className="px-2.5 py-2 whitespace-nowrap text-gray-600">{d.shift}</td>
+                    <td className="px-2.5 py-2 font-mono text-[10px] whitespace-nowrap text-gray-500">{d.batch}</td>
+                    <td className="px-2.5 py-2 whitespace-nowrap text-gray-600">{d.machine}</td>
                     <td className="px-2.5 py-2 whitespace-nowrap text-gray-500">{d.date}</td>
                   </tr>
                 ))}

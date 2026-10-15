@@ -150,6 +150,30 @@ const ICON_MAP: Record<string, React.ReactNode> = {
     </svg>
   ),
 
+  // ===== 工艺质量板块 =====
+  // 工艺参数推荐：调音推子（双轨滑块，推子一高一低示意调节）
+  "🎚️": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#06B6D4" />
+      <rect x="6.25" y="4" width="1.5" height="12" rx="0.75" fill="white" opacity="0.5" />
+      <rect x="12.25" y="4" width="1.5" height="12" rx="0.75" fill="white" opacity="0.5" />
+      <rect x="3.75" y="6.5" width="6.5" height="2.2" rx="1.1" fill="white" />
+      <rect x="9.75" y="11" width="6.5" height="2.2" rx="1.1" fill="white" />
+    </svg>
+  ),
+  // 诊断：听诊器（U 形耳管 + 膜片）
+  "🩺": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#10B981" />
+      <path d="M6 4.5V9C6 11 7.5 12.5 10 12.5C12.5 12.5 14 11 14 9V4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+      <circle cx="6" cy="4" r="1" fill="white" />
+      <circle cx="14" cy="4" r="1" fill="white" />
+      <path d="M10 12.5V13.8" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="10" cy="15.3" r="2" fill="white" />
+      <circle cx="10" cy="15.3" r="0.8" fill="#10B981" />
+    </svg>
+  ),
+
   // ===== 一级导航 =====
   "🏠": (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">

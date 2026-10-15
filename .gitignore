@@ -8,6 +8,8 @@ lerna-debug.log*
 
 node_modules/
 .next/
+.next-corrupted-*/
+.trash/
 out/
 .env.local
 .env.development.local

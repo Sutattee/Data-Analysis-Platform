@@ -3,7 +3,7 @@
 // 两组参数映射（包装组 / 卷接组），同组缺陷共用展示参数，各缺陷独立模型与判定规则；
 // 风险评分 0-1，等级：低 <0.40（黄）/ 中 0.40-0.70（橙）/ 高 ≥0.70（红）；
 // 参考范围 / 基准值原表标注「待提供」，此处预置模拟值供演示，可直接替换。
-import { DEFECT_RECORDS, catalogOf } from "@/lib/mock-data/quality-defect";
+import { BRAND_OPTIONS, DEFECT_RECORDS, SHIFT_OPTIONS, catalogOf } from "@/lib/mock-data/quality-defect";
 
 // ============ 参数映射 ============
 
@@ -67,9 +67,11 @@ export function groupOf(code: string): GroupKey {
 // ============ 预测结果 ============
 
 export interface TrendPoint {
-  t: string; // 实际日期时间 2026-10-09 12:00
-  label: string; // 横轴刻度：−5小时 / 现在 / ＋1小时 …
+  label: string; // 批次号（横轴刻度，如 97684）
   score: number; // 风险评分 0-1
+  brand: string; // 牌号
+  shiftGroup: string; // 班组（甲班/乙班/丙班）
+  shiftLabel: string; // 班次（如 10-9白班）
 }
 
 export interface ForecastParamValue {
@@ -84,9 +86,9 @@ export interface DefectForecast {
   score: number; // 当前风险评分（= 历史末点 = 未来首点）
   confidence: number; // 模型置信度 0-1
   updatedAt: string; // 预测更新时间（本次预测生成时刻）
-  windowHours: 8; // 预测窗口
-  hist: TrendPoint[]; // 历史风险（−5小时 … 现在，实线）
-  future: TrendPoint[]; // 未来预测（现在 … ＋8小时，虚线）
+  windowBatches: 10; // 预测窗口（未来批次数）
+  hist: TrendPoint[]; // 历史风险（近5个批次 … 当前批次，实线）
+  future: TrendPoint[]; // 未来预测（当前批次 … 未来10个批次，虚线）
   params: ForecastParamValue[]; // 本轮预测实际使用的参数
   insufficient?: boolean; // 必需输入不满足模型要求 → 整次预测标「数据不足」
 }
@@ -113,7 +115,9 @@ interface ForecastSeed {
   score: number;
   conf: number;
   updatedAt: string;
-  shape: "rising" | "falling" | "flat"; // 趋势形态（生成 hist / future 序列）
+  // 趋势形态（生成 hist / future 序列）；surgeMid / surgeHigh = 当前低风险、
+  // 预测窗口内分别越过中风险阈值 0.40 / 高风险阈值 0.70 的演示形态
+  shape: "rising" | "falling" | "flat" | "surgeMid" | "surgeHigh";
   values: (number | null)[];
   phis: number[];
   insufficient?: boolean;
@@ -182,9 +186,10 @@ const SEEDS: ForecastSeed[] = [
     phis: [0.09, 0.06, 0, 0, 0.03],
   },
   {
-    code: "JKKTB", machine: "5#卷接包机组", score: 0.29, conf: 0.86, updatedAt: "2026-10-09 08:50", shape: "falling",
-    values: [6600, 4.5, 0.27, 24, 52],
-    phis: [0, -0.02, 0.01, 0, 0],
+    // 示例二：当前低风险（0.28）→ 预测窗口内越过高风险阈值 0.70（第9个批次 0.73）
+    code: "JKKTB", machine: "5#卷接包机组", score: 0.28, conf: 0.86, updatedAt: "2026-10-09 08:50", shape: "surgeHigh",
+    values: [7300, 4.0, 0.33, 28, 70],
+    phis: [0.16, 0.14, 0.06, 0.01, 0.08],
   },
   // ===== 滤嘴缩头 =====
   {
@@ -193,9 +198,10 @@ const SEEDS: ForecastSeed[] = [
     phis: [0.14, 0, 0.12, 0, 0.04],
   },
   {
-    code: "JZSTC", machine: "4#卷接包机组", score: 0.38, conf: 0.84, updatedAt: "2026-10-09 09:10", shape: "flat",
-    values: [6700, 4.6, 0.29, 24, 56],
-    phis: [0, -0.015, 0.02, 0, 0],
+    // 示例一：当前低风险（0.32）→ 预测窗口内越过中风险阈值 0.40（第4个批次 0.40，峰值 0.44 不及高风险）
+    code: "JZSTC", machine: "4#卷接包机组", score: 0.32, conf: 0.84, updatedAt: "2026-10-09 09:10", shape: "surgeMid",
+    values: [7100, 4.2, 0.33, 26, 66],
+    phis: [0.11, 0.07, 0.05, 0, 0.03],
   },
   {
     code: "JZSTC", machine: "3#卷接包机组", score: 0.44, conf: 0.8, updatedAt: "2026-10-09 08:20", shape: "flat",
@@ -204,41 +210,78 @@ const SEEDS: ForecastSeed[] = [
   },
 ];
 
-// ---- 趋势序列生成（确定性，评分与「现在」点同口径）----
+// ---- 趋势序列生成（确定性，评分与当前批次点同口径）----
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const clamp01 = (n: number) => Math.min(0.95, Math.max(0.05, n));
 
-// "2026-10-09 08:00" 偏移 n 小时 → 同格式
-function addHour(iso: string, n: number): string {
-  const d = new Date(Date.parse(`${iso}:00`.replace(" ", "T")));
-  d.setHours(d.getHours() + n);
-  const p = (x: number) => (x < 10 ? `0${x}` : `${x}`);
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+// 预测更新时间偏移 n 天 → 「M-D」展示（无前导零，与班次标签格式一致）
+function addDayMD(iso: string, n: number): string {
+  const d = new Date(Date.parse(`${iso.slice(0, 10)}T00:00:00Z`));
+  d.setUTCDate(d.getUTCDate() + n);
+  return `${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
 }
 
-// hist 形态系数（乘 score 得各点）与 future 增量
+// 点位生产上下文（牌号/班组/班次）：班次按每日白班/夜班两班倒推定（当前班型由预测更新
+// 时间推定，8~20 点白班），偏移奇数班取相反班型、日期 = 偏移天数÷2 向下取整；
+// 牌号/班组以当前批次上下文为锚，按批次偏移轮换（负偏移取模回正）
+function pointMetaOf(
+  g: number, // 全局批次序号：历史 0..5（末位 = 当前批次）、预测 i → 5 + i
+  updatedAt: string,
+  brandAnchor: number,
+  shiftAnchor: number
+): { brand: string; shiftGroup: string; shiftLabel: string } {
+  const s = g - 5; // 相对当前批次的偏移（负 = 历史）
+  const hour = Number(updatedAt.slice(11, 13));
+  const baseType = hour >= 8 && hour < 20 ? "白班" : "夜班";
+  const type = (((s % 2) + 2) % 2) === 0 ? baseType : baseType === "白班" ? "夜班" : "白班";
+  return {
+    brand: BRAND_OPTIONS[(((brandAnchor + s) % BRAND_OPTIONS.length) + BRAND_OPTIONS.length) % BRAND_OPTIONS.length],
+    shiftGroup: SHIFT_OPTIONS[(((shiftAnchor + s) % SHIFT_OPTIONS.length) + SHIFT_OPTIONS.length) % SHIFT_OPTIONS.length],
+    shiftLabel: `${addDayMD(updatedAt, Math.floor(s / 2))}${type}`,
+  };
+}
+
+// hist 形态系数（乘 score 得各点，近5个批次 + 当前批次）与 future 增量（当前 + 未来10个批次）；
+// surge* 形态 = 低风险起步、窗口内加速上冲越过对应阈值
 const HIST_FACTORS: Record<ForecastSeed["shape"], number[]> = {
   rising: [0.6, 0.66, 0.72, 0.79, 0.9, 1],
   falling: [1.28, 1.24, 1.19, 1.14, 1.07, 1],
   flat: [0.97, 1.01, 0.99, 1.03, 0.99, 1],
+  surgeMid: [0.5, 0.56, 0.63, 0.72, 0.86, 1],
+  surgeHigh: [0.55, 0.6, 0.68, 0.78, 0.9, 1],
 };
 const FUTURE_DELTAS: Record<ForecastSeed["shape"], number[]> = {
-  rising: [0, 0.02, 0.04, 0.05, 0.06, 0.05, 0.04, 0.03, 0.02],
-  falling: [0, -0.02, -0.04, -0.05, -0.06, -0.08, -0.09, -0.11, -0.12],
-  flat: [0, 0.01, -0.01, 0.01, 0, -0.01, 0.01, 0, -0.01],
+  rising: [0, 0.02, 0.04, 0.05, 0.06, 0.05, 0.04, 0.03, 0.02, 0.02, 0.01],
+  falling: [0, -0.02, -0.04, -0.05, -0.06, -0.08, -0.09, -0.11, -0.12, -0.13, -0.14],
+  flat: [0, 0.01, -0.01, 0.01, 0, -0.01, 0.01, 0, -0.01, 0, 0.01],
+  // 0.32 → 0.44（第4个批次达 0.40 中风险，峰值不及高风险）
+  surgeMid: [0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.11, 0.12, 0.12, 0.11, 0.1],
+  // 0.28 → 0.76（第3个批次达中风险，第9个批次 0.73 达高风险）
+  surgeHigh: [0, 0.04, 0.08, 0.13, 0.18, 0.24, 0.3, 0.36, 0.41, 0.45, 0.48],
 };
 
-function buildTrend(score: number, shape: ForecastSeed["shape"], updatedAt: string): { hist: TrendPoint[]; future: TrendPoint[] } {
+function buildTrend(
+  score: number,
+  shape: ForecastSeed["shape"],
+  updatedAt: string,
+  code: string,
+  machine: string
+): { hist: TrendPoint[]; future: TrendPoint[] } {
+  // 当前批次生产上下文（与对象信息行同源）：批次号 + 牌号/班组锚点
+  const ctx = contextOf(code, machine);
+  const baseBatch = Number(ctx.batch) || 90000;
+  const brandAnchor = Math.max(0, BRAND_OPTIONS.indexOf(ctx.brand));
+  const shiftAnchor = Math.max(0, SHIFT_OPTIONS.indexOf(ctx.shift));
   const hist = HIST_FACTORS[shape].map((f, i) => ({
-    t: addHour(updatedAt, i - 5),
-    label: i === 5 ? "现在" : `−${5 - i}小时`,
+    label: String(baseBatch - 5 + i),
     score: round2(clamp01(score * f)),
+    ...pointMetaOf(i, updatedAt, brandAnchor, shiftAnchor),
   }));
   const future = FUTURE_DELTAS[shape].map((d, i) => ({
-    t: addHour(updatedAt, i),
-    label: i === 0 ? "现在" : `＋${i}小时`,
+    label: String(baseBatch + i),
     score: round2(clamp01(score + d)),
+    ...pointMetaOf(5 + i, updatedAt, brandAnchor, shiftAnchor),
   }));
   return { hist, future };
 }
@@ -246,14 +289,14 @@ function buildTrend(score: number, shape: ForecastSeed["shape"], updatedAt: stri
 // 展开为完整预测结果
 const FORECASTS: DefectForecast[] = SEEDS.map((s) => {
   const group = PARAM_GROUPS[groupOf(s.code)];
-  const { hist, future } = buildTrend(s.score, s.shape, s.updatedAt);
+  const { hist, future } = buildTrend(s.score, s.shape, s.updatedAt, s.code, s.machine);
   return {
     code: s.code,
     machine: s.machine,
     score: s.score,
     confidence: s.conf,
     updatedAt: s.updatedAt,
-    windowHours: 8,
+    windowBatches: 10,
     hist,
     future,
     params: group.params.map((p, i) => ({ key: p.key, value: s.values[i], phi: s.phis[i] })),
@@ -279,7 +322,19 @@ export function forecastOf(code: string, machine: string): DefectForecast | unde
   return FORECASTS.find((f) => f.code === code && f.machine === machine);
 }
 
-// 生产上下文：批次 / 牌号 / 班次取该缺陷 + 机台最新检验记录带出，无则 —；工序 = 组工序；部位 = 档案部位
+// 无检验记录的组合用确定性模拟兜底（批次 9 万段避开记录池，保证生产上下文完整展示）
+function fallbackContext(code: string, machine: string): { batch: string; brand: string; shift: string } {
+  let h = 0;
+  const s = `${code}|${machine}`;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 9973;
+  return {
+    batch: String(90000 + (h % 9999)),
+    brand: BRAND_OPTIONS[h % BRAND_OPTIONS.length],
+    shift: SHIFT_OPTIONS[h % SHIFT_OPTIONS.length],
+  };
+}
+
+// 生产上下文：批次 / 牌号 / 班次取该缺陷 + 机台最新检验记录带出，无记录时确定性模拟兜底；工序 = 组工序；部位 = 档案部位
 export function contextOf(code: string, machine: string): {
   batch: string;
   brand: string;
@@ -291,13 +346,23 @@ export function contextOf(code: string, machine: string): {
   const rec = DEFECT_RECORDS.filter((r) => r.code === code && r.machine === machine).sort((a, b) =>
     `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`)
   )[0];
+  const fb = fallbackContext(code, machine);
   return {
-    batch: rec?.batch ?? "—",
-    brand: rec?.brand ?? "—",
-    shift: rec?.shift ?? "—",
+    batch: rec?.batch ?? fb.batch,
+    brand: rec?.brand ?? fb.brand,
+    shift: rec?.shift ?? fb.shift,
     process: PARAM_GROUPS[groupOf(code)].process,
     part: cat?.part ?? "—",
   };
+}
+
+// 高风险预测：当前批次已达阈值 / 预计N个批次内达阈值（首次越过 0.70 的批次序数）/ 未来10个批次未达阈值 / 暂无法预测
+export function etaOf(f: DefectForecast): string {
+  if (f.insufficient) return "暂无法预测";
+  if (f.score >= 0.7) return "已达阈值";
+  const idx = f.future.slice(1).findIndex((p) => p.score >= 0.7);
+  if (idx >= 0) return `预计${idx + 1}个批次内达阈值`;
+  return `未来${f.windowBatches}个批次未达阈值`;
 }
 
 // ============ 参数展示派生 ============
@@ -373,23 +438,28 @@ const ADVICE: Record<string, string> = {
   envHum: "车间湿度测点与除湿设备运行",
 };
 
-export function aiInterpretation(f: DefectForecast, code: string, machine: string): string[] {
-  const name = catalogOf(code)?.name ?? code;
-  if (f.insufficient) {
-    return [
-      `本次预测标记为「数据不足」：${machine} 的环境湿度等必需输入缺失，不满足模型要求，未生成有效风险评分与趋势。`,
-      "建议检查车间环境测点采集与数据链路，恢复后等待下一轮滚动预测；期间可参考同缺陷其他机台的预测结果。",
-      "当前依据不足，不建议以历史参数直接推断本机台风险。",
-    ];
-  }
+// AI 解读段落：主题 + 正文（视图按「主题：正文」渲染）
+export interface DefectAiSection {
+  topic: "风险概况" | "参数关注" | "核查重点";
+  text: string;
+}
 
+// 数据不足的组合由视图层拦截，不进入本函数
+export function aiInterpretation(f: DefectForecast, code: string, machine: string): DefectAiSection[] {
+  const name = catalogOf(code)?.name ?? code;
   const level = levelOf(f.score);
   const s0 = f.future[0]?.score ?? f.score;
   const s8 = f.future[f.future.length - 1]?.score ?? f.score;
   const trendWord = s8 > s0 + 0.01 ? "上升" : s8 < s0 - 0.01 ? "回落" : "持平";
-  // 首次越过高风险阈值的时间（若当前未处于高风险）
-  const firstHigh = f.future.find((p) => p.score >= 0.7 && p.label !== "现在");
-  const peakNote = f.score < 0.7 && firstHigh ? `，${firstHigh.label}起进入高风险区间` : "";
+  // 首次越过阈值的批次序数：高风险优先；当前低风险且未达高风险时，看是否将越过中风险线
+  const firstHigh = f.future.slice(1).findIndex((p) => p.score >= 0.7);
+  const firstMid = f.future.slice(1).findIndex((p) => p.score >= 0.4);
+  const peakNote =
+    f.score < 0.7 && firstHigh >= 0
+      ? `，预计第${firstHigh + 1}个批次起进入高风险区间`
+      : f.score < 0.4 && firstMid >= 0
+        ? `，预计第${firstMid + 1}个批次起进入中风险区间`
+        : "";
 
   // 超出参考范围的参数（偏差展示）
   const group = PARAM_GROUPS[groupOf(code)];
@@ -403,7 +473,7 @@ export function aiInterpretation(f: DefectForecast, code: string, machine: strin
     .filter((x) => x.dir === "up" || x.dir === "down");
   const outOfRangeText =
     outOfRange.length > 0
-      ? `主要关联参数偏离：${outOfRange
+      ? `${outOfRange
           .slice(0, 2)
           .map((x) => `${x.def.name}（${x.value} ${x.def.unit}，${x.dir === "up" ? "超出参考上限" : "低于参考下限"} ${x.deviation.replace("+", "")}）`)
           .join("、")}；参数方向偏离不直接视为因果证据。`
@@ -414,8 +484,14 @@ export function aiInterpretation(f: DefectForecast, code: string, machine: strin
   const reducingText = reducing.length ? `；${reducing.map((r) => `${r.name}（${r.phi}）为风险降低因素` ).join("、")}` : "";
 
   return [
-    `当前 ${machine} ${name}风险评分 ${f.score.toFixed(2)}（${level.label}），模型置信度 ${Math.round(f.confidence * 100)}%；未来 8 小时预计由 ${s0.toFixed(2)} ${trendWord}至 ${s8.toFixed(2)}${peakNote}。`,
-    outOfRangeText,
-    `建议重点核查：${top ? ADVICE[top.key] : "本轮无显著增险参数，维持常规巡检"}${reducingText}。`,
+    {
+      topic: "风险概况",
+      text: `当前 ${machine} ${name}风险评分 ${f.score.toFixed(2)}（${level.label}），模型置信度 ${Math.round(f.confidence * 100)}%；未来${f.windowBatches}个批次预计由 ${s0.toFixed(2)} ${trendWord}至 ${s8.toFixed(2)}${peakNote}。`,
+    },
+    { topic: "参数关注", text: outOfRangeText },
+    {
+      topic: "核查重点",
+      text: top ? `建议优先核查${ADVICE[top.key]}${reducingText}。` : `本轮无显著增险参数，维持常规巡检${reducingText}。`,
+    },
   ];
 }

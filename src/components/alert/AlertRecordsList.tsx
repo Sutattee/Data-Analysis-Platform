@@ -58,7 +58,9 @@ export function AlertRecordsList({ metrics, basePath }: { metrics?: string[]; ba
     ALERT_RECORDS.filter((r) =>
       metrics
         ? metrics.includes(r.metricName)
-        : !PRODUCTION_MATERIAL_METRICS.includes(r.metricName) && !EXPENSE_ALERT_METRIC_NAMES.has(r.metricName)
+        : !PRODUCTION_MATERIAL_METRICS.includes(r.metricName) &&
+          !EXPENSE_ALERT_METRIC_NAMES.has(r.metricName) &&
+          !r.id.startsWith("ZL") // 能源口径排除工艺质量记录（ZL 前缀独立数据集）
     ).map((r) => ({ ...r }))
   );
   const [filter, setFilter] = useState<AlertFilter>(EMPTY_FILTER); // 输入态（keyword/date）

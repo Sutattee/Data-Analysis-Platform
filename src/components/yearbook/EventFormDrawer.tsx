@@ -69,9 +69,9 @@ function formatNow(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// 影响指标 / 关联预警 选项
+// 影响指标 / 关联预警 选项（年鉴保持能源口径：排除工艺质量记录 ZL 前缀）
 const METRIC_OPTIONS = metricList.map((m) => ({ value: m.nameCn, label: m.nameCn, hint: m.code }));
-const ALERT_OPTIONS = ALERT_RECORDS.filter((r) => r.type === "当前异常").map((r) => ({
+const ALERT_OPTIONS = ALERT_RECORDS.filter((r) => r.type === "当前异常" && !r.id.startsWith("ZL")).map((r) => ({
   value: r.id,
   label: `${r.title}（${r.objectName}）`,
   hint: `${r.triggerTime}｜${r.level}`,

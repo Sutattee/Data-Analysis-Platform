@@ -14,6 +14,7 @@ import { useApp } from "@/lib/store/AppContext";
 import { useToast } from "@/components/ui/Toast";
 import { ALERT_RECORDS, orgPathOf, EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
 import { EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseSubjectOfMetric } from "@/lib/mock-data/expense-alerts";
+import { TYPE_DISPLAY, QUALITY_MACHINES, qualityCycleUnitOf } from "@/lib/mock-data/quality-alerts";
 import { DEPT_STATS } from "@/lib/mock-data/expense-indicators";
 import { EXPENSE_NODES } from "@/lib/mock-data/expense-overview";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
@@ -32,8 +33,9 @@ interface StratFilter {
   enabled: string;
   dept: string;      // 费用口径：部门筛选（"" = 全部部门）
   subjectId: string; // 费用口径：费用科目筛选（"all" = 全部费用）
+  machine: string;   // 质量口径：机台筛选（"" = 全部机台）
 }
-const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "", dept: "", subjectId: "all" };
+const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "", dept: "", subjectId: "all", machine: "" };
 
 // 费用科目下拉选项：全角空格缩进表层级（同费用总览 ExpenseHeader）
 const SUBJECT_OPTIONS = EXPENSE_NODES.map((n) => ({
@@ -61,9 +63,10 @@ const selectCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
 
 // metrics：指标白名单。传入 → 仅展示监测白名单指标的策略（生产管理/费用预算执行告警中心）；
-// 不传 → 展示全部并排除费用预算执行策略（能源告警中心维持原有口径）
+// 不传 → 展示全部并排除费用预算执行策略（能源告警中心维持原有口径，且排除质量 QAS 前缀）
 // basePath：新建/编辑路由前缀（费用预算执行传 /expense/alert/management；缺省按 metrics 二分保持兼容）
 // variant="expense"：费用口径列结构（含所属部门、无告警等级列）与 部门+费用科目 筛选区
+// variant="quality"：工艺质量口径（QAS 前缀策略；实测异常+预测风险均展示，告警类型单列；机台筛选）
 export function AlertStrategiesList({
   metrics,
   basePath,
@@ -71,25 +74,30 @@ export function AlertStrategiesList({
 }: {
   metrics?: string[];
   basePath?: string;
-  variant?: "default" | "expense";
+  variant?: "default" | "expense" | "quality";
 }) {
   const router = useRouter();
   const { state } = useApp();
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
   const isExpense = variant === "expense";
+  const isQuality = variant === "quality";
   // 新建/编辑路由按板块区分：生产管理走 /production/alert/management
   const mgmtPath = basePath ?? (metrics ? "/production/alert/management" : "/alert/management");
 
-  // 默认展示「当前异常」类型的告警策略
+  // 质量口径：QAS 前缀策略（实测异常 + 预测风险均展示）；
+  // 其余默认展示「当前异常」类型的告警策略（能源口径排除费用与质量前缀）
   const [strategies, setStrategies] = useState<AlertStrategy[]>(() =>
-    getAlertStrategies().filter(
-      (s) =>
-        s.type === "当前异常" &&
-        (metrics
-          ? s.conditions.some((c) => metrics.includes(c.metric))
-          : !s.conditions.some((c) => EXPENSE_ALERT_METRIC_NAMES.has(c.metric)))
-    )
+    isQuality
+      ? getAlertStrategies().filter((s) => s.id.startsWith("QAS"))
+      : getAlertStrategies().filter(
+          (s) =>
+            s.type === "当前异常" &&
+            !s.id.startsWith("QAS") &&
+            (metrics
+              ? s.conditions.some((c) => metrics.includes(c.metric))
+              : !s.conditions.some((c) => EXPENSE_ALERT_METRIC_NAMES.has(c.metric)))
+        )
   );
   const [filter, setFilter] = useState<StratFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<StratFilter>(EMPTY_FILTER);
@@ -159,14 +167,20 @@ export function AlertStrategiesList({
         return c.metric.toLowerCase().includes(k) || sp.toLowerCase().includes(k);
       });
     }
+    // 质量口径：机台命中（策略告警对象含选中机台即保留）
+    function matchQualityFilters(s: AlertStrategy): boolean {
+      return !applied.machine || s.objects.includes(applied.machine);
+    }
     const filtered = strategies.filter(
       (s) =>
         matchKeyword(s) &&
         (!applied.enabled || (applied.enabled === "启用" ? s.enabled : !s.enabled)) &&
-        (isExpense ? matchExpenseFilters(s) : matchStrategyOrg(s))
+        // 质量口径：告警类型表头筛选（实测异常/预测风险，存储枚举经展示文案映射比较）
+        (!isQuality || !applied.type || TYPE_DISPLAY[s.type] === applied.type) &&
+        (isExpense ? matchExpenseFilters(s) : isQuality ? matchQualityFilters(s) : matchStrategyOrg(s))
     );
     return [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [strategies, applied, orgFilter, isExpense]);
+  }, [strategies, applied, orgFilter, isExpense, isQuality]);
 
   const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -177,7 +191,13 @@ export function AlertStrategiesList({
     orgFilter.workshop !== "" || orgFilter.grid !== "" || orgFilter.equipment !== "";
 
   function handleSearch() {
-    setApplied((prev) => ({ ...prev, keyword: filter.keyword, dept: filter.dept, subjectId: filter.subjectId }));
+    setApplied((prev) => ({
+      ...prev,
+      keyword: filter.keyword,
+      dept: filter.dept,
+      subjectId: filter.subjectId,
+      machine: filter.machine,
+    }));
     setPage(1);
     runLoad();
   }
@@ -189,7 +209,7 @@ export function AlertStrategiesList({
     runLoad();
   }
   // 表头筛选：即时应用
-  function applyColumnFilter(key: "enabled", v: string) {
+  function applyColumnFilter(key: "enabled" | "type", v: string) {
     setApplied((prev) => ({ ...prev, [key]: v }));
     setPage(1);
   }
@@ -234,8 +254,16 @@ export function AlertStrategiesList({
         )
       )
     ).join("、");
-  // 该策略关联的告警记录：优先按策略指标名精确匹配，无命中再回退领域+类型
+  // 该策略关联的告警记录：质量口径在 ZL 前缀记录中优先按策略名快照精确匹配，无命中回退指标匹配；
+  // 其余按策略指标名精确匹配，无命中再回退领域+类型
   const recordsOf = (s: AlertStrategy) => {
+    if (isQuality) {
+      const zl = ALERT_RECORDS.filter((r) => r.id.startsWith("ZL"));
+      const byName = zl.filter((r) => r.strategyName === s.name);
+      if (byName.length > 0) return byName.slice(0, 6);
+      const metricSet = new Set(s.conditions.map((c) => c.metric));
+      return zl.filter((r) => metricSet.has(r.metricName)).slice(0, 6);
+    }
     const metricSet = new Set(s.conditions.map((c) => c.metric));
     const byMetric = ALERT_RECORDS.filter((r) => metricSet.has(r.metricName) && r.type === s.type);
     const recs =
@@ -255,46 +283,64 @@ export function AlertStrategiesList({
             placeholder={isExpense ? "搜索告警名称、部门名称、费用名称、指标名称" : "搜索告警名称"}
             className="w-[480px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
+          {/* 质量口径：机台筛选紧随搜索框（查询/重置之前），与搜索同排 */}
+          {isQuality && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">机台</span>
+              <select
+                className={selectCls}
+                value={filter.machine}
+                onChange={(e) => setFilter({ ...filter, machine: e.target.value })}
+              >
+                <option value="">全部机台</option>
+                {QUALITY_MACHINES.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button onClick={handleSearch}>查询</Button>
           <Button variant="secondary" onClick={handleReset}>重置</Button>
           {isAdmin && (
             <Button className="ml-auto" onClick={() => router.push(`${mgmtPath}/new`)}>+ 新建数据告警</Button>
           )}
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          {isExpense ? (
-            /* 费用口径：部门 + 费用科目（同费用总览）组合筛选 */
-            <>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500">部门</span>
-                <select
-                  className={selectCls}
-                  value={filter.dept}
-                  onChange={(e) => setFilter({ ...filter, dept: e.target.value })}
-                >
-                  <option value="">全部部门</option>
-                  {DEPT_STATS.map((d) => (
-                    <option key={d.dept} value={d.dept}>{d.dept}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500">费用科目</span>
-                <div className="w-52">
-                  <SearchSelect
-                    options={SUBJECT_OPTIONS}
-                    value={filter.subjectId}
-                    onChange={(id) => setFilter({ ...filter, subjectId: id })}
-                    placeholder="全部费用"
-                  />
+        {!isQuality && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {isExpense ? (
+              /* 费用口径：部门 + 费用科目（同费用总览）组合筛选 */
+              <>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">部门</span>
+                  <select
+                    className={selectCls}
+                    value={filter.dept}
+                    onChange={(e) => setFilter({ ...filter, dept: e.target.value })}
+                  >
+                    <option value="">全部部门</option>
+                    {DEPT_STATS.map((d) => (
+                      <option key={d.dept} value={d.dept}>{d.dept}</option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-            </>
-          ) : (
-            /* 组织级联筛选仅能源域适用（辅料为全厂级指标） */
-            !metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
-          )}
-        </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">费用科目</span>
+                  <div className="w-52">
+                    <SearchSelect
+                      options={SUBJECT_OPTIONS}
+                      value={filter.subjectId}
+                      onChange={(id) => setFilter({ ...filter, subjectId: id })}
+                      placeholder="全部费用"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* 组织级联筛选仅能源域适用（辅料为全厂级指标） */
+              !metrics && <OrgCascaderFilter value={orgFilter} onChange={setOrgFilter} />
+            )}
+          </div>
+        )}
       </Card>
 
       {/* 区块小标题（费用口径） */}
@@ -331,6 +377,15 @@ export function AlertStrategiesList({
                   <th className="text-left px-4 py-3">数据指标</th>
                   {/* 费用口径在数据指标后展示所属部门（该指标关联部门全集） */}
                   {isExpense && <th className="text-left px-4 py-3">所属部门</th>}
+                  {/* 质量口径在数据指标后展示告警类型（实测异常/预测风险），支持表头筛选 */}
+                  {isQuality && (
+                    <th className="text-left px-4 py-3">
+                      <span className="inline-flex items-center gap-0.5">
+                        告警类型
+                        <ColumnFilter options={["实测异常", "预测风险"]} value={applied.type} onChange={(v) => applyColumnFilter("type", v)} />
+                      </span>
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3">触发条件</th>
                   <th className="text-left px-4 py-3">告警等级</th>
                   <th className="text-left px-4 py-3">
@@ -353,6 +408,9 @@ export function AlertStrategiesList({
                         <div className="truncate" title={s.objects.join("、")}>{s.objects.join("、")}</div>
                       </td>
                     )}
+                    {isQuality && (
+                      <td className="px-4 py-3 text-gray-600">{TYPE_DISPLAY[s.type]}</td>
+                    )}
                     <td className="px-4 py-3 text-gray-600 max-w-[220px]">
                       <div className="truncate" title={formatConditions(s)}>{formatConditions(s)}</div>
                     </td>
@@ -366,7 +424,7 @@ export function AlertStrategiesList({
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{s.updatedAt}</td>
                     <td className="px-4 py-3 sticky right-0 bg-white z-10">
-                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                      <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setViewTarget(s)}>查看</Button>
                         <Button variant="ghost" size="sm" onClick={() => setRecordsTarget(s)}>告警记录</Button>
                         {isAdmin && (
@@ -434,6 +492,8 @@ export function AlertStrategiesList({
             <h2 className="text-lg font-bold text-gray-900">{viewTarget.name}</h2>
             {viewTarget.description && <p className="text-gray-500">{viewTarget.description}</p>}
             <DetailRow label="业务域" value={viewTarget.domain} />
+            {/* 质量口径：告警类型（实测异常/预测风险展示文案） */}
+            {isQuality && <DetailRow label="告警类型" value={TYPE_DISPLAY[viewTarget.type]} />}
             {/* 费用口径标签为「所属部门」（值同为该指标关联部门全集） */}
             <DetailRow
               label={isExpense ? "所属部门" : "告警对象"}
@@ -451,9 +511,21 @@ export function AlertStrategiesList({
                 ))}
               </div>
             </div>
-            <DetailRow label="接收人" value={viewTarget.receivers.join("、")} />
-            <DetailRow label="通知方式" value={viewTarget.notifyMethods.join("、")} />
-            <DetailRow label="重复提醒" value={viewTarget.repeatAlert ? `开启，最多 ${viewTarget.repeatCount} 次，间隔 ${viewTarget.repeatInterval} 分钟` : "关闭"} />
+            {/* 质量口径：连续同向偏离（未配置不展示；单位随指标周期，如 3批次） */}
+            {isQuality && viewTarget.conditions[0]?.consecutiveShifts != null && (
+              <DetailRow
+                label="连续同向偏离"
+                value={`${viewTarget.conditions[0].consecutiveShifts}${qualityCycleUnitOf(viewTarget.conditions[0].metric)}`}
+              />
+            )}
+            {/* 质量口径不做通知配置，接收人/通知方式/重复提醒不展示 */}
+            {!isQuality && <DetailRow label="接收人" value={viewTarget.receivers.join("、")} />}
+            {!isQuality && <DetailRow label="通知方式" value={viewTarget.notifyMethods.join("、")} />}
+            {!isQuality && <DetailRow label="重复提醒" value={viewTarget.repeatAlert ? `开启，最多 ${viewTarget.repeatCount} 次，间隔 ${viewTarget.repeatInterval} 分钟` : "关闭"} />}
+            {/* 质量口径：创建与编辑信息（创建人/创建时间/编辑人；未被编辑过显示 —） */}
+            {isQuality && <DetailRow label="创建人" value={viewTarget.creator ?? "—"} />}
+            {isQuality && <DetailRow label="创建时间" value={viewTarget.createdAt ?? "—"} />}
+            {isQuality && <DetailRow label="编辑人" value={viewTarget.editedBy ?? "—"} />}
             <DetailRow label="更新时间" value={viewTarget.updatedAt} />
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setViewTarget(null)}>关闭</Button>

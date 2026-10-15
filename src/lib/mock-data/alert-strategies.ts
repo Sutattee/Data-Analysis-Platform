@@ -14,6 +14,7 @@ import { PRODUCTION_MATERIAL_METRICS } from "./alerts";
 import {
   EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseDeptsOfMetric, expenseMetricDefOf,
 } from "./expense-alerts";
+import { QUALITY_ALERT_METRIC_NAMES, qualityMetricDefOf } from "./quality-alerts";
 import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
@@ -50,10 +51,12 @@ export const FORECAST_METRIC_OPTIONS: string[] = [
 ];
 
 // 指标定义（id + 单位），供触发条件按指标带出单位 / 带入目标值
-// 费用预算执行告警指标（如「日常差旅费-执行进度偏差」）单位固定 pct
+// 费用预算执行告警指标（如「日常差旅费-执行进度偏差」）单位固定 pct；工艺质量告警指标独立定义
 export function metricDefOf(name: string): { id: string; unit: string } | undefined {
   const expense = expenseMetricDefOf(name);
   if (expense) return expense;
+  const quality = qualityMetricDefOf(name);
+  if (quality) return quality;
   const m = metricList.find((x) => x.nameCn === name);
   return m ? { id: m.id, unit: m.unit } : undefined;
 }
@@ -78,6 +81,18 @@ export const METRIC_HISTORICAL_AVG: Record<string, string> = {
   烘丝机出口水分偏差: "0.32",
   百小时停机断料率: "4.15",
   台时产量: "1085",
+  // 工艺质量告警指标（参考过程管控/稳定性预测口径；烘丝机出口水分偏差与能源口径共用同值）
+  松散回潮非稳态指数: "1.36",
+  成品水分标准偏差: "1.65",
+  烘丝工序非稳态指数: "0.43",
+  加香出口水分不达标次数: "0.8",
+  "烟支单支克重偏差(毫克)": "42",
+  非细支单支重量偏差: "2.97",
+  常规烟支硬度变异系数: "2.55",
+  中支烟硬度变异系数: "1.43",
+  包装与卷制质量检验加权平均值: "96.8",
+  "优质品率（成品）": "98.5",
+  "优质品率（制丝）": "98.4",
 };
 
 // 最新历史均值（基准类型=历史均值时系统自动带入，不支持编辑；无数据返回空串）
@@ -142,6 +157,17 @@ export function formatCondition(c: AlertCondition): string {
     }
     return `${name} 执行进度偏差 ${c.operator} ${c.baselineValue} pct`;
   }
+  // 工艺质量口径：等级按相对基准的偏离比例划分，条件文案带偏离比例区间
+  // （如 松散回潮非稳态指数 ≥ 上限4% 偏离比例20%-50%，与告警记录判定依据同口径；
+  //   连续同向偏离不在条件文案中体现，由「连续同向偏离」独立字段展示）
+  if (QUALITY_ALERT_METRIC_NAMES.has(c.metric)) {
+    const unit = metricDefOf(c.metric)?.unit ?? "";
+    const dev = c.deviation ? ` 偏离比例${c.deviation}%` : "";
+    if (c.forecastRange) {
+      return `${c.metric} 未来${c.forecastRange}预测值 ${c.operator} ${c.baselineType} ${c.baselineValue}${joinUnit(unit)}${dev}`;
+    }
+    return `${c.metric} ${c.operator} ${c.baselineType} ${c.baselineValue}${joinUnit(unit)}${dev}`;
+  }
   const unit = metricDefOf(c.metric)?.unit ?? "";
   let base: string;
   if (c.baselineType === "正常区间") {
@@ -166,6 +192,7 @@ export function formatConditions(s: { conditions: AlertCondition[]; relation: "�
 export function domainOfMetric(metric: string): AlertDomain {
   if (!metric) return "生产管理";
   if (EXPENSE_ALERT_METRIC_NAMES.has(metric)) return "费用预算执行";
+  if (QUALITY_ALERT_METRIC_NAMES.has(metric)) return "工艺质量";
   const domain = metricList.find((m) => m.nameCn === metric)?.domain;
   if (domain === "能源管理") return "能源消耗";
   if (domain === "质量管理" || domain === "工艺质量") return "工艺质量";
@@ -983,6 +1010,243 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
     repeatAlert: false,
     enabled: false,
     updatedAt: "2026-07-16 15:45",
+  },
+  // ========== 工艺质量 · 数据告警策略（QAS 前缀，质量告警中心专属；能源口径按前缀排除） ==========
+  {
+    id: "QAS-001",
+    name: "松散回潮非稳态指数异常告警策略",
+    description: "松散回潮非稳态指数达到上限 4% 触发，偏离比例 20%-50% 判定告警（产品示例策略）",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
+    conditions: [
+      { metric: "松散回潮非稳态指数", operator: "≥", baselineType: "上限", baselineValue: "4", deviation: "20-50" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["吴敏"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "吴敏",
+    createdAt: "2026-05-06 09:30",
+    editedBy: "周婷",
+    updatedAt: "2026-07-27 10:20",
+  },
+  {
+    id: "QAS-002",
+    name: "成品水分标准偏差异常告警策略",
+    description: "成品水分标准偏差达到上限 2% 触发，偏离比例 10%-20% 判定告警",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
+    conditions: [
+      { metric: "成品水分标准偏差", operator: "≥", baselineType: "上限", baselineValue: "2", deviation: "10-20" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["周婷"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "周婷",
+    createdAt: "2026-05-12 14:05",
+    editedBy: "陈静",
+    updatedAt: "2026-07-22 14:40",
+  },
+  {
+    id: "QAS-003",
+    name: "烘丝工序非稳态指数风险预警策略",
+    description: "预测未来 15 天烘丝工序非稳态指数相对上限 1.1 偏离 4.55%-9.09% 判定预警",
+    type: "预测风险",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
+    conditions: [
+      { metric: "烘丝工序非稳态指数", operator: "≥", baselineType: "上限", baselineValue: "1.1", deviation: "4.55-9.09", forecastRange: "未来15天" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["陈静"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "陈静",
+    createdAt: "2026-05-20 10:15",
+    updatedAt: "2026-07-19 09:05",
+  },
+  {
+    id: "QAS-004",
+    name: "烘丝机出口水分偏差异常告警策略",
+    description: "烘丝机出口水分偏差达到上限 0.42% 触发，偏离比例 7.14%-19.05% 判定预警",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
+    conditions: [
+      { metric: "烘丝机出口水分偏差", operator: "≥", baselineType: "上限", baselineValue: "0.42", deviation: "7.14-19.05" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["王芳"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "王芳",
+    createdAt: "2026-05-27 16:40",
+    editedBy: "吴敏",
+    updatedAt: "2026-07-15 16:30",
+  },
+  {
+    id: "QAS-005",
+    name: "加香出口水分不达标次数异常告警策略",
+    description: "月度加香出口水分不达标次数达上限 4 次触发，偏离比例 25%-75% 判定告警（停用示例）",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#加香机", "2#加香机", "3#加香机"],
+    conditions: [
+      { metric: "加香出口水分不达标次数", operator: "≥", baselineType: "上限", baselineValue: "4", deviation: "25-75" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每月",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["刘洋"],
+    repeatAlert: false,
+    enabled: false,
+    creator: "刘洋",
+    createdAt: "2026-06-04 11:20",
+    updatedAt: "2026-07-08 11:25",
+  },
+  {
+    id: "QAS-006",
+    name: "烟支单支克重偏差风险预警策略",
+    description: "预测烟支单支克重偏差跌破下限 -12mg，偏离比例 25%-50% 判定告警",
+    type: "预测风险",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
+    conditions: [
+      { metric: "烟支单支克重偏差(毫克)", operator: "≤", baselineType: "下限", baselineValue: "-12", deviation: "25-50", forecastRange: "未来7天" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每班次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["高亚东"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "高亚东",
+    createdAt: "2026-06-09 15:30",
+    editedBy: "周婷",
+    updatedAt: "2026-07-03 15:10",
+  },
+  {
+    id: "QAS-007",
+    name: "卷接包装工序质量组合监测策略",
+    description: "常规与中支烟硬度变异系数相对上限偏离同时越档即预警（双条件且关系示例，停用）",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["2#卷接包机组", "3#卷接包机组", "4#卷接包机组", "5#卷接包机组"],
+    conditions: [
+      { metric: "常规烟支硬度变异系数", operator: "≥", baselineType: "上限", baselineValue: "3", deviation: "11.67-16.67" },
+      { metric: "中支烟硬度变异系数", operator: "≥", baselineType: "上限", baselineValue: "3.5", deviation: "10-14.29" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每班次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["吴敏", "高亚东"],
+    repeatAlert: false,
+    enabled: false,
+    creator: "吴敏",
+    createdAt: "2026-06-13 10:50",
+    editedBy: "高亚东",
+    updatedAt: "2026-06-28 10:45",
+  },
+  {
+    id: "QAS-008",
+    name: "优质品率（成品）异常告警策略",
+    description: "成品优质品率低于下限 98%，偏离比例 1.02%-2.04% 判定预警",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["全厂"],
+    conditions: [
+      { metric: "优质品率（成品）", operator: "≤", baselineType: "下限", baselineValue: "98", deviation: "1.02-2.04" },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["周婷"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "周婷",
+    createdAt: "2026-06-16 09:40",
+    updatedAt: "2026-06-20 09:50",
+  },
+  {
+    id: "QAS-009",
+    name: "包装与卷制质量检验加权平均值异常告警策略",
+    description: "包装与卷制质量检验加权平均值低于下限 96.5 分，偏离比例 0.52%-1.55% 判定预警（停用示例）",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["全厂"],
+    conditions: [
+      { metric: "包装与卷制质量检验加权平均值", operator: "≤", baselineType: "下限", baselineValue: "96.5", deviation: "0.52-1.55" },
+    ],
+    relation: "且",
+    level: "预警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["王芳"],
+    repeatAlert: false,
+    enabled: false,
+    creator: "王芳",
+    createdAt: "2026-06-10 14:25",
+    updatedAt: "2026-06-15 14:15",
+  },
+  {
+    id: "QAS-010",
+    name: "烘丝机出口水分偏差飘移预警策略",
+    type: "当前异常",
+    domain: "工艺质量",
+    scope: "指定对象",
+    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
+    conditions: [
+      { metric: "烘丝机出口水分偏差", operator: ">", baselineType: "上限", baselineValue: "0.50", consecutiveShifts: 3 },
+    ],
+    relation: "且",
+    level: "告警",
+    detectCycle: "每批次",
+    notifyTemplate: "",
+    notifyMethods: ["邮件"],
+    receivers: ["王芳"],
+    repeatAlert: false,
+    enabled: true,
+    creator: "刘洋",
+    createdAt: "2026-07-06 10:35",
+    editedBy: "陈静",
+    updatedAt: "2026-07-25 11:15",
   },
 ] as AlertStrategy[]).map((s) => ({ ...s, notifyTemplate: defaultNotifyTemplate() }));
 

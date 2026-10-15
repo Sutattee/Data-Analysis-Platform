@@ -376,8 +376,16 @@ export interface AlertRecord {
   deviationLabel?: string;    // 执行进度偏差（如 "+22pct"）
   confidenceRange?: string;   // 置信区间（仅预测风险）
   duration?: string;          // 持续时间（仅当前异常）
-  forecastTime?: string;      // 预计越界时间（仅预测风险）
+  forecastTime?: string;      // 预计越界时间（仅预测风险；能源口径如「预计2026年8月越界」）
   riskProb?: string;          // 风险概率（仅预测模型可提供时）
+  // —— 工艺质量扩展（详情基本信息：批次/班组/牌号/工序）——
+  batch?: string;             // 批次（实测如「第 2417 批」/预测如「第 2418 批（3个批次后）」；月度指标为「本月」）
+  process?: string;           // 来源工序（SF 稳定性指标关联，如「松散回潮」；结果类指标无 → 不展示）
+  forecastWindow?: string;    // 预测窗口（仅预测风险，如「未来10个批次」；实测异常不展示）
+  shift?: string;             // 班组（甲班/乙班/丙班）
+  shiftLabel?: string;        // 班次（白班/夜班，如「7-19 白班」；班周期指标按触发时间推定，批次/月度指标不生成）
+  brand?: string;             // 牌号（如「娇子」；结果类指标为「—」）
+  consecutiveShifts?: number; // 连续同向偏离周期数（飘移类记录；详情展示如「3个批次」，列表置顶排序）
   // —— 判定依据 ——
   strategyName: string;       // 告警策略名称
   triggerCondition: string;   // 触发条件
@@ -392,12 +400,13 @@ export interface AlertRecord {
   handleNote?: string;        // 处置说明
   handledAt?: string;         // 处理时间
   handledBy?: string;         // 处理人
+  handleResult?: string;      // 确认结果（质量口径：确认为异常/判为偶发）
 }
 
 // ========== 告警管理（数据告警策略）==========
 export type AlertOperator = "<" | "≤" | ">" | "≥" | "≠" | "=" | "超出正常区间" | "处于区间";
 export type AlertBaselineType = "目标值" | "基准值" | "上限" | "下限" | "历史均值" | "正常区间";
-export type AlertDetectCycle = "每小时" | "每日" | "每月";
+export type AlertDetectCycle = "每小时" | "每日" | "每月" | "每批次" | "每班次";
 export type AlertScope = "全部适用对象" | "指定对象"; // 保留类型兼容；新表单固定为指定对象
 
 // 单条触发条件
@@ -408,6 +417,7 @@ export interface AlertCondition {
   baselineType: AlertBaselineType; // 基准类型
   baselineValue: string;          // 基准值；正常区间为 "下限~上限"；目标值为系统带入的目标值
   deviation?: string;             // 偏离比例区间 %（如 5-10；正常区间类型不填）
+  consecutiveShifts?: number;     // 连续同向偏离周期数（质量口径；连续 N 个统计周期同向越界触发）
 }
 
 // 数据告警策略
@@ -431,6 +441,9 @@ export interface AlertStrategy {
   repeatInterval?: number;        // 提醒间隔（分钟，默认5）
   enabled: boolean;               // 启用状态（新建默认停用）
   updatedAt: string;              // 更新时间 YYYY-MM-DD HH:mm
+  creator?: string;               // 创建人用户名（质量口径：策略详情展示）
+  createdAt?: string;             // 创建时间 YYYY-MM-DD HH:mm（质量口径）
+  editedBy?: string;              // 最近编辑人用户名（质量口径；未被编辑过则无）
 }
 
 // ========== 指标管理 ==========

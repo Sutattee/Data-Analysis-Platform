@@ -6,8 +6,8 @@ import { ALERT_RECORDS } from "./alerts";
 
 export const EFFICIENCY_LATEST_ISO = "2026-08-09"; // 数据锚点（与能源总览 END_DATE 一致）
 
-// ===== 16 台卷接包机组 =====
-export const EQUIPMENT_UNITS = Array.from({ length: 16 }, (_, i) => `${i + 1}#卷接包机组`);
+// ===== 16 台卷接包装机组 =====
+export const EQUIPMENT_UNITS = Array.from({ length: 16 }, (_, i) => `${i + 1}#卷接包装机组`);
 
 // 班次（台时产量下钻口径）：全天为班次聚合默认档（下拉展示「全部班次」）
 export type Shift = "全天" | "早班" | "中班" | "晚班";

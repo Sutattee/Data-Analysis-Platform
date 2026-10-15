@@ -5,6 +5,7 @@ import type {
   AlertDomain,
 } from "@/types";
 import { buildExpenseAlertRecords } from "./expense-alerts";
+import { buildQualityAlertRecords } from "./quality-alerts";
 
 // ========== 筛选项枚举 ==========
 export const ALERT_LEVELS: AlertLevel[] = ["提示", "关注", "预警", "告警", "危险"];
@@ -301,28 +302,29 @@ function buildProductionAlertRecords(): AlertRecord[] {
   });
 }
 
-// 全量告警记录：基础 56 条 + 生产辅料 16 条 + 费用预算执行 30 条（AnomalyDrawer / 告警详情按 id 全局查找）
+// 全量告警记录：基础 56 条 + 生产辅料 16 条 + 费用预算执行 30 条 + 工艺质量 31 条（AnomalyDrawer / 告警详情按 id 全局查找）
 export const ALERT_RECORDS: AlertRecord[] = [
   ...BASE_ALERT_RECORDS,
   ...buildProductionAlertRecords(),
   ...buildExpenseAlertRecords(),
+  ...buildQualityAlertRecords(),
 ];
 
 // ========== 告警处理状态（会话级覆盖 store，刷新还原） ==========
 // 详情页「确认」后标记已处理：不改动 ALERT_RECORDS 原始数据，列表/详情初始化时应用覆盖；
 // 预置记录自带 handledBy/handledAt 的保持原值（覆盖优先级低于预置处理字段）
-const HANDLED_OVERRIDES = new Map<string, { by: string; at: string }>();
+const HANDLED_OVERRIDES = new Map<string, { by: string; at: string; result?: string }>();
 
-// 确认处理：写入会话级覆盖（处理人 / 处理时间）
-export function confirmAlertHandled(id: string, by: string, at: string): void {
-  HANDLED_OVERRIDES.set(id, { by, at });
+// 确认处理：写入会话级覆盖（处理人 / 处理时间 / 确认结果）
+export function confirmAlertHandled(id: string, by: string, at: string, result?: string): void {
+  HANDLED_OVERRIDES.set(id, { by, at, result });
 }
 
 // 应用处理覆盖：返回带会话确认信息的记录副本（预置 handledBy 优先，不被覆盖）
 export function applyHandledOverride(r: AlertRecord): AlertRecord {
   const ov = HANDLED_OVERRIDES.get(r.id);
   if (!ov || r.handledBy) return r;
-  return { ...r, handledBy: ov.by, handledAt: ov.at };
+  return { ...r, handledBy: ov.by, handledAt: ov.at, handleResult: ov.result ?? r.handleResult };
 }
 
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========

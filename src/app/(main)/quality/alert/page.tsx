@@ -1,6 +1,6 @@
-import { ComingSoon } from "@/components/ui/ComingSoon";
+import { redirect } from "next/navigation";
 
-// 工艺质量告警中心（待开发）
+// 工艺质量 · 告警中心：默认进入告警记录
 export default function QualityAlertPage() {
-  return <ComingSoon title="告警中心" />;
+  redirect("/quality/alert/records");
 }

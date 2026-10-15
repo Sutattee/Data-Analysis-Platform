@@ -28,10 +28,10 @@ export function RiskContributionChart({ contributions }: { contributions: Contri
     return <div className="flex h-[200px] items-center justify-center text-sm text-gray-400">本轮无增险参数贡献</div>;
   }
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {contributions.map((c) => (
-        <div key={c.key} className="flex items-center gap-3">
-          <span className="w-24 flex-shrink-0 truncate text-xs text-gray-600" title={c.name}>
+        <div key={c.key} className="flex items-center gap-2">
+          <span className="w-20 flex-shrink-0 truncate text-xs text-gray-600" title={c.name}>
             {c.name}
           </span>
           <div className="h-5 flex-1 overflow-hidden rounded-md bg-gray-100">
@@ -40,16 +40,15 @@ export function RiskContributionChart({ contributions }: { contributions: Contri
               style={{ width: `${Math.max(c.pct, 2)}%` }}
             />
           </div>
-          <span className="w-36 flex-shrink-0 text-right text-xs whitespace-nowrap">
+          <span className="w-28 flex-shrink-0 text-right text-xs whitespace-nowrap">
             <span className="font-medium text-gray-800">＋{c.phi.toFixed(3)}</span>
-            <span className="ml-1.5 text-gray-400">{c.pct}%</span>
+            <span className="ml-1 text-gray-400">{c.pct}%</span>
           </span>
-          <span className="w-16 flex-shrink-0 rounded bg-gray-50 px-1.5 py-0.5 text-center text-[10px] text-gray-500">
+          <span className="w-14 flex-shrink-0 rounded bg-gray-50 px-1 py-0.5 text-center text-[10px] text-gray-500">
             {c.sourceLabel}
           </span>
         </div>
       ))}
-      <p className="pt-1 text-[10px] text-gray-400">贡献占比 = 该参数贡献值 ÷ 全部增险参数贡献之和</p>
     </div>
   );
 }
@@ -72,7 +71,6 @@ export function SourceBreakdownChart({ breakdown }: { breakdown: Breakdown }) {
           </span>
         </div>
       ))}
-      <p className="pt-1 text-[10px] text-gray-400">按参数贡献汇总（每参数唯一来源归属）</p>
     </div>
   );
 }

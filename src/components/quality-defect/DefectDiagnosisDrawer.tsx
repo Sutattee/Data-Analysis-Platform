@@ -12,6 +12,7 @@ import {
   displayRecordId,
   formatRecordDate,
   occurrenceContextOf,
+  shiftLabelOf,
   saveDiagnosisById,
   upsertDiagnosisByCode,
   type CauseType,
@@ -139,6 +140,7 @@ export function DefectDiagnosisDrawer({
           <Field label="批次">{occ?.batch ?? "-"}</Field>
           <Field label="牌号">{occ?.brand ?? "-"}</Field>
           <Field label="班组">{occ?.shift ?? "-"}</Field>
+          <Field label="班次">{occ ? shiftLabelOf(occ) : "-"}</Field>
           <Field label="责任岗位">{catalog?.post ?? "—"}</Field>
           <Field label="检验日期">{occ ? formatRecordDate(occ) : "—"}</Field>
         </div>

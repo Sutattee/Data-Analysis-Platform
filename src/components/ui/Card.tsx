@@ -8,9 +8,12 @@ interface CardProps {
   title?: string;
   headerRight?: ReactNode;
   padding?: boolean;
+  fill?: boolean; // 内容区撑满剩余高度并纵向 flex（用于图表随卡片高度自适应）
 }
 
-export function Card({ children, className = "", title, headerRight, padding = true }: CardProps) {
+export function Card({ children, className = "", title, headerRight, padding = true, fill = false }: CardProps) {
+  // fill：内容层 flex-1 + min-h-0，把卡片高度传递给子元素（配合 ResponsiveContainer height=100%）
+  const contentCls = [padding ? "p-5" : "", fill ? "flex min-h-0 flex-1 flex-col" : ""].filter(Boolean).join(" ");
   return (
     <div className={`bg-white rounded-xl border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md hover:border-gray-200 ${className}`}>
       {(title || headerRight) && (
@@ -19,7 +22,7 @@ export function Card({ children, className = "", title, headerRight, padding = t
           {headerRight}
         </div>
       )}
-      <div className={padding ? "p-5" : ""}>{children}</div>
+      <div className={contentCls}>{children}</div>
     </div>
   );
 }

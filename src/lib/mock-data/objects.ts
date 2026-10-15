@@ -1,5 +1,6 @@
 import type { ObjectRelation } from "@/types";
 import { expenseDeptsOfMetric } from "./expense-alerts";
+import { qualityObjectsOfMetric } from "./quality-alerts";
 
 /**
  * 对象数据 —— 模拟数据 + 会话级 store（刷新还原）。
@@ -223,7 +224,10 @@ export function listObjects(): ObjectRelation[] {
 // 告警对象候选：按指标自动筛选已关联的对象，按「全厂 → 车间/部门 → 系统」层级去重罗列
 // 供数据告警「告警对象」自动展示（仅展示、不支持编辑）
 // 费用预算执行指标（如「日常差旅费-执行进度偏差」）→ 直接返回该预算指标关联的部门
+// 工艺质量告警指标（12 项）→ 直接返回该指标关联的机台（结果类指标为「全厂」）
 export function objectsForMetric(metricName: string): string[] {
+  const qualityObjects = qualityObjectsOfMetric(metricName);
+  if (qualityObjects.length > 0) return qualityObjects;
   const expenseDepts = expenseDeptsOfMetric(metricName);
   if (expenseDepts.length > 0) return expenseDepts;
   const depts = new Set<string>();

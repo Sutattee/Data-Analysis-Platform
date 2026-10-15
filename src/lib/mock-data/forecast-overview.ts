@@ -1,12 +1,7 @@
 // 预测总览 — 模拟数据（确定性生成：固定锚点 2026-08-09 + sin 扰动，无 Date.now / Math.random）
-// 顶部 4 张指标卡 + 4 张核心图表（目标达成 / 单箱电耗 / 蒸汽耗总量 / 单箱天然气耗）
-import { DATA_END } from "./forecast";
-
-export { DATA_END };
+// 4 张指标预测卡（单箱综合能耗 / 单箱电耗 / 蒸汽耗总量 / 天然气单耗）横向四行平铺，每张卡内左指标信息 + 右趋势预测图（未来 7/15/30 日）
 
 // ===== 指标卡 =====
-export type CardTone = "good" | "warn" | "danger" | "muted";
-
 export interface CardRow {
   label: string;
   value: string;
@@ -18,27 +13,18 @@ export interface WanZhiVariant {
   title: string;
   main: { label: string; value: string };
   rows: CardRow[];
-  sparkPoints?: number[]; // 微型图换算后的数值（与箱口径 spark 点一一对应）
 }
 
 export interface OverviewCardData {
   key: string;
   title: string;
+  predTime: string; // 预测时间（本轮预测生成时间）
   main: { label: string; value: string }; // 突出显示的预测主值
-  tag?: { text: string; tone: CardTone }; // 预测判断标签（仅判断，非预警等级）
   rows: CardRow[];
-  spark?: { kind: "line" | "bar"; points: { date: string; value: number; peak?: boolean }[] };
   wanZhi?: WanZhiVariant;
 }
 
 const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
-const fmt = (v: number, d: number) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
-
-// 日期标签（自 2026-08-10 起第 i 天，"8/10" 格式）
-function futureLabel(i: number): string {
-  const d = new Date(2026, 7, 10 + i - 1);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 // 蒸汽耗 7 日预测序列（手调：累计 286.4，峰值 46.5 出现在 8/13，周末回落）
 const STEAM_7D = [42.8, 40.1, 41.2, 46.5, 40.3, 39.4, 36.1];
@@ -48,28 +34,23 @@ const isWeekend = (y: number, m: number, d: number) => {
 };
 
 export function getOverviewCards(): OverviewCardData[] {
-  // 单箱电耗：7 日预测序列（均值 24.9，历史基准 25.0）
-  const power7 = Array.from({ length: 7 }, (_, j) => round(24.9 + Math.sin(17 + j * 0.8) * 0.35, 1));
-  // 单箱天然气耗：7 日预测序列（均值 8.6，缓升）
-  const gas7 = Array.from({ length: 7 }, (_, j) => round(8.4 + j * 0.06 + Math.sin(9 + j * 0.7) * 0.08, 1));
-
   return [
     {
       key: "comprehensive",
       title: "单箱综合能耗",
-      main: { label: "本月预测", value: "31.6 kgce/箱" },
-      tag: { text: "预计超标", tone: "danger" },
+      predTime: "2026-10-12 10:52:50",
+      main: { label: "未来7日预测均值", value: "31.6 kgce/箱" },
       rows: [
         { label: "年度目标值", value: "≤ 31.0 kgce/箱", tone: "orange" },
-        { label: "预计差距", value: "高于目标 0.6 kgce/箱（1.9%）", tone: "danger" },
+        { label: "预测差值", value: "+0.6 kgce/箱（+1.9%）", tone: "danger" },
         { label: "预测区间", value: "30.9 ～ 32.3 kgce/箱", tone: "muted" },
       ],
       wanZhi: {
         title: "万支综合能耗",
-        main: { label: "本月预测", value: "6.32 kgce/万支" },
+        main: { label: "未来7日预测均值", value: "6.32 kgce/万支" },
         rows: [
           { label: "年度目标值", value: "≤ 6.2 kgce/万支", tone: "orange" },
-          { label: "预计差距", value: "高于目标 0.12 kgce/万支（1.9%）", tone: "danger" },
+          { label: "预测差值", value: "+0.12 kgce/万支（+1.9%）", tone: "danger" },
           { label: "预测区间", value: "6.18 ～ 6.46 kgce/万支", tone: "muted" },
         ],
       },
@@ -77,191 +58,150 @@ export function getOverviewCards(): OverviewCardData[] {
     {
       key: "packPower",
       title: "单箱电耗",
+      predTime: "2026-10-12 10:53:01",
       main: { label: "未来7日预测均值", value: "24.9 kWh/箱" },
-      tag: { text: "预计基本稳定", tone: "muted" },
       rows: [
         { label: "最新实际值", value: "24.6 kWh/箱", tone: "muted" },
-        { label: "同工况历史均值", value: "25.0 kWh/箱", tone: "muted" },
-        { label: "预计差异", value: "低于基准 0.1 kWh/箱（0.4%）", tone: "green" },
+        { label: "预测差值", value: "-0.1 kWh/箱（-0.4%）", tone: "green" },
         { label: "预测区间", value: "24.2 ～ 25.6 kWh/箱", tone: "muted" },
       ],
-      spark: { kind: "line", points: power7.map((v, j) => ({ date: futureLabel(j + 1), value: v })) },
       wanZhi: {
         title: "万支电耗",
         main: { label: "未来7日预测均值", value: "4.98 kWh/万支" },
         rows: [
           { label: "最新实际值", value: "4.92 kWh/万支", tone: "muted" },
-          { label: "同工况历史均值", value: "5.00 kWh/万支", tone: "muted" },
-          { label: "预计差异", value: "低于基准 0.02 kWh/万支（0.4%）", tone: "green" },
+          { label: "预测差值", value: "-0.02 kWh/万支（-0.4%）", tone: "green" },
           { label: "预测区间", value: "4.84 ～ 5.12 kWh/万支", tone: "muted" },
         ],
-        sparkPoints: power7.map((v) => round(v * 0.2, 2)),
       },
     },
     {
       key: "steam",
       title: "蒸汽耗（总量）",
+      predTime: "2026-10-12 10:53:10",
       main: { label: "未来7日预测累计", value: "286.4 t" },
       rows: [
-        { label: "明日预测值", value: "42.8 t", tone: "muted" },
-        { label: "预测峰值", value: "46.5 t · 预计 8月13日出现", tone: "orange" },
-        { label: "同工况历史累计", value: "279.0 t", tone: "muted" },
-        { label: "预计差异", value: "增加 7.4 t（2.7%）", tone: "orange" },
-        { label: "预测区间", value: "34.3 ～ 48.8 t", tone: "muted" },
+        { label: "预测峰值", value: "46.5 t", tone: "orange" },
+        { label: "预测区间", value: "39.6 ～ 48.3 t", tone: "muted" },
       ],
-      spark: {
-        kind: "bar",
-        points: STEAM_7D.map((v, j) => ({ date: futureLabel(j + 1), value: v, peak: v === 46.5 })),
-      },
     },
     {
       key: "gas",
-      title: "单箱天然气耗",
+      title: "天然气单耗",
+      predTime: "2026-10-12 10:53:10",
       main: { label: "未来7日预测均值", value: "8.6 Nm³/箱" },
-      tag: { text: "预计有所上升", tone: "warn" },
       rows: [
         { label: "最新实际值", value: "8.4 Nm³/箱", tone: "muted" },
-        { label: "同工况历史均值", value: "8.2 Nm³/箱", tone: "muted" },
-        { label: "预计差异", value: "高于基准 0.4 Nm³/箱（4.9%）", tone: "orange" },
+        { label: "预测差值", value: "+0.4 Nm³/箱（+4.9%）", tone: "orange" },
         { label: "预测区间", value: "8.1 ～ 9.0 Nm³/箱", tone: "muted" },
       ],
-      spark: { kind: "line", points: gas7.map((v, j) => ({ date: futureLabel(j + 1), value: v })) },
       wanZhi: {
-        title: "万支天然气耗",
+        title: "万支天然气单耗",
         main: { label: "未来7日预测均值", value: "1.72 Nm³/万支" },
         rows: [
           { label: "最新实际值", value: "1.68 Nm³/万支", tone: "muted" },
-          { label: "同工况历史均值", value: "1.64 Nm³/万支", tone: "muted" },
-          { label: "预计差异", value: "高于基准 0.08 Nm³/万支（4.9%）", tone: "orange" },
+          { label: "预测差值", value: "+0.08 Nm³/万支（+4.9%）", tone: "orange" },
           { label: "预测区间", value: "1.62 ～ 1.80 Nm³/万支", tone: "muted" },
         ],
-        sparkPoints: gas7.map((v) => round(v * 0.2, 2)),
       },
     },
   ];
 }
 
-// ===== 趋势预测图表（单箱电耗 / 蒸汽耗总量 / 单箱天然气耗）=====
+// ===== 趋势预测图表（未来 N 日预测：综合能耗 / 单箱电耗 / 蒸汽耗总量 / 天然气单耗）=====
 export interface TrendPoint {
-  date: string;
-  actual?: number;
-  predict?: number;
-  upper?: number;
-  lower?: number;
-  histAvg?: number;
-  peak?: number; // 仅峰值点有值（蒸汽）
+  date: string; // "8/13"
+  predict: number; // 预测值
+  target?: number; // 目标值（综合能耗；生效日起切换为新目标，同一条橙色实线阶梯过渡）
+  peak?: number; // 峰值点（仅窗口内最高点有值）
 }
 
 export interface TrendSeries {
   title: string;
   unit: string;
   decimals: number;
+  kind: "line" | "bar"; // 折线 / 柱状（蒸汽）
+  diffBase?: number; // 差异比例基准（同工况历史均值，仅用于悬停差异计算，不绘制）
   points: TrendPoint[];
-  peakInfo?: { date: string; value: number; upper: number; lower: number }; // 峰值详情（点击标记展示）
+  peakInfo: { date: string; value: number }; // 峰值日期与预测值（蒸汽点击峰值查看）
 }
 
-// 指标画像：基准 / 历史基准 / 预测趋势 / 区间幅度
-const TREND_PROFILES = {
-  packPower: { title: "单箱电耗趋势预测", unit: "kWh/箱", decimals: 1, base: 24.6, histAvg: 25.0, predBase: 24.9, band: 0.02, seed: 17 },
-  steam: { title: "蒸汽耗总量趋势预测", unit: "t", decimals: 1, base: 40.6, histAvg: 39.9, predBase: 40.9, band: 0.05, seed: 23 },
-  gas: { title: "单箱天然气耗趋势预测", unit: "Nm³/箱", decimals: 1, base: 8.3, histAvg: 8.2, predBase: 8.55, band: 0.045, seed: 9 },
-} as const;
+// 指标画像：预测基准 / 波幅 / 缓升 / 目标值（生效日起切换新目标）/ 差异基准
+interface TrendProfile {
+  title: string;
+  unit: string;
+  decimals: number;
+  kind: "line" | "bar";
+  predBase: number;
+  amp?: number; // sin 波幅（折线类）
+  rise?: number; // 每日缓升（折线类）
+  seed: number;
+  target?: { active: number; pending: number; from: number }; // from = 待生效目标自窗口首日起的生效日序号
+  diffBase?: number;
+}
+
+const TREND_PROFILES: { comprehensive: TrendProfile; packPower: TrendProfile; steam: TrendProfile; gas: TrendProfile } = {
+  comprehensive: {
+    title: "单箱综合能耗趋势预测", unit: "kgce/箱", decimals: 1, kind: "line",
+    predBase: 31.6, amp: 0.4, rise: 0, seed: 5,
+    target: { active: 31.0, pending: 30.5, from: 6 }, // 8/15 起新目标 30.5 生效
+    diffBase: 31.0,
+  },
+  packPower: {
+    title: "单箱电耗趋势预测", unit: "kWh/箱", decimals: 1, kind: "line",
+    predBase: 24.9, amp: 0.35, rise: 0, seed: 17, diffBase: 25.0,
+  },
+  steam: {
+    title: "蒸汽耗总量趋势预测", unit: "t", decimals: 1, kind: "bar",
+    predBase: 40.9, seed: 23,
+  },
+  gas: {
+    title: "天然气单耗趋势预测", unit: "Nm³/箱", decimals: 1, kind: "line",
+    predBase: 8.6, amp: 0.08, rise: 0.006, seed: 9, diffBase: 8.2,
+  },
+};
 
 export type TrendMetric = keyof typeof TREND_PROFILES;
 
-// 过去 30 日实际 + 未来 days 日预测（含区间与历史均值线）
+// 未来 days 日预测序列：蒸汽前 7 日使用手调序列（含 8/13 峰值 46.5），其余按画像生成；峰值 = 窗口内最高点
 export function getTrendSeries(metric: TrendMetric, days: 7 | 15 | 30): TrendSeries {
   const p = TREND_PROFILES[metric];
   const points: TrendPoint[] = [];
 
-  // 历史 30 日（7/11 ~ 8/9），蒸汽周末回落
-  for (let i = 30; i >= 1; i--) {
-    const d = new Date(2026, 7, 9 - i + 1);
-    const wk = metric === "steam" && isWeekend(2026, 7, d.getDate()) ? 0.9 : 1;
-    points.push({
-      date: `${d.getMonth() + 1}/${d.getDate()}`,
-      actual: round(p.base * wk * (1 + Math.sin(p.seed + i * 0.7) * 0.05), p.decimals),
-      histAvg: round(p.histAvg, p.decimals),
-    });
-  }
-
-  // 未来 days 日预测
-  let peakInfo: TrendSeries["peakInfo"];
   for (let j = 1; j <= days; j++) {
     const d = new Date(2026, 7, 10 + j - 1);
     const wk = metric === "steam" && isWeekend(2026, 7, d.getDate()) ? 0.9 : 1;
-    // 蒸汽前 7 日使用手调序列（含 8/13 峰值 46.5）
-    const v =
-      metric === "steam" && j <= 7
-        ? STEAM_7D[j - 1]
-        : round(p.predBase * wk * (1 + Math.sin(p.seed + j * 0.6) * 0.04), p.decimals);
-    const pt: TrendPoint = {
+    let v: number;
+    if (metric === "steam" && j <= 7) {
+      v = STEAM_7D[j - 1];
+    } else if (metric === "steam") {
+      v = round(p.predBase * wk * (1 + Math.sin(p.seed + j * 0.6) * 0.04), p.decimals);
+    } else {
+      v = round(p.predBase + Math.sin(p.seed + j * 0.7) * (p.amp ?? 0) + (p.rise ?? 0) * j, p.decimals);
+    }
+    points.push({
       date: `${d.getMonth() + 1}/${d.getDate()}`,
       predict: v,
-      upper: round(v * (1 + p.band), p.decimals),
-      lower: round(v * (1 - p.band), p.decimals),
-      histAvg: round(p.histAvg, p.decimals),
-    };
-    if (metric === "steam" && v === 46.5) {
-      pt.peak = v;
-      peakInfo = { date: "8月13日", value: v, upper: pt.upper!, lower: pt.lower! };
-    }
-    points.push(pt);
+      // 目标值：生效日前 = 当前目标，生效日起切换为新目标（同一条橙色实线，阶梯过渡）
+      ...(p.target ? { target: j >= p.target.from ? p.target.pending : p.target.active } : {}),
+    });
   }
 
-  return { title: p.title, unit: p.unit, decimals: p.decimals, points, peakInfo };
+  // 峰值 = 窗口内最高预测点
+  let peakIdx = 0;
+  points.forEach((pt, i) => {
+    if (pt.predict > points[peakIdx].predict) peakIdx = i;
+  });
+  points[peakIdx].peak = points[peakIdx].predict;
+  const peakPt = points[peakIdx];
+
+  return {
+    title: p.title,
+    unit: p.unit,
+    decimals: p.decimals,
+    kind: p.kind,
+    diffBase: p.diffBase,
+    points,
+    peakInfo: { date: `${peakPt.date.replace("/", "月")}日`, value: peakPt.predict },
+  };
 }
-
-// ===== 单箱综合能耗能否达标预测图（实际按周更新）=====
-export interface TargetPoint {
-  date: string;
-  actual?: number;
-  predict?: number;
-  upper?: number;
-  lower?: number;
-  target?: number;
-}
-
-export function getTargetSeries(period: "本月" | "本年度"): { unit: string; points: TargetPoint[]; summary: string } {
-  const target = 31.0;
-  const base = 29.8;
-  const monthEnd = 30.4; // 月末预测（本月口径）
-  const yearEnd = 31.6; // 年末预测（本年度口径）
-  const points: TargetPoint[] = [];
-
-  if (period === "本月") {
-    for (let i = 1; i <= 31; i++) {
-      const pt: TargetPoint = { date: `8/${i}`, target };
-      if (i <= 9) {
-        pt.actual = round(base * (1 + Math.sin(3 + i) * 0.02), 1);
-      } else {
-        // 自最新实际平滑插值到月末预测值（末点精确收敛于 monthEnd）
-        const t = (i - 9) / 22;
-        const v = round(base * (1 + Math.sin(3 + i) * 0.02) * (1 - t) + monthEnd * t, 1);
-        pt.predict = v;
-        pt.upper = round(v * 1.02, 1);
-        pt.lower = round(v * 0.98, 1);
-      }
-      points.push(pt);
-    }
-    return { unit: "kgce/箱", points, summary: `月末单箱综合能耗预计 ${monthEnd} kgce/箱，目标≤${target}，预计达标，剩余周期仍有约 0.6 的余量` };
-  }
-
-  for (let mo = 1; mo <= 12; mo++) {
-    const pt: TargetPoint = { date: `${mo}月`, target };
-    if (mo <= 8) {
-      pt.actual = round(base * (1 + Math.sin(3 + mo) * 0.015), 1);
-    } else {
-      // 自 8 月实际平滑插值到年末预测值（末点精确收敛于 yearEnd）
-      const t = (mo - 8) / 4;
-      const v = round(base * (1 + Math.sin(3 + mo) * 0.015) * (1 - t) + yearEnd * t, 1);
-      pt.predict = v;
-      pt.upper = round(v * 1.02, 1);
-      pt.lower = round(v * 0.98, 1);
-    }
-    points.push(pt);
-  }
-  return { unit: "kgce/箱", points, summary: "" };
-}
-
-export { fmt };

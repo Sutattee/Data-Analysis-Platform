@@ -745,6 +745,13 @@ export function formatRecordDate(r: DefectRecord): string {
   return `${y}/${m}/${d} ${r.time}`;
 }
 
+// 班次标签：按记录时间推定（8~20 点白班），格式与缺陷预测页一致（如 9-21白班）
+export function shiftLabelOf(r: DefectRecord): string {
+  const h = Number(r.time.slice(0, 2));
+  const [, m, d] = r.date.split("-").map(Number);
+  return `${m}-${d}${h >= 8 && h < 20 ? "白班" : "夜班"}`;
+}
+
 // 展示用 ID：缺陷记录 dr-013@2026-09-22 → 20260922013
 export function displayRecordId(r: DefectRecord): string {
   return `${r.date.replace(/-/g, "")}${r.id.slice(-3)}`;

@@ -87,7 +87,7 @@ export function HourlyOutputTrendChart({ onAnomaly }: { onAnomaly: (d: AnomalyDe
         </div>
       }
     >
-      {/* 机组 TAB：16 台卷接包机组 */}
+      {/* 机组 TAB：16 台卷接包装机组 */}
       <div className="mb-3 flex flex-wrap gap-1">
         {EQUIPMENT_UNITS.map((u) => {
           const active = u === unit;

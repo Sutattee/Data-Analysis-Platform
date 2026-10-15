@@ -56,18 +56,12 @@ const DIST_DIMS = [
   { key: "shift" as const, label: "班组" },
 ];
 
-// 横向条形图（分布图共用）：条侧标注次数（牌号另加占比）
-function RankBarChart({
-  data,
-  labelMode,
-}: {
-  data: { name: string; count: number }[];
-  labelMode: "count" | "countPct";
-}) {
+// 横向条形图（分布图共用）：条侧标注次数 + 次数占比
+function RankBarChart({ data }: { data: { name: string; count: number }[] }) {
   const total = data.reduce((s, d) => s + d.count, 0) || 1;
   const chartData = data.map((d) => {
     const pct = ((d.count / total) * 100).toFixed(1);
-    return { ...d, pct, label: labelMode === "countPct" ? `${d.count}条 · ${pct}%` : `${d.count}条` };
+    return { ...d, pct, label: `${d.count}条 · ${pct}%` };
   });
 
   if (chartData.length === 0) {
@@ -338,12 +332,11 @@ export function DefectDiagnosisView() {
                 <Tooltip
                   content={({ active, payload }: any) => {
                     if (!active || !payload?.length) return null;
-                    const d = payload[0].payload as { date: string; count: number; abnormal: boolean };
+                    const d = payload[0].payload as { date: string; count: number };
                     return (
                       <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs shadow-md">
-                        <p className="text-gray-500">日期：{md(d.date)}</p>
                         <p className="text-gray-800">发生次数：{d.count}条</p>
-                        {d.abnormal && <p className="text-red-500">异常上升</p>}
+                        <p className="text-gray-500">日期：{md(d.date)}</p>
                       </div>
                     );
                   }}
@@ -383,7 +376,7 @@ export function DefectDiagnosisView() {
             </div>
           </div>
           <div className="px-4 py-3">
-            <RankBarChart data={distData} labelMode={distDim === "brand" ? "countPct" : "count"} />
+            <RankBarChart data={distData} />
           </div>
         </Card>
       </div>

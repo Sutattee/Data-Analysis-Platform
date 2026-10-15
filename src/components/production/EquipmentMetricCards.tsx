@@ -33,7 +33,7 @@ function CompareLine({ label, base, card }: { label: string; base: number; card:
 }
 
 // 顶部 4 张指标卡：白底，当前值突出显示，昨日口径（效率类 ↓ 橙 / ↑ 绿）
-// 台时产量卡支持机组下拉筛选（默认 1#卷接包机组），切换后展示该机组实际值 / 目标值 / 历史均值
+// 台时产量卡支持机组下拉筛选（默认 1#卷接包装机组），切换后展示该机组实际值 / 目标值 / 历史均值
 export function EquipmentMetricCards() {
   const [unit, setUnit] = useState(EQUIPMENT_UNITS[0]);
 

@@ -64,24 +64,24 @@ export const TOP_DEFECTS = [
   { name: "小盒内部未粘牢", count: 3 },
 ];
 
-// 新冒头缺陷列表（按日期倒序，滚动展示）
+// 新冒头缺陷列表（按日期倒序，滚动展示；批次号与发生日期对应，机台为卷接包机组）
 export interface EmergingDefect {
   id: string;
   name: string;
-  code: string;
-  shift: string;
+  batch: string; // 发生批次号（如 20260816-03）
+  machine: string; // 发生机台
   date: string;
 }
 
 export const EMERGING_DEFECTS: EmergingDefect[] = [
-  { id: "ed-1", name: "透明纸烫皱", code: "HTTZC", shift: "甲班", date: "2026-08-16" },
-  { id: "ed-2", name: "条盒纸压痕", code: "THYHC", shift: "丙班", date: "2026-08-15" },
-  { id: "ed-3", name: "爆口", code: "JDBKA", shift: "乙班", date: "2026-08-14" },
-  { id: "ed-4", name: "商标纸色差", code: "HFSCC", shift: "甲班", date: "2026-08-13" },
-  { id: "ed-5", name: "封签翘折", code: "HQQZC", shift: "丙班", date: "2026-08-11" },
-  { id: "ed-6", name: "接装纸皱", code: "JSZTC", shift: "乙班", date: "2026-08-10" },
-  { id: "ed-7", name: "钢印模糊", code: "JGMHC", shift: "甲班", date: "2026-08-08" },
-  { id: "ed-8", name: "卷烟表面污", code: "JAWZC", shift: "乙班", date: "2026-08-06" },
+  { id: "ed-1", name: "透明纸烫皱", batch: "20260816-03", machine: "2#卷接包机组", date: "2026-08-16" },
+  { id: "ed-2", name: "条盒纸压痕", batch: "20260815-01", machine: "5#卷接包机组", date: "2026-08-15" },
+  { id: "ed-3", name: "爆口", batch: "20260814-02", machine: "3#卷接包机组", date: "2026-08-14" },
+  { id: "ed-4", name: "商标纸色差", batch: "20260813-05", machine: "1#卷接包机组", date: "2026-08-13" },
+  { id: "ed-5", name: "封签翘折", batch: "20260811-04", machine: "4#卷接包机组", date: "2026-08-11" },
+  { id: "ed-6", name: "接装纸皱", batch: "20260810-02", machine: "2#卷接包机组", date: "2026-08-10" },
+  { id: "ed-7", name: "钢印模糊", batch: "20260808-01", machine: "5#卷接包机组", date: "2026-08-08" },
+  { id: "ed-8", name: "卷烟表面污", batch: "20260806-03", machine: "1#卷接包机组", date: "2026-08-06" },
 ];
 
 // ============ 模块二：过程管控 ============
@@ -89,20 +89,24 @@ export const EMERGING_DEFECTS: EmergingDefect[] = [
 // 摘要：半年评价达标项 / 当日异常批次
 export const PROCESS_SUMMARY = { halfYearPass: 7, halfYearTotal: 9, todayAbnormal: 3, todayBatches: 28 };
 
-// 过程管控指标（9 项）：评价标准 toleranceNum 为 null 表示「待配置」（不参与超差判定）
+// 过程管控指标（9 项）：管控值为 null 且无 tolRange 表示「待配置」（不参与超差判定）；
+// tolRange = 区间型管控（值落在区间内达标，如 12.50%～13.50%），设置时优先于 toleranceNum 判定
 export interface ProcessMetric {
   id: string;
   stage: string; // 工序
   name: string; // 指标
-  halfYearValue: string; // 半年评价值（如 1.36%）
-  halfYearPass: boolean; // 半年评价：达标 / 未达标
-  latestValue: string; // 最新监测值（如 0.48%）
-  latestNum: number; // 最新监测数值（与评价标准比较，超标准标红）
+  halfYearValue: string; // 半年均值评价值（如 1.36%）
+  halfYearPass: boolean; // 半年均值评价：达标 / 未达标
+  latestValue: string; // 最新监测值（如 4.8%）
+  latestNum: number; // 最新监测数值（与管控值比较，超标准标红）
   latestNote: string; // 最新监测口径（批次/班组/本月）
   recent: string; // 近期均值展示
-  recentNum: number; // 近期均值数值（超差判定）
-  tolerance: string; // 评价标准展示（如 ≤4.0% / 3次 / 待配置）
-  toleranceNum: number | null; // 评价标准数值（null = 待配置）
+  recentNum: number; // 近期均值数值
+  recentNote: string; // 近期均值统计周期（近10批次 / 近3个月 / 近10班次）
+  deviation: string; // 超限比例展示（相对管控值；如 +20% / +15% / 0% / -，- = 待配置无基准）
+  tolerance: string; // 管控值展示（如 ≤4.0% / ≤3次 / 12.50%～13.50% / 待配置）
+  toleranceNum: number | null; // 上限型管控值数值（null = 非上限型或待配置）
+  tolRange?: [number, number]; // 区间型管控 [下限, 上限]
 }
 
 export const PROCESS_METRICS: ProcessMetric[] = [
@@ -112,18 +116,20 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     name: "松散回潮非稳态指数",
     halfYearValue: "1.36%",
     halfYearPass: true,
-    latestValue: "0.48%",
-    latestNum: 0.48,
+    latestValue: "4.8%",
+    latestNum: 4.8,
     latestNote: "批次20260817-02",
-    recent: "4.10%",
+    recent: "4.1%",
     recentNum: 4.1,
+    recentNote: "近10批次",
+    deviation: "+20%",
     tolerance: "≤4.0%",
     toleranceNum: 4.0,
   },
   {
     id: "pm-2",
     stage: "松散回潮",
-    name: "烟丝水分标准偏差",
+    name: "成品水分标准偏差",
     halfYearValue: "1.8%",
     halfYearPass: false,
     latestValue: "1.65%",
@@ -131,6 +137,8 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     latestNote: "批次20260817-02",
     recent: "1.57%",
     recentNum: 1.57,
+    recentNote: "近10批次",
+    deviation: "+18.15%",
     tolerance: "≤1.55%",
     toleranceNum: 1.55,
   },
@@ -145,6 +153,8 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     latestNote: "批次20260816-05",
     recent: "0.45%",
     recentNum: 0.45,
+    recentNote: "近10批次",
+    deviation: "-",
     tolerance: "待配置",
     toleranceNum: null,
   },
@@ -154,13 +164,16 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     name: "烘丝机出口水分偏差",
     halfYearValue: "0.46%",
     halfYearPass: true,
-    latestValue: "0.4%",
-    latestNum: 0.4,
+    latestValue: "12.4%",
+    latestNum: 12.4,
     latestNote: "批次20260816-05",
-    recent: "0.49%",
-    recentNum: 0.49,
-    tolerance: "≤0.5%",
-    toleranceNum: 0.5,
+    recent: "12.49%",
+    recentNum: 12.49,
+    recentNote: "近10批次",
+    deviation: "-20%",
+    tolerance: "12.50%～13.50%",
+    toleranceNum: null,
+    tolRange: [12.5, 13.5],
   },
   {
     id: "pm-5",
@@ -173,7 +186,9 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     latestNote: "本月",
     recent: "1次",
     recentNum: 1,
-    tolerance: "3次",
+    recentNote: "近3个月",
+    deviation: "0%",
+    tolerance: "≤3次",
     toleranceNum: 3,
   },
   {
@@ -184,9 +199,11 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: false,
     latestValue: "46mg",
     latestNum: 46,
-    latestNote: "班组卷包甲班",
+    latestNote: "09-28 白班 乙班",
     recent: "42mg",
     recentNum: 42,
+    recentNote: "近10班次",
+    deviation: "+15%",
     tolerance: "≤40mg",
     toleranceNum: 40,
   },
@@ -198,9 +215,11 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "3.1%",
     latestNum: 3.1,
-    latestNote: "班组卷包甲班",
+    latestNote: "09-28 夜班 甲班",
     recent: "2.97%",
     recentNum: 2.97,
+    recentNote: "近10班次",
+    deviation: "0%",
     tolerance: "≤3.2%",
     toleranceNum: 3.2,
   },
@@ -212,9 +231,11 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "2.4%",
     latestNum: 2.4,
-    latestNote: "班组卷包乙班",
+    latestNote: "09-28 夜班 丙班",
     recent: "2.55%",
     recentNum: 2.55,
+    recentNote: "近10班次",
+    deviation: "0%",
     tolerance: "≤2.6%",
     toleranceNum: 2.6,
   },
@@ -226,9 +247,11 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "1.09%",
     latestNum: 1.09,
-    latestNote: "班组卷包乙班",
+    latestNote: "09-28 白班 丁班",
     recent: "1.43%",
     recentNum: 1.43,
+    recentNote: "近10班次",
+    deviation: "0%",
     tolerance: "≤1.5%",
     toleranceNum: 1.5,
   },
