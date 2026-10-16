@@ -369,11 +369,11 @@ export function buildQualityAlertRecords(): AlertRecord[] {
     const forecastWindow = isForecast ? `未来${[5, 10, 15][i % 3]}个${cycleUnit}` : undefined;
 
     const triggerTime = tsAt(3300 + i * 263);
-    // 班次（仅班周期指标）：按触发时间推定 —— 8~20 点白班、其余夜班；
+    // 班次（批/班周期指标；月度指标无班次）：按触发时间推定 —— 8~20 点白班、其余夜班；
     // 日期格式与稳定性预测页班次标签一致（如「7-19 白班」）
     const triggerHour = Number(triggerTime.slice(11, 13));
     const shiftLabel =
-      metric.cycle === "每班次"
+      metric.cycle !== "每月"
         ? `${Number(triggerTime.slice(5, 7))}-${Number(triggerTime.slice(8, 10))} ${triggerHour >= 8 && triggerHour < 20 ? "白班" : "夜班"}`
         : undefined;
     const dateStr = triggerTime.slice(0, 10).replace(/-/g, "");
@@ -411,7 +411,7 @@ export function buildQualityAlertRecords(): AlertRecord[] {
           : `第 ${2417 + i} 批${isForecast ? `（${forecastShift}个${cycleUnit}后）` : ""}`,
       forecastWindow,
       shift: SHIFTS[i % 3],
-      shiftLabel, // 班次（白班/夜班；批次/月度指标不生成 → 详情不展示）
+      shiftLabel, // 班次（白班/夜班，批/班周期指标生成；月度指标不生成 → 详情不展示）
       brand: BRANDS[i % 3],
       process: metric.process, // 来源工序（结果类指标无 → 详情不展示）
       consecutiveShifts: spec.shifts, // 飘移类：连续同向偏离周期数（详情「连续同向偏离」= N个批次/班次/月；列表置顶）

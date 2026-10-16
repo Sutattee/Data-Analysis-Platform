@@ -383,7 +383,7 @@ export interface AlertRecord {
   process?: string;           // 来源工序（SF 稳定性指标关联，如「松散回潮」；结果类指标无 → 不展示）
   forecastWindow?: string;    // 预测窗口（仅预测风险，如「未来10个批次」；实测异常不展示）
   shift?: string;             // 班组（甲班/乙班/丙班）
-  shiftLabel?: string;        // 班次（白班/夜班，如「7-19 白班」；班周期指标按触发时间推定，批次/月度指标不生成）
+  shiftLabel?: string;        // 班次（白班/夜班，如「7-19 白班」；批/班周期指标按触发时间推定，月度指标不生成）
   brand?: string;             // 牌号（如「娇子」；结果类指标为「—」）
   consecutiveShifts?: number; // 连续同向偏离周期数（飘移类记录；详情展示如「3个批次」，列表置顶排序）
   // —— 判定依据 ——

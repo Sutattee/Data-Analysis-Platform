@@ -228,7 +228,7 @@ export function AlertRecordDetail({
                 if (f === "shift") return <Field key={f} label="班组" value={record.shift} />;
                 return <Field key={f} label="牌号" value={record.brand} />;
               })}
-              {/* 班次（白班/夜班，班周期指标按触发时间推定；批次/月度指标无 → 不展示） */}
+              {/* 班次（白班/夜班，批/班周期指标按触发时间推定；月度指标无 → 不展示） */}
               {record.shiftLabel && <Field label="班次" value={record.shiftLabel} />}
               {/* 来源工序（SF 稳定性指标关联；结果类指标无 → 不展示） */}
               {record.process && <Field label="工序" value={record.process} />}
