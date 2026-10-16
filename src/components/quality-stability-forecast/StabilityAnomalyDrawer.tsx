@@ -119,6 +119,8 @@ export function StabilityAnomalyDrawer({
             <Field label="机台" value={record.objectName} />
             <Field label="班组" value={record.shift ?? "-"} />
             <Field label="牌号" value={record.brand ?? "-"} />
+            {/* 班次（白班/夜班，取点位上下文；批/班周期指标有、月周期指标无 → 不展示） */}
+            {record.shiftLabel && <Field label="班次" value={record.shiftLabel} />}
             {record.process && <Field label="工序" value={record.process} />}
             <Field label="告警触发时间" value={record.triggerTime} />
             <Field label="告警值" value={record.valueLabel} />

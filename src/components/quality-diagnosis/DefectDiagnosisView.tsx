@@ -98,14 +98,7 @@ function RankBarChart({ data }: { data: { name: string; count: number }[] }) {
   );
 }
 
-// 频次趋势异常点（单日 ≥3 条）红色大点
-function renderTrendDot(props: any) {
-  const { cx, cy, payload } = props;
-  if (payload?.abnormal) {
-    return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={1.5} />;
-  }
-  return <circle cx={cx} cy={cy} r={2.5} fill="#3b82f6" />;
-}
+// 频次趋势点：统一蓝色小点（不做异常点标红）
 
 // 缺陷诊断页主视图：单缺陷代码视角的频次统计 + 诊断明细管理
 // 筛选区（部位/类别/缺陷名称/检验日期）为草稿态，点「查询」提交生效
@@ -347,7 +340,7 @@ export function DefectDiagnosisView() {
                   name="发生次数"
                   stroke="#3b82f6"
                   strokeWidth={2}
-                  dot={renderTrendDot}
+                  dot={{ r: 2.5, fill: "#3b82f6" }}
                   activeDot={{ r: 5 }}
                 />
               </LineChart>

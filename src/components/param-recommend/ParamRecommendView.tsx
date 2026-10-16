@@ -31,12 +31,11 @@ const th = "text-left px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-n
 const td = "px-3 py-2.5 whitespace-nowrap";
 
 // 工况只读字段
-function CondField({ label, value, note }: { label: string; value: string; note?: string }) {
+function CondField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="mb-1 text-xs text-gray-500">{label}</div>
       <div className="text-sm font-medium text-gray-800">{value}</div>
-      {note && <div className="mt-0.5 text-xs text-gray-400">{note}</div>}
     </div>
   );
 }
@@ -153,7 +152,7 @@ export function ParamRecommendView() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">工艺参数推荐</h1>
-        <p className="mt-0.5 text-sm text-gray-500">以加香出口水分达标为目标，结合当前工况与历史达标表现生成的参数建议，供工艺人员参考</p>
+        <p className="mt-0.5 text-sm text-gray-500">以加香出口水分达标为目标，结合当前工况与历史达标表现生成的参数建议，供参考</p>
       </div>
 
       {/* ===== 区域一：生产条件与当前工况 ===== */}
@@ -211,11 +210,7 @@ export function ParamRecommendView() {
               value={cond.flowRate}
               onChange={(v) => editCond({ flowRate: v })}
             />
-            <CondField
-              label="配方版本"
-              value={cond.recipeVer}
-              note={`采集 ${cond.recipeCollectedAt}`}
-            />
+            <CondField label="配方版本" value={cond.recipeVer} />
             <CondField label="当前批次" value={cond.batch} />
             <CondField label="工况采集时间" value={cond.collectedAt} />
             <CondField label="出口水分达标标准" value={cond.standardText} />

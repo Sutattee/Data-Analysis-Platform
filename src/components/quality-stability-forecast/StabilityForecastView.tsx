@@ -83,7 +83,7 @@ export function StabilityForecastView() {
     if (rec) setAnomalyAlert(pointAlertOf(rec, info));
   }
 
-  // 以点击点位的数值覆写告警记录展示字段（等级 / 告警值 / 基准 / 偏离 / 批次 / 班组 / 牌号 /
+  // 以点击点位的数值覆写告警记录展示字段（等级 / 告警值 / 基准 / 偏离 / 批次 / 班次 / 班组 / 牌号 /
   // 预测窗口等与点位一致；点位在预测曲线上 → 告警类型 = 预测风险，基准点为最新实测值 →
   // 实测异常、告警值「当前值」且不展示预测窗口）；
   // 策略、原因、建议、触发时间等无法由点位派生的字段保留告警记录原文
@@ -126,6 +126,7 @@ export function StabilityForecastView() {
       deviationRate:
         delta === null || baseAbs < 1e-9 ? "-" : `${delta >= 0 ? "+" : "-"}${Math.round((Math.abs(delta) / baseAbs) * 1000) / 10}%`,
       batch: info.point?.batch ? `第 ${info.point.batch} 批` : undefined,
+      shiftLabel: info.point?.shift, // 班次取点位上下文（批/班周期有、月周期无），不沿用原记录
       shift: info.point?.shiftGroup,
       brand: info.point?.brand,
       forecastWindow: info.measured ? undefined : rec.forecastWindow ?? windowTextOf(metric.cycle),

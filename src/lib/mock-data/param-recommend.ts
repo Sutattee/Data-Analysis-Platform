@@ -87,7 +87,6 @@ export interface ConditionSnapshot {
   recipeVer: string; // 配方版本（原系统版本标识）
   batch: string; // 当前批次
   collectedAt: string; // 工况采集时间 yyyy-MM-dd HH:mm
-  recipeCollectedAt: string; // 配方版本生效时间（前一日换批，与主采集时间不一致 → 字段旁标注）
   standardText: string; // 出口水分达标标准：目标（下限 ~ 上限），按牌号自动读取，不可修改
 }
 
@@ -128,7 +127,6 @@ export function conditionOf(brand: string, machine: string): ConditionSnapshot {
     recipeVer: seed.recipeVer,
     batch: seed.batch,
     collectedAt: `${today} ${seed.collectedHM}`,
-    recipeCollectedAt: `${addDaysISO(today, -1)} 20:15`,
     standardText: STANDARD_TEXT[brand] ?? "—",
   };
 }
@@ -229,13 +227,13 @@ export function recommendOf(
     // 建议值 = 计算基准（当前设定，未接入时取达标组合基准）+ 水分偏差敏感度，量化到设备调整步长
     const base = cur ?? seed.refs[def.key];
     const suggest = roundTo(base + dev * SENSITIVITY[def.key], def.step);
-    const deltaNum = cur === null ? null : suggest - cur;
+    // 当前设定值未接入 → 调整量无法计算；与当前一致 → 无需调整
     const delta =
       cur === null
         ? "—"
-        : Math.abs(deltaNum) < 1e-9
+        : Math.abs(suggest - cur) < 1e-9
           ? "无需调整"
-          : `${deltaNum > 0 ? "+" : "-"}${fmt(Math.abs(deltaNum), def.decimals)}${def.pctDelta ? "pct" : ""}`;
+          : `${suggest > cur ? "+" : "-"}${fmt(Math.abs(suggest - cur), def.decimals)}${def.pctDelta ? "pct" : ""}`;
     return { key: def.key, name: def.name, unit: def.unit, current, suggest: fmt(suggest, def.decimals), delta };
   });
   return { rows, sampleCount, insufficient };
