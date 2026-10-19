@@ -15,8 +15,7 @@ import {
   TYPE_DISPLAY,
   alertTypeOfDisplay,
   QUALITY_TYPE_OPTIONS,
-  qualityMetricOptionsOf,
-  qualityDefectKindOf,
+  QUALITY_ALERT_METRICS,
   qualityMetricOf,
   qualityCycleUnitOf,
 } from "@/lib/mock-data/quality-alerts";
@@ -108,21 +107,6 @@ export function QualityAlertStrategyForm({
 
   // 存储枚举（实测异常→当前异常），供条件构造器区分预测风险显示
   const alertType = alertTypeOfDisplay(data.typeDisplay);
-
-  // 切换告警类型：实测异常不支持缺陷预测指标 → 清空条件中的缺陷指标（校验会提示重新选择）
-  function handleTypeChange(display: string) {
-    const next = alertTypeOfDisplay(display);
-    setData((prev) => ({
-      ...prev,
-      typeDisplay: display,
-      conditions:
-        next === "当前异常"
-          ? prev.conditions.map((c) =>
-              qualityDefectKindOf(c.metric) ? { ...c, metric: "", forecastRange: undefined } : c
-            )
-          : prev.conditions,
-    }));
-  }
 
   // 告警对象：按首条条件的指标自动带入机台（结果类指标为「全厂」），仅展示、不支持编辑
   const firstMetric = data.conditions[0]?.metric ?? "";
@@ -244,15 +228,13 @@ export function QualityAlertStrategyForm({
             <select
               className={selectCls}
               value={data.typeDisplay}
-              onChange={(e) => handleTypeChange(e.target.value)}
+              onChange={(e) => set("typeDisplay", e.target.value)}
             >
               {QUALITY_TYPE_OPTIONS.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-400">
-              实测异常监测当前值越界；预测风险监测预测值将越界，并支持 5 个缺陷预测指标（风险评分 / 水分偏差 / 箱储时长）。
-            </p>
+            <p className="mt-1 text-xs text-gray-400">实测异常监测当前值越界；预测风险监测预测值将越界。</p>
           </div>
 
           {/* 策略说明 */}
@@ -285,7 +267,7 @@ export function QualityAlertStrategyForm({
               conditions={data.conditions}
               relation={data.relation}
               errors={condErrors}
-              metricOptions={qualityMetricOptionsOf(alertType)}
+              metricOptions={QUALITY_ALERT_METRICS.map((m) => m.name)}
               onChange={(conditions, relation) => setData((prev) => ({ ...prev, conditions, relation }))}
             />
             <div className="mt-3">

@@ -14,7 +14,7 @@ import { PRODUCTION_MATERIAL_METRICS } from "./alerts";
 import {
   EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseDeptsOfMetric, expenseMetricDefOf,
 } from "./expense-alerts";
-import { QUALITY_ALERT_METRIC_NAMES, QUALITY_DEFECT_METRIC_NAMES, qualityMetricDefOf, qualityDefectKindOf } from "./quality-alerts";
+import { QUALITY_ALERT_METRIC_NAMES, qualityMetricDefOf } from "./quality-alerts";
 import type { MetricTargetVersion } from "@/types";
 
 // ========== 选项常量（供表单下拉） ==========
@@ -157,19 +157,6 @@ export function formatCondition(c: AlertCondition): string {
     }
     return `${name} 执行进度偏差 ${c.operator} ${c.baselineValue} pct`;
   }
-  // 工艺质量 · 缺陷预测指标：三类形态各有专属文案（与缺陷预测页口径一致）
-  // 风险评分：未来8小时内最高风险评分 ≥ 80分 / 水分偏差：≥ +0.3pct（符号随判断方向）/ 箱储：＞ 储存时长上限 72小时
-  if (QUALITY_DEFECT_METRIC_NAMES.has(c.metric)) {
-    const kind = qualityDefectKindOf(c.metric);
-    if (kind === "score") {
-      return `${c.metric} ${c.forecastRange ?? "未来8小时"}内最高风险评分 ${c.operator} ${c.baselineValue}分`;
-    }
-    if (kind === "moistureDev") {
-      const sign = c.operator === "≥" || c.operator === ">" ? "+" : c.operator === "<" || c.operator === "≤" ? "-" : "";
-      return `${c.metric} ${c.operator} ${sign}${c.baselineValue}pct`;
-    }
-    return `${c.metric} ${c.operator} 储存时长上限 ${c.baselineValue}小时`;
-  }
   // 工艺质量口径：等级按相对基准的偏离比例划分，条件文案带偏离比例区间
   // （如 松散回潮非稳态指数 ≥ 上限4% 偏离比例20%-50%，与告警记录判定依据同口径；
   //   连续同向偏离不在条件文案中体现，由「连续同向偏离」独立字段展示）
@@ -205,7 +192,7 @@ export function formatConditions(s: { conditions: AlertCondition[]; relation: "�
 export function domainOfMetric(metric: string): AlertDomain {
   if (!metric) return "生产管理";
   if (EXPENSE_ALERT_METRIC_NAMES.has(metric)) return "费用预算执行";
-  if (QUALITY_ALERT_METRIC_NAMES.has(metric) || QUALITY_DEFECT_METRIC_NAMES.has(metric)) return "工艺质量";
+  if (QUALITY_ALERT_METRIC_NAMES.has(metric)) return "工艺质量";
   const domain = metricList.find((m) => m.nameCn === metric)?.domain;
   if (domain === "能源管理") return "能源消耗";
   if (domain === "质量管理" || domain === "工艺质量") return "工艺质量";
@@ -1260,126 +1247,6 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
     createdAt: "2026-07-06 10:35",
     editedBy: "陈静",
     updatedAt: "2026-07-25 11:15",
-  },
-  // ========== 工艺质量 · 缺陷指标预测告警策略（QAS-011~015，预测风险类型专属） ==========
-  // 与缺陷预测页（quality-defect-forecast）滚动预测联动：风险评分判预测时间窗口内最高评分；
-  // 水分偏差对标准水分 12.5% 的允差 ±0.3pct（上偏/下偏两条条件，满足任一即触发）；
-  // 箱储总时长与储存时长上限比较。告警记录见 quality-alerts.ts DEFECT_SPECS（strategyName 与策略名逐字一致）
-  {
-    id: "QAS-011",
-    name: "成品水分不合格风险评分预警策略",
-    description: "缺陷预测：未来8小时内最高风险评分 ≥ 80分 触发告警（与缺陷预测页滚动预测联动）",
-    type: "预测风险",
-    domain: "工艺质量",
-    scope: "指定对象",
-    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
-    conditions: [
-      { metric: "成品水分不合格风险评分", operator: "≥", baselineType: "基准值", baselineValue: "80", forecastRange: "未来8小时" },
-    ],
-    relation: "且",
-    level: "告警",
-    detectCycle: "每批次",
-    notifyTemplate: "",
-    notifyMethods: ["邮件"],
-    receivers: ["吴敏"],
-    repeatAlert: false,
-    enabled: true,
-    creator: "吴敏",
-    createdAt: "2026-10-12 09:20",
-    updatedAt: "2026-10-18 16:40",
-  },
-  {
-    id: "QAS-012",
-    name: "烟支刺破风险评分预警策略",
-    description: "缺陷预测：未来8小时内最高风险评分 ≥ 75分 触发预警（与缺陷预测页滚动预测联动）",
-    type: "预测风险",
-    domain: "工艺质量",
-    scope: "指定对象",
-    objects: ["ZJ17-02卷接机组", "ZJ19-01卷接机组", "ZJ17-04卷接机组", "5#卷接包机组"],
-    conditions: [
-      { metric: "烟支刺破风险评分", operator: "≥", baselineType: "基准值", baselineValue: "75", forecastRange: "未来8小时" },
-    ],
-    relation: "且",
-    level: "预警",
-    detectCycle: "每批次",
-    notifyTemplate: "",
-    notifyMethods: ["邮件"],
-    receivers: ["周婷"],
-    repeatAlert: false,
-    enabled: true,
-    creator: "周婷",
-    createdAt: "2026-10-12 09:25",
-    updatedAt: "2026-10-18 16:40",
-  },
-  {
-    id: "QAS-013",
-    name: "箱储存储时间超上限风险评分预警策略",
-    description: "缺陷预测：未来8小时内最高风险评分 ≥ 80分 触发告警（与缺陷预测页滚动预测联动）",
-    type: "预测风险",
-    domain: "工艺质量",
-    scope: "指定对象",
-    objects: ["1#储丝柜", "2#储丝柜", "3#储丝柜"],
-    conditions: [
-      { metric: "箱储存储时间超上限风险评分", operator: "≥", baselineType: "基准值", baselineValue: "80", forecastRange: "未来8小时" },
-    ],
-    relation: "且",
-    level: "告警",
-    detectCycle: "每批次",
-    notifyTemplate: "",
-    notifyMethods: ["邮件"],
-    receivers: ["陈静"],
-    repeatAlert: false,
-    enabled: true,
-    creator: "陈静",
-    createdAt: "2026-10-12 09:30",
-    updatedAt: "2026-10-18 16:45",
-  },
-  {
-    id: "QAS-014",
-    name: "预测成品水分偏差预警策略",
-    description: "缺陷预测：预测成品水分偏差 ≥+0.3pct 或 ＜-0.3pct（超出标准水分 12.5% 允差）触发告警",
-    type: "预测风险",
-    domain: "工艺质量",
-    scope: "指定对象",
-    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
-    conditions: [
-      { metric: "预测成品水分偏差", operator: "≥", baselineType: "基准值", baselineValue: "0.3" },
-      { metric: "预测成品水分偏差", operator: "<", baselineType: "基准值", baselineValue: "0.3" },
-    ],
-    relation: "或",
-    level: "告警",
-    detectCycle: "每批次",
-    notifyTemplate: "",
-    notifyMethods: ["邮件"],
-    receivers: ["王芳"],
-    repeatAlert: false,
-    enabled: true,
-    creator: "王芳",
-    createdAt: "2026-10-12 09:35",
-    updatedAt: "2026-10-18 16:45",
-  },
-  {
-    id: "QAS-015",
-    name: "预计箱储总存储时长预警策略",
-    description: "缺陷预测：预计箱储总存储时长 ＞ 储存时长上限 72小时 触发告警（剩余允许时间仅作临近截止提醒）",
-    type: "预测风险",
-    domain: "工艺质量",
-    scope: "指定对象",
-    objects: ["1#储丝柜", "2#储丝柜", "3#储丝柜"],
-    conditions: [
-      { metric: "预计箱储总存储时长", operator: ">", baselineType: "上限", baselineValue: "72" },
-    ],
-    relation: "且",
-    level: "告警",
-    detectCycle: "每批次",
-    notifyTemplate: "",
-    notifyMethods: ["邮件"],
-    receivers: ["刘洋"],
-    repeatAlert: false,
-    enabled: true,
-    creator: "刘洋",
-    createdAt: "2026-10-12 09:40",
-    updatedAt: "2026-10-18 16:50",
   },
 ] as AlertStrategy[]).map((s) => ({ ...s, notifyTemplate: defaultNotifyTemplate() }));
 

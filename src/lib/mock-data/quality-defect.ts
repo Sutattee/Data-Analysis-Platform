@@ -980,96 +980,85 @@ export function heatmapOf(records: DefectRecord[], dim: HeatDim): HeatmapData {
   return { cols, rows, cells, rowTotals, colTotals, grandTotal: rowTotals.reduce((s, v) => s + v, 0) };
 }
 
-// ============ 缺陷诊断口径（3 个重点缺陷） ============
-
-// 诊断域（缺陷诊断页 / 诊断记录页 / 诊断抽屉）围绕 3 个重点缺陷组织，
-// 与缺陷分析页的全量缺陷档案（DEFECT_CATALOG）分属不同口径。
-export const DIAG_CATALOG: DefectCatalogItem[] = [
-  {
-    code: "CPSFBH", name: "成品水分不合格", part: "成品", grade: "B",
-    process: "烘丝", post: "烘丝机组操作",
-    aiCause: "烘丝出口水分设定偏差 / 排潮风门开度不当",
-  },
-  {
-    code: "YZCB", name: "烟支刺破", part: "烟支", grade: "C",
-    process: "卷制", post: "卷接机组操作",
-    aiCause: "烟支通道导板毛刺 / 烙铁边角刮伤",
-  },
-  {
-    code: "XCCG", name: "箱储存储时间超上限", part: "箱储", grade: "A",
-    process: "仓储", post: "库房管理",
-    aiCause: "先进先出执行不到位 / 库房周转调度滞后",
-  },
-];
-
-export function diagCatalogOf(code: string): DefectCatalogItem | undefined {
-  return DIAG_CATALOG.find((c) => c.code === code);
+// 维度分布（全部取值，按次数倒序，不合并「其他」）
+export function distAll(records: DefectRecord[], key: "machine" | "brand" | "shift"): { name: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const r of records) map.set(r[key], (map.get(r[key]) ?? 0) + r.count);
+  return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 }
 
-// 3 缺陷发生记录（诊断明细的检验日期关联与抽屉的发生上下文口径）
-let diagRecSeq = 0;
-function DR(
-  code: string,
-  brand: string,
-  machine: string,
-  shift: string,
-  spec: string,
-  count: number,
-  sampled: number,
-  date: string,
-  time: string
-): DefectRecord {
-  const c = diagCatalogOf(code)!;
-  diagRecSeq += 1;
+// 维度分布 Top N + 其余合并「其他」
+export function distTopN(records: DefectRecord[], key: "machine" | "brand" | "shift", n = 5): { name: string; count: number }[] {
+  const sorted = distAll(records, key);
+  if (sorted.length <= n) return sorted;
+  const top = sorted.slice(0, n);
+  const rest = sorted.slice(n).reduce((s, x) => s + x.count, 0);
+  return rest > 0 ? [...top, { name: "其他", count: rest }] : top;
+}
+
+// ============ 缺陷诊断页统计 ============
+
+// 诊断时间范围 → 环比上一等长窗口
+export function prevOfRange(from: string, to: string): { from: string; to: string } {
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+  return { from: addDaysISO(from, -days), to: addDaysISO(from, -1) };
+}
+
+export interface CodeStats {
+  count: number;
+  prevCount: number;
+  momCount: number;
+  sharePct: number; // 占同部位缺陷比例
+  shareNum: number;
+  shareDen: number;
+}
+
+// 所选周期发生次数 / 环比 / 占同部位比例（code = "all" 时比例为 100%）
+export function codeStats(code: string, from: string, to: string): CodeStats {
+  const cur = DEFECT_RECORDS.filter((r) => inRange(r, from, to) && (code === "all" || r.code === code));
+  const prev = DEFECT_RECORDS.filter((r) => {
+    const p = prevOfRange(from, to);
+    return inRange(r, p.from, p.to) && (code === "all" || r.code === code);
+  });
+  const count = cur.reduce((s, r) => s + r.count, 0);
+  const prevCount = prev.reduce((s, r) => s + r.count, 0);
+  const catalog = code === "all" ? undefined : catalogOf(code);
+  const partTotal = catalog
+    ? DEFECT_RECORDS.filter((r) => inRange(r, from, to) && r.part === catalog.part).reduce((s, r) => s + r.count, 0)
+    : count;
   return {
-    id: `dr-${String(diagRecSeq).padStart(3, "0")}`,
-    code,
-    name: c.name,
-    part: c.part,
-    grade: c.grade,
-    brand,
-    machine,
-    shift,
-    spec,
-    batch: batchOf(date, machine),
     count,
-    sampled,
-    date,
-    time,
+    prevCount,
+    momCount: count - prevCount,
+    sharePct: partTotal ? (count / partTotal) * 100 : 0,
+    shareNum: count,
+    shareDen: partTotal,
   };
 }
 
-const DIAG_OCCURRENCES: DefectRecord[] = [
-  // 成品水分不合格（烘丝）
-  DR("CPSFBH", "娇子", "3#烘丝机", "甲班", "硬盒 84mm", 2, 118, "2026-08-27", "10:15"),
-  DR("CPSFBH", "长城", "1#烘丝机", "乙班", "软盒 84mm", 3, 124, "2026-09-05", "15:40"),
-  DR("CPSFBH", "宽窄", "3#烘丝机", "丙班", "细支 97mm", 2, 121, "2026-09-12", "09:33"),
-  DR("CPSFBH", "娇子", "5#烘丝机", "甲班", "硬盒 84mm", 3, 118, "2026-09-19", "14:22"),
-  // 烟支刺破（卷制）
-  DR("YZCB", "娇子", "2#卷接包机组", "乙班", "硬盒 84mm", 2, 121, "2026-08-30", "11:08"),
-  DR("YZCB", "长城", "4#卷接包机组", "甲班", "软盒 84mm", 3, 124, "2026-09-08", "16:47"),
-  DR("YZCB", "宽窄", "2#卷接包机组", "丙班", "中支 89mm", 2, 118, "2026-09-16", "10:52"),
-  // 箱储存储时间超上限（仓储）
-  DR("XCCG", "长城", "5#卷接包机组", "甲班", "软盒 84mm", 2, 150, "2026-09-03", "09:20"),
-  DR("XCCG", "娇子", "5#卷接包机组", "乙班", "硬盒 84mm", 2, 148, "2026-09-14", "13:36"),
-  DR("XCCG", "宽窄", "5#卷接包机组", "甲班", "细支 97mm", 2, 152, "2026-09-21", "15:11"),
-];
+// 单缺陷代码频次趋势（单日 ≥3 条标记为异常上升）
+export function freqTrendOf(code: string, from: string, to: string): { date: string; count: number; abnormal: boolean }[] {
+  const records = DEFECT_RECORDS.filter((r) => inRange(r, from, to) && (code === "all" || r.code === code));
+  return dailyTrend(records, from, to).map((d) => ({ ...d, abnormal: d.count >= 3 }));
+}
 
 // 该缺陷代码最近一次发生记录（诊断明细/抽屉的牌号、班组展示口径）
 export function latestOccurrenceOf(code: string): DefectRecord | undefined {
-  return DIAG_OCCURRENCES.filter((r) => r.code === code)
+  return DEFECT_RECORDS.filter((r) => r.code === code)
     .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))[0];
 }
 
 // 诊断行关联的发生上下文（牌号/班组/批次）：优先取登记日期当天的发生记录
 // （同日多条取最新），否则回退最近一次发生记录
 export function occurrenceContextOf(code: string, recordDate: string): DefectRecord | undefined {
-  const sameDay = DIAG_OCCURRENCES.filter((r) => r.code === code && r.date === recordDate);
+  const sameDay = DEFECT_RECORDS.filter((r) => r.code === code && r.date === recordDate);
   if (sameDay.length > 0) return sameDay[sameDay.length - 1];
   return latestOccurrenceOf(code);
 }
 
-// ============ 诊断原因修正（会话级 store：缺陷分析抽屉 / 缺陷诊断页 / 诊断记录页 共享） ============
+// ============ 诊断判定（会话级 store：缺陷分析抽屉 / 缺陷诊断页 / 诊断记录页 共享） ============
+
+export type CauseType = "设备" | "材料" | "操作";
 
 export interface DiagnosisItem {
   id: string;
@@ -1077,82 +1066,106 @@ export interface DiagnosisItem {
   process: string; // 关联工序
   machine: string; // 关联机台（无关联为 "-"）
   post: string; // 责任岗位
-  aiCause: string; // AI 生成的缺陷原因
+  aiCause: string; // AI 诊断原因
   recordDate: string; // 登记日期（时间筛选用，均有值）
-  causeText?: string; // 人工修正后的缺陷原因（未修正为空 = 原因类型 AI生成）
-  diagnoser?: string; // 修正人 / 诊断人（未修正为空）
-  diagnosedAt?: string; // 修正时间 / 诊断时间 2026/09/23 09:20:00（未修正为空）
+  causeType?: CauseType; // 未判定为空
+  conclusion?: string; // 未填写为空
+  diagnoser?: string;
+  diagnosedAt?: string; // 诊断时间 2026/09/23 09:20:00
+  remark?: string;
 }
 
-// 原因类型：人工修正过 = 人工补录，否则 AI 生成
-export function causeSourceOf(d: DiagnosisItem): "AI生成" | "人工补录" {
-  return d.causeText ? "人工补录" : "AI生成";
-}
-
-// 展示用缺陷原因：人工修正文字优先，否则 AI 生成原因
-export function causeTextOf(d: DiagnosisItem): string {
-  return d.causeText ?? d.aiCause;
-}
+// 关联机台池（执行层机组，与筛选机台下拉的卷接包机组分属不同口径）
+const DIAG_MACHINES = [
+  "2# 包装机", "1# 包装机", "3# 包装机", "4# 包装机", "5# 包装机",
+  "卷接机组ZJ17-01", "卷接机组ZJ17-02", "卷接机组ZJ17-03", "卷接机组ZJ17-04", "卷接机组ZJ17-05",
+  "卷接机组ZJ19-01", "卷接机组ZJ19-02", "装封箱机XF-01", "装封箱机XF-02", "-",
+];
 
 let diagSeq = 0;
-function DG(
-  cat: DefectCatalogItem,
-  machine: string,
+function D(
+  code: string,
+  machineIdx: number,
   recordDate: string,
-  revised?: { causeText: string; diagnoser: string; diagnosedAt: string }
+  judged?: { causeType: CauseType; conclusion: string; diagnoser: string; diagnosedAt: string; remark?: string }
 ): DiagnosisItem {
+  const c = catalogOf(code)!;
   diagSeq += 1;
   return {
     id: `dg-${String(diagSeq).padStart(3, "0")}`,
-    code: cat.code,
-    process: cat.process,
-    machine,
-    post: cat.post,
-    aiCause: cat.aiCause,
+    code,
+    process: c.process,
+    machine: DIAG_MACHINES[machineIdx % DIAG_MACHINES.length],
+    post: c.post,
+    aiCause: c.aiCause,
     recordDate,
-    ...revised,
+    ...judged,
   };
 }
 
-// 预置 14 条（9 条已人工修正 + 5 条未修正；登记日期与 3 缺陷发生记录对齐，默认近1月窗口内可见）
-const [CPSF_CAT, YZCB_CAT, XCCG_CAT] = DIAG_CATALOG;
+// 预置 20 条（13 已判定 + 7 待判定；判定时间集中在 9 月上中旬，默认近1月窗口内可见）
 let diagnoses: DiagnosisItem[] = [
-  // 成品水分不合格（烘丝）
-  DG(CPSF_CAT, "3#烘丝机", "2026-08-27", { causeText: "3#烘丝机出口水分仪标定漂移，显示值偏低导致实际水分超出上限，重新标定后复检合格。", diagnoser: "苏恒", diagnosedAt: "2026/08/27 10:41:18" }),
-  DG(CPSF_CAT, "1#烘丝机", "2026-09-05", { causeText: "排潮风门开度未按来料水分变化调整，出口水分偏高，已更新参数卡并对班组培训。", diagnoser: "叶洛星", diagnosedAt: "2026/09/05 15:44:20" }),
-  DG(CPSF_CAT, "3#烘丝机", "2026-09-12", { causeText: "该批烟丝来料水分偏高且凉丝时间不足，烘后成品水分超上限，已调整掺配比例并延长凉丝。", diagnoser: "王建国", diagnosedAt: "2026/09/12 11:30:52" }),
-  DG(CPSF_CAT, "5#烘丝机", "2026-09-19", undefined),
-  // 烟支刺破（卷制）
-  DG(YZCB_CAT, "卷接机组ZJ17-02", "2026-08-30", { causeText: "ZJ17-02 烟支通道导板有毛刺刮破卷烟纸，修磨抛光后缺陷未再发生。", diagnoser: "苏恒", diagnosedAt: "2026/08/30 14:23:56" }),
-  DG(YZCB_CAT, "卷接机组ZJ19-01", "2026-09-08", { causeText: "烙铁边角磨损刮伤烟支表面产生刺破，更换烙铁组件并首件确认合格。", diagnoser: "叶洛星", diagnosedAt: "2026/09/08 09:26:08" }),
-  DG(YZCB_CAT, "卷接机组ZJ17-04", "2026-09-16", { causeText: "卷烟纸盘接头进入机台未及时剔除，接头处刺破烟支，已加强换纸巡检与接头剔除确认。", diagnoser: "王建国", diagnosedAt: "2026/09/16 13:05:59" }),
-  DG(YZCB_CAT, "2#卷接包机组", "2026-09-18", undefined),
-  DG(YZCB_CAT, "4#卷接包机组", "2026-09-22", undefined),
-  // 箱储存储时间超上限（仓储）
-  DG(XCCG_CAT, "装封箱机XF-01", "2026-09-03", { causeText: "库房先进先出执行不到位，角落批次滞留超期，已重新规划货位并按批次标识顺序出库。", diagnoser: "王建国", diagnosedAt: "2026/09/03 16:08:41" }),
-  DG(XCCG_CAT, "-", "2026-09-11", { causeText: "出入库台账更新延迟，系统库存与实物不一致导致超期未预警，已规范台账录入时效。", diagnoser: "叶洛星", diagnosedAt: "2026/09/11 10:55:19" }),
-  DG(XCCG_CAT, "-", "2026-09-14", { causeText: "库容压力集中、周转调度滞后造成局部批次超期，已与生产计划联动均衡出库。", diagnoser: "苏恒", diagnosedAt: "2026/09/14 14:29:38" }),
-  DG(XCCG_CAT, "装封箱机XF-02", "2026-09-21", undefined),
-  DG(XCCG_CAT, "-", "2026-09-23", undefined),
+  D("HAZZC", 0, "2026-09-02", { causeType: "设备", conclusion: "2# 包装机组模压辊温度偏低，导致小盒成型轧皱，已安排调整温控参数并跟踪验证。", diagnoser: "叶洛星", diagnosedAt: "2026/09/02 10:12:35" }),
+  D("HAWLC", 1, "2026-09-03", { causeType: "材料", conclusion: "该批封签胶液粘度超标，涂胶后外溢导致小盒外部粘连，已联系供胶厂家更换批次。", diagnoser: "叶洛星", diagnosedAt: "2026/09/03 15:44:20" }),
+  D("JDBKA", 5, "2026-09-01", { causeType: "设备", conclusion: "ZJ17-01 机组烙铁温度控制模块漂移，搭口胶活化不足引发爆口，更换温控模块后恢复正常。", diagnoser: "苏恒", diagnosedAt: "2026/09/01 09:26:08" }),
+  D("HANJC", 2, "2026-09-06", { causeType: "设备", conclusion: "3# 包装机涂胶辊轴承磨损导致上胶不均，小盒内部出现未粘牢，已更换涂胶辊。", diagnoser: "叶洛星", diagnosedAt: "2026/09/06 11:30:52" }),
+  D("XXSZA", 13, "2026-09-04", { causeType: "操作", conclusion: "换牌后未按规程复检缺包检测器灵敏度，造成箱装少装流出，已组织班组培训并加装复核。", diagnoser: "王建国", diagnosedAt: "2026/09/04 16:08:41" }),
+  D("TAZZC", 3, "2026-09-08", { causeType: "设备", conclusion: "4# 包装机组条盒输送导板固定螺栓松动产生偏移，条盒受挤压轧皱，已校正并紧固。", diagnoser: "苏恒", diagnosedAt: "2026/09/08 10:55:19" }),
+  D("JKKTB", 7, "2026-09-05", { causeType: "材料", conclusion: "本批烟丝填充值低于工艺下限，卷制后空头比例升高，已调整掺配方案。", diagnoser: "叶洛星", diagnosedAt: "2026/09/05 14:37:26" }),
+  D("XTPCA", 14, "2026-09-09", { causeType: "操作", conclusion: "清线不彻底残留上一牌号产品，分道挡板切换不到位造成错装混装，已修订换牌作业指导书。", diagnoser: "王建国", diagnosedAt: "2026/09/09 09:18:33" }),
+  D("HLCQD", 0, "2026-09-10", undefined),
+  D("HAZPB", 4, "2026-09-12", { causeType: "设备", conclusion: "5# 包装机组模压辊边缘出现毛刺刮破小盒纸，修磨后缺陷未再发生。", diagnoser: "苏恒", diagnosedAt: "2026/09/12 08:47:15" }),
+  D("JZSTC", 8, "2026-09-13", { causeType: "操作", conclusion: "搓板压力设定值未按细支规格调整，滤嘴接装缩头，已更新参数卡并锁定。", diagnoser: "叶洛星", diagnosedAt: "2026/09/13 13:05:59" }),
+  D("HFSCC", 4, "2026-09-15", { causeType: "材料", conclusion: "商标纸供应商换版后色差临界，上机后目视差异明显，已让步接收并反馈整改。", diagnoser: "王建国", diagnosedAt: "2026/09/15 10:41:02" }),
+  D("JAWZC", 9, "2026-09-16", { causeType: "材料", conclusion: "烟丝掺配中梗签含量偏高，接装纸拖墨辊沾污后压出表面污点，已清洗辊组并调整风分参数。", diagnoser: "苏恒", diagnosedAt: "2026/09/16 14:29:38" }),
+  D("HSCQC", 1, "2026-09-18", undefined),
+  D("TTRKC", 2, "2026-09-19", undefined),
+  D("THCQB", 3, "2026-09-20", undefined),
+  D("XXBND", 13, "2026-09-21", undefined),
+  D("THZZD", 14, "2026-09-22", undefined),
+  D("XXCYA", 12, "2026-09-17", undefined),
+  D("XXBPD", 13, "2026-09-23", undefined),
+  // 历次追加判定（同代码多次记录）：默认近1月窗口内合计 20 条已判定 —— 设备10 / 材料4 / 操作6，涉及机台 14
+  D("JDBKA", 6, "2026-08-26", { causeType: "设备", conclusion: "ZJ17-02 机组烙铁温度偏低导致搭口爆口，已校正温控参数并复检合格。", diagnoser: "苏恒", diagnosedAt: "2026/08/26 10:41:18" }),
+  D("JKKTB", 10, "2026-08-28", { causeType: "设备", conclusion: "ZJ19-01 吸丝带风量调节阀卡滞，烟丝填充不足产生空头，已更换调节阀。", diagnoser: "苏恒", diagnosedAt: "2026/08/28 14:23:56" }),
+  D("XXBND", 12, "2026-08-31", { causeType: "设备", conclusion: "XF-01 装封箱机折角导板位置偏移导致箱装不牢固，已校正导板定位并紧固。", diagnoser: "叶洛星", diagnosedAt: "2026/08/31 09:15:42" }),
+  D("HAZZC", 0, "2026-09-13", { causeType: "设备", conclusion: "2# 包装机模压辊压力设定偏高，小盒受压轧皱，已回调压力参数。", diagnoser: "王建国", diagnosedAt: "2026/09/13 16:34:09" }),
+  D("JDBKA", 11, "2026-09-17", { causeType: "设备", conclusion: "ZJ19-02 机组搭口胶喷嘴堵塞，胶量不足引发爆口，已清洗喷嘴并巡检。", diagnoser: "苏恒", diagnosedAt: "2026/09/17 11:02:33" }),
+  D("XXSZA", 13, "2026-09-14", { causeType: "操作", conclusion: "XF-02 装封箱机换牌后推杆行程未复核，少装流出，已修订换牌核查单。", diagnoser: "王建国", diagnosedAt: "2026/09/14 08:56:27" }),
+  D("JZSTC", 8, "2026-09-19", { causeType: "操作", conclusion: "ZJ17-04 搓板压力未按牌号参数卡执行，滤嘴缩头，已锁定参数并培训。", diagnoser: "叶洛星", diagnosedAt: "2026/09/19 15:47:51" }),
+  D("THZZD", 1, "2026-09-21", { causeType: "操作", conclusion: "1# 包装机条盒纸输送导板偏移受挤压产生皱折，已校正导板并首件确认。", diagnoser: "王建国", diagnosedAt: "2026/09/21 10:19:44" }),
 ];
 
-// 全量诊断项（缺陷诊断页 / 诊断记录页共用，含未修正项）
+// 全量诊断项（含待判定）
 export function listDiagnoses(): DiagnosisItem[] {
   return diagnoses;
 }
 
-// 按缺陷代码取诊断项（缺陷分析抽屉回显：优先已人工修正的记录）
-export function diagnosisOfCode(code: string): DiagnosisItem | undefined {
-  return diagnoses.find((d) => d.code === code && d.causeText) ?? diagnoses.find((d) => d.code === code);
+// 已判定项（诊断记录页）
+export function judgedDiagnoses(): DiagnosisItem[] {
+  return diagnoses.filter((d) => d.causeType && d.conclusion);
 }
 
-// 按 id 保存原因修正（缺陷诊断页抽屉入口）：写入人工补录原因与修正人/修正时间
-export function saveDiagnosisCauseById(id: string, causeText: string, ctx: { user: string; now: string }): DiagnosisItem {
+// 按缺陷代码取诊断项（抽屉回显：优先已判定记录）
+export function diagnosisOfCode(code: string): DiagnosisItem | undefined {
+  return diagnoses.find((d) => d.code === code && d.conclusion) ?? diagnoses.find((d) => d.code === code);
+}
+
+export interface DiagnosisSaveInput {
+  causeType: CauseType;
+  conclusion: string;
+  remark?: string;
+}
+
+// 按 id 更新指定诊断项（缺陷诊断页「判定」入口：判定仅一次，已判定项不再走此入口）
+export function saveDiagnosisById(id: string, input: DiagnosisSaveInput, ctx: { user: string; now: string }): DiagnosisItem {
   const idx = diagnoses.findIndex((d) => d.id === id);
   if (idx < 0) throw new Error("诊断项不存在");
   const updated: DiagnosisItem = {
     ...diagnoses[idx],
-    causeText,
+    causeType: input.causeType,
+    conclusion: input.conclusion,
+    remark: input.remark ?? diagnoses[idx].remark,
     diagnoser: ctx.user,
     diagnosedAt: ctx.now,
   };
@@ -1160,12 +1173,12 @@ export function saveDiagnosisCauseById(id: string, causeText: string, ctx: { use
   return updated;
 }
 
-// 按缺陷代码 upsert 原因修正（缺陷分析页抽屉入口）：已有诊断项则更新，否则按档案新建。
+// 按缺陷代码 upsert（缺陷分析页抽屉入口）：已有判定项则更新，否则按档案新建。
 // 保存后缺陷分析抽屉 / 缺陷诊断明细 / 诊断记录三处同源同步。
-export function upsertDiagnosisCause(code: string, causeText: string, ctx: { user: string; now: string }): DiagnosisItem {
+export function upsertDiagnosisByCode(code: string, input: DiagnosisSaveInput, ctx: { user: string; now: string }): DiagnosisItem {
   const existing = diagnosisOfCode(code);
-  if (existing) return saveDiagnosisCauseById(existing.id, causeText, ctx);
-  const c = catalogOf(code) ?? diagCatalogOf(code);
+  if (existing) return saveDiagnosisById(existing.id, input, ctx);
+  const c = catalogOf(code);
   if (!c) throw new Error("缺陷代码不存在");
   diagSeq += 1;
   const created: DiagnosisItem = {
@@ -1176,7 +1189,9 @@ export function upsertDiagnosisCause(code: string, causeText: string, ctx: { use
     post: c.post,
     aiCause: c.aiCause,
     recordDate: ANCHOR,
-    causeText,
+    causeType: input.causeType,
+    conclusion: input.conclusion,
+    remark: input.remark,
     diagnoser: ctx.user,
     diagnosedAt: ctx.now,
   };
