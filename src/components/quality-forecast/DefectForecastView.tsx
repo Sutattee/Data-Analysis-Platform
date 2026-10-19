@@ -1,276 +1,325 @@
 "use client";
 
-// 缺陷预测主视图：对象信息（缺陷 + 机台 + 生产上下文）→ 风险摘要 → 预测趋势 → 来源工序参数
-// → AI 风险解读 → 风险来源 + 来源工序分布；切换缺陷 / 机台后全量联动；本期仅展示最新预测结果
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
-import { catalogOf } from "@/lib/mock-data/quality-defect";
-import {
-  FORECAST_DEFECTS,
-  PARAM_GROUPS,
-  aiInterpretation,
-  contributionsOf,
-  contextOf,
-  etaOf,
-  forecastMachinesOf,
-  forecastOf,
-  groupOf,
-  levelOf,
-  paramDirection,
-  reducingFactorsOf,
-  sourceBreakdownOf,
-  topMachineOf,
-} from "@/lib/mock-data/quality-defect-forecast";
 import { RiskTrendChart } from "./RiskTrendChart";
-import { ReducingFactors, RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
+import { RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
+import {
+  BASE_TIME,
+  FORECAST_DEFECTS,
+  UPDATED_AT,
+  aiInterpretation,
+  defaultBatchOf,
+  defaultTargetOf,
+  forecastDefectOf,
+  forecastObjectsOf,
+  forecastOf,
+  highRiskEta,
+  levelOf,
+  peakOf,
+  windowTextOf,
+  type ParamCell,
+} from "@/lib/mock-data/quality-defect-forecast";
 
 const selectCls =
-  "px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
+  "w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none";
+const th = "text-left px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
 
-// 摘要单项
-function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
+// 缺陷下拉选项（3 个重点缺陷："名称｜编码"）
+const FORECAST_DEFECT_OPTIONS = FORECAST_DEFECTS.map((d) => ({ value: d.code, label: `${d.name}｜${d.code}` }));
+
+// AI 解读三段固定小标题
+const AI_SECTION_TITLES = ["预测概况", "参数关注", "核查重点"];
+
+// 摘要信息格：字段与值同行（如「预测最高风险评分：54.8」），备注行在下方
+function SummaryItem({
+  label,
+  value,
+  sub,
+  valueCls = "text-gray-900",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueCls?: string;
+}) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 text-xs text-gray-500">{label}</div>
-      <div className="text-sm font-medium text-gray-800">{children}</div>
+      <div className="flex items-baseline gap-1.5 text-xs text-gray-400">
+        <span className="shrink-0">{label}：</span>
+        <span className={`truncate text-sm font-semibold ${valueCls}`}>{value}</span>
+      </div>
+      {sub && <div className="mt-0.5 text-xs text-gray-400">{sub}</div>}
     </div>
   );
 }
 
-// 只读带出项（当前批次 / 牌号 / 班组 / 班次 / 工序 / 部位）
+// 只读上下文信息格：字段与值同行（缺失或不适用显示 "—"），紧随预测对象字段展示
 function ContextItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className="text-sm font-medium text-gray-800">{value}</span>
+    <div className="flex items-baseline gap-1.5">
+      <span className="shrink-0 text-xs text-gray-500">{label}：</span>
+      <span className="text-sm text-gray-700">{value || "—"}</span>
     </div>
   );
 }
 
+// 参数偏差单元格：超上限 ↑ 橙 / 低于下限 ↓ 蓝 / 范围内 → 灰 / 不适用 — 浅灰
+function DevCell({ dev }: { dev: ParamCell["dev"] }) {
+  const cls =
+    dev.dir === "up"
+      ? "text-orange-600"
+      : dev.dir === "down"
+        ? "text-blue-600"
+        : dev.dir === "in"
+          ? "text-gray-400"
+          : "text-gray-300";
+  return <span className={`font-medium ${cls}`}>{dev.text}</span>;
+}
+
+// 缺陷预测主视图：顶部项目及对象选择（缺陷单选 → 预测对象联动 → 多批次分别预测，字段与控件同行），
+// 只读上下文紧随其后；风险摘要字段值同行、无卡片标题（压缩高度让参数表进第一屏）；左侧主区域（预测趋势 / 关联参数表），
+// 右侧辅助区域（AI 解读 / 贡献度 / 来源分布）。本期仅展示最新一轮预测：切换对象即整轮切换，不混合轮次。
 export function DefectForecastView() {
-  // 默认选中首个支持预测的缺陷及其风险最高的有效机台
-  const [code, setCode] = useState(FORECAST_DEFECTS[0].code);
-  const [machine, setMachine] = useState(() => topMachineOf(FORECAST_DEFECTS[0].code));
+  const [code, setCode] = useState(() => defaultTargetOf().code);
+  const [objectKey, setObjectKey] = useState(() => defaultTargetOf().objectKey);
+  const [batch, setBatch] = useState(() => defaultTargetOf().batch);
 
-  const defectName = catalogOf(code)?.name ?? code;
-  const forecast = forecastOf(code, machine);
-  const ctx = contextOf(code, machine);
-  const machines = forecastMachinesOf(code);
-  // 基准批次点（hist 末位，与趋势图基准批次同源）：顶部「当前批次 / 班次」取自该点，保证两处一致
-  const basePoint = forecast?.hist[forecast.hist.length - 1];
+  const defect = forecastDefectOf(code);
+  const objects = forecastObjectsOf(code);
+  const activeObject = objects.find((o) => o.key === objectKey) ?? objects[0];
+  const forecast = forecastOf(code, activeObject.key, batch);
+  const peak = peakOf(forecast);
+  const lv = peak ? levelOf(peak.score) : null;
+  const eta = highRiskEta(forecast);
+  const texts = aiInterpretation(forecast);
+  const ctx = forecast.context;
 
-  // 切换缺陷：机台重置为该缺陷风险最高的有效机台，全量联动
-  function changeCode(v: string) {
-    setCode(v);
-    setMachine(topMachineOf(v));
+  // 切换缺陷：整轮重置为该缺陷的默认对象（同窗口最高评分的首个有效对象）
+  function handleChangeCode(next: string) {
+    const t = defaultTargetOf(next);
+    setCode(t.code);
+    setObjectKey(t.objectKey);
+    setBatch(t.batch);
   }
 
-  // 数据不足（必需输入不满足模型要求）：整次预测标「数据不足」，布局与正常态一致：左 = 占位说明，右 = AI 解读提示
-  if (!forecast || forecast.insufficient) {
-    return (
-      <div className="space-y-4">
-        {/* 对象信息行 */}
-        <Card>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
-            <label className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">缺陷</span>
-              <div className="w-56">
-                <SearchSelect
-                  options={FORECAST_DEFECTS.map((d) => ({ value: d.code, label: `${catalogOf(d.code)?.name ?? d.code}  ${d.code}` }))}
-                  value={code}
-                  onChange={changeCode}
-                  placeholder="搜索..."
-                />
-              </div>
-            </label>
-            <label className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">机台</span>
-              <select className={selectCls} value={machine} onChange={(e) => setMachine(e.target.value)}>
-                {machines.map((m) => (
-                  <option key={m.machine} value={m.machine}>
-                    {m.machine}｜{m.insufficient ? "数据不足" : levelOf(m.score).label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="h-5 w-px bg-gray-100" />
-            <ContextItem label="当前批次" value={basePoint?.label ?? ctx.batch} />
-            <ContextItem label="牌号" value={ctx.brand} />
-            <ContextItem label="班组" value={ctx.shift} />
-            <ContextItem label="班次" value={basePoint?.shiftLabel ?? "—"} />
-            <ContextItem label="工序" value={ctx.process} />
-            <ContextItem label="部位" value={ctx.part} />
-          </div>
-        </Card>
-
-        <div className="grid gap-4 xl:grid-cols-3">
-          {/* 左：数据不足占位 */}
-          <Card className="xl:col-span-2">
-            <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-center">
-              <span className="text-3xl">📭</span>
-              <p className="text-sm font-medium text-gray-700">数据不足，本轮预测未生成</p>
-              <p className="max-w-md text-xs leading-relaxed text-gray-400">
-                {machine} 的必需输入（车间环境测点数据）不满足模型要求，未生成有效风险评分与趋势；
-                恢复数据采集后将随下一轮滚动预测自动更新。
-              </p>
-            </div>
-          </Card>
-
-          {/* 右：AI 解读不生成，直接提示 */}
-          <Card>
-            <div className="mb-2.5 flex items-center gap-1.5">
-              <span>🤖</span>
-              <h3 className="text-sm font-semibold text-gray-800">AI 风险解读</h3>
-            </div>
-            <p className="text-xs leading-relaxed text-gray-600">数据不足，无法生成解读</p>
-          </Card>
-        </div>
-      </div>
-    );
+  // 切换对象：关联批次重置为该对象最高风险批次（多批次分别预测，不混合）
+  function handleChangeObject(nextKey: string) {
+    setObjectKey(nextKey);
+    setBatch(defaultBatchOf(code, nextKey));
   }
 
-  const level = levelOf(forecast.score);
-  const contributions = contributionsOf(forecast);
-  const reducing = reducingFactorsOf(forecast);
-  const breakdown = sourceBreakdownOf(forecast);
-  const aiTexts = aiInterpretation(forecast, code, machine);
-  const group = PARAM_GROUPS[groupOf(code)];
+  // 高风险预测口径配色：已达/预计达阈值 红，单点无时序 灰，数据不足 浅灰
+  const etaCls =
+    eta.kind === "reached" || eta.kind === "within"
+      ? "text-red-600"
+      : eta.kind === "noSeries"
+        ? "text-gray-500"
+        : forecast.status === "insufficient"
+          ? "text-gray-400"
+          : "text-gray-900";
+
+  // 箱储时长核算字段：数据不足时仅展示已储存时长 / 上限 / 剩余允许时间（不编造预计出库时间）
+  const st = forecast.storage;
+  const storageFields: [string, string][] =
+    st === undefined
+      ? []
+      : forecast.status === "insufficient"
+        ? [
+            ["已储存时长", st.stored],
+            ["储存时长上限", st.limit],
+            ["剩余允许储存时间", st.remaining],
+          ]
+        : [
+            ["已储存时长", st.stored],
+            ["储存时长上限", st.limit],
+            ["剩余允许储存时间", st.remaining],
+            ["预计总储存时长", st.total],
+            ["预计出库/耗用时间", st.outbound],
+            ["允许储存截止时间", st.deadline],
+          ];
+
+  // 班次按"日期 班次"格式展示（与预测基准时间同日）
+  const contextItems: [string, string][] = [
+    ["牌号", ctx.brand],
+    ["班次", `${BASE_TIME.slice(5, 10)} ${ctx.shift}`],
+    ["班组", ctx.shiftGroup],
+    ["工序", ctx.process],
+    ["部位", ctx.part],
+    ["质量类别", ctx.qualityClass],
+  ];
 
   return (
-    <div className="space-y-4">
-      {/* 对象信息：缺陷 + 机台选择，批次 / 牌号 / 班组 / 班次 / 工序 / 部位自动带出（无则 —） */}
+    <div className="space-y-3">
+      {/* 顶部：项目及对象选择（字段与控件同行，下拉选项直接带风险等级）+ 只读上下文紧随其后 */}
       <Card>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
-          <label className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">缺陷</span>
-            <div className="w-56">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <label className="flex items-center gap-2">
+            <span className="shrink-0 text-xs text-gray-500">缺陷</span>
+            <div className="w-48">
               <SearchSelect
-                options={FORECAST_DEFECTS.map((d) => ({ value: d.code, label: `${catalogOf(d.code)?.name ?? d.code}  ${d.code}` }))}
+                options={FORECAST_DEFECT_OPTIONS}
                 value={code}
-                onChange={changeCode}
-                placeholder="搜索..."
+                onChange={handleChangeCode}
+                placeholder="按缺陷名称搜索"
               />
             </div>
           </label>
-          <label className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">机台</span>
-            <select className={selectCls} value={machine} onChange={(e) => setMachine(e.target.value)}>
-              {machines.map((m) => (
-                <option key={m.machine} value={m.machine}>
-                  {m.machine}｜{m.insufficient ? "数据不足" : levelOf(m.score).label}
-                </option>
-              ))}
-            </select>
+          <label className="flex items-center gap-2">
+            <span className="shrink-0 text-xs text-gray-500">预测对象</span>
+            <div className="w-56">
+              <select value={activeObject.key} onChange={(e) => handleChangeObject(e.target.value)} className={selectCls}>
+                {objects.map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </label>
-          <span className="h-5 w-px bg-gray-100" />
-          <ContextItem label="当前批次" value={ctx.batch} />
-          <ContextItem label="牌号" value={ctx.brand} />
-          <ContextItem label="班组" value={ctx.shift} />
-          <ContextItem label="工序" value={ctx.process} />
-          <ContextItem label="部位" value={ctx.part} />
+          {activeObject.batches.length > 1 && (
+            <label className="flex items-center gap-2">
+              <span className="shrink-0 text-xs text-gray-500">关联批次</span>
+              <div className="w-40">
+                <select value={batch} onChange={(e) => setBatch(e.target.value)} className={selectCls}>
+                  {activeObject.batches.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </label>
+          )}
+          {/* 只读上下文（牌号 / 班次 / 班组 / 工序 / 部位 / 质量类别） */}
+          {contextItems.map(([label, value]) => (
+            <ContextItem key={label} label={label} value={value} />
+          ))}
         </div>
       </Card>
 
-      {/* 风险摘要：评分与趋势图基准批次点同口径 */}
+      {/* 风险摘要：筛选区下方整行展示（字段与值同行、无卡片标题，压缩页面高度） */}
       <Card>
-        <div className="grid grid-cols-3 gap-4 md:grid-cols-6">
-          <SummaryItem label="当前风险评分">
-            <span className={`text-2xl font-bold ${level.textCls}`}>{forecast.score.toFixed(2)}</span>
-          </SummaryItem>
-          <SummaryItem label="风险等级">
-            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${level.badgeCls}`}>
-              {level.label}
-            </span>
-          </SummaryItem>
-          <SummaryItem label="高风险预测">{etaOf(forecast)}</SummaryItem>
-          <SummaryItem label="预测窗口">未来{forecast.windowBatches}个批次</SummaryItem>
-          <SummaryItem label="预测更新时间">{forecast.updatedAt}</SummaryItem>
-          <SummaryItem label="模型置信度">{Math.round(forecast.confidence * 100)}%</SummaryItem>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 md:grid-cols-3 xl:grid-cols-6">
+          <SummaryItem
+            label="预测最高风险评分"
+            value={peak ? peak.score.toFixed(1) : "—"}
+            sub={peak ? undefined : "数据不足，未生成有效预测"}
+            valueCls={lv ? lv.textCls : "text-gray-400"}
+          />
+          <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-400">
+            <span className="shrink-0">风险等级：</span>
+            {lv ? (
+              <span
+                className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-xs font-medium ${lv.badgeCls}`}
+              >
+                {lv.label}
+              </span>
+            ) : (
+              <span className="text-sm font-semibold text-gray-400">—</span>
+            )}
+          </div>
+          <SummaryItem label="高风险预测" value={eta.text} valueCls={etaCls} sub={forecast.status === "ok" ? undefined : "必需输入不足，本轮未生成预测"} />
+          <SummaryItem label="预测窗口" value={windowTextOf(forecast)} />
+          <SummaryItem label="预测更新时间" value={UPDATED_AT} />
+          {forecast.confidence !== undefined && (
+            <SummaryItem label="模型置信度" value={`${Math.round(forecast.confidence * 100)}%`} />
+          )}
         </div>
+
+        {/* 项目业务依据：成品水分 → 预测水分 / 允差（含标准水分）/ 偏差；箱储 → 时长核算 */}
+        {forecast.moisture && (
+          <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+            <div className="grid grid-cols-1 gap-x-4 gap-y-2.5 md:grid-cols-3">
+              <SummaryItem label="预测成品水分" value={forecast.moisture.predicted} />
+              <SummaryItem label="允差" value={`${forecast.moisture.tolerance}（标准水分 12.5%）`} />
+              <SummaryItem label="预测偏差" value={forecast.moisture.dev} valueCls="text-orange-600" />
+            </div>
+          </div>
+        )}
+        {st && storageFields.length > 0 && (
+          <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+            <div className="mb-2 text-xs font-medium text-gray-500">箱储时长核算</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 md:grid-cols-3 xl:grid-cols-6">
+              {storageFields.map(([label, value]) => (
+                <SummaryItem key={label} label={label} value={value} />
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
-      {/* 左右布局：左 = 趋势 + 来源工序参数；右 = AI 解读 + 风险来源 + 工序分布（紧凑一屏） */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="space-y-4 xl:col-span-2">
-          {/* 风险预测趋势 */}
-          <Card>
-            <h3 className="mb-1 text-sm font-semibold text-gray-800">{defectName}风险预测趋势</h3>
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+        {/* 左侧主区域：预测趋势 / 关联参数表 */}
+        <div className="space-y-3 xl:col-span-2">
+          <Card title={`${defect.name}风险预测趋势`}>
             <RiskTrendChart forecast={forecast} />
           </Card>
 
-          {/* 来源工序参数：指标卡片（数值 + 参考范围 + 偏差方向合并展示） */}
-          <Card>
-            <h3 className="mb-3 text-sm font-semibold text-gray-800">来源工序参数</h3>
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
-              {group.params.map((def) => {
-                const p = forecast.params.find((x) => x.key === def.key)!;
-                const { dir, deviation, rangeText } = paramDirection(p);
-                const devCls =
-                  dir === "up" ? "text-red-500" : dir === "down" ? "text-blue-500" : dir === "in" ? "text-gray-400" : "text-gray-300";
-                const devText =
-                  dir === "up" ? `${deviation} ↑` : dir === "down" ? `${deviation} ↓` : dir === "in" ? "0 →" : "—";
-                return (
-                  <div key={def.key} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-3">
-                    <div className="text-xs text-gray-500">{def.name}</div>
-                    <div className="mt-1 flex items-baseline gap-1">
-                      {p.value === null ? (
-                        <span className="text-xl font-bold text-gray-300">—</span>
-                      ) : (
-                        <>
-                          <span className="text-xl font-bold text-gray-900">{p.value}</span>
-                          <span className="text-xs text-gray-400">{def.unit}</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs">
-                      <span className="text-gray-400">范围 {rangeText}</span>
-                      <span className={`font-medium ${devCls}`}>{devText}</span>
-                    </div>
-                  </div>
-                );
-              })}
+          <Card title="关联工序及环境参数" padding={false}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr className="border-b border-gray-100">
+                    <th className={th}>参数名称</th>
+                    <th className={th}>来源工序及系统</th>
+                    <th className={`${th} text-right`}>数值</th>
+                    <th className={th}>单位</th>
+                    <th className={th}>取值时间/统计周期</th>
+                    <th className={th}>基准值/参考范围</th>
+                    <th className={`${th} text-right`}>偏差</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {forecast.params.map((p) => (
+                    <tr key={p.name} className="transition-colors hover:bg-gray-50">
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">{p.name}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{p.source}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap font-medium text-gray-800">
+                        {p.value ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-500">{p.unit ?? "—"}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{p.time}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{p.ref}</td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        <DevCell dev={p.dev} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
         </div>
 
-        <div className="space-y-4">
-          {/* AI 风险解读：三段带主题（风险概况 / 参数关注 / 核查重点），与预测结果同步更新 */}
-          <Card>
-            <div className="mb-2.5 flex items-center gap-1.5">
-              <span>🤖</span>
-              <h3 className="text-sm font-semibold text-gray-800">AI 风险解读</h3>
-            </div>
-            <div className="space-y-2">
-              {aiTexts.map((s, i) => (
-                <p key={i} className="text-xs leading-relaxed text-gray-600">
-                  <span className="font-medium text-gray-700">{s.topic}：</span>
-                  {s.text}
-                </p>
-              ))}
-            </div>
+        {/* 右侧辅助区域：AI 解读 / 贡献度 / 来源分布（无可信解释时后两者不展示） */}
+        <div className="space-y-3">
+          <Card title="AI 风险解读">
+            {forecast.status === "insufficient" ? (
+              <p className="text-sm text-gray-400">数据不足，无法生成解读</p>
+            ) : (
+              <div className="space-y-3">
+                {AI_SECTION_TITLES.map((title, i) => (
+                  <div key={title}>
+                    <div className="text-xs font-semibold text-gray-500">{title}</div>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-700">{texts[i]}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* 风险来源：φ>0 降序 + 风险降低因素 */}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">风险来源</h3>
-              <span className="text-xs text-gray-400">按贡献从高到低</span>
-            </div>
-            <RiskContributionChart contributions={contributions} />
-            <div className="mt-3">
-              <ReducingFactors factors={reducing} />
-            </div>
-          </Card>
-
-          {/* 来源工序分布 */}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">来源工序分布</h3>
-              <span className="text-xs text-gray-400">按贡献从高到低</span>
-            </div>
-            <SourceBreakdownChart breakdown={breakdown} />
-          </Card>
+          {forecast.contributions.length > 0 && (
+            <Card title="风险贡献度">
+              <RiskContributionChart items={forecast.contributions} />
+            </Card>
+          )}
+          {forecast.sources.length > 0 && (
+            <Card title="来源分布">
+              <SourceBreakdownChart breakdown={forecast.sources} />
+            </Card>
+          )}
         </div>
       </div>
     </div>

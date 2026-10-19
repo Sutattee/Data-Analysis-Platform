@@ -105,6 +105,7 @@ export default function DefectAnalysisPage() {
         open={!!drawerRecord}
         onClose={() => setDrawerRecord(null)}
         onSaved={() => bumpRev((n) => n + 1)}
+        variant="detail"
       />
     </div>
   );

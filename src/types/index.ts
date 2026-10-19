@@ -386,6 +386,8 @@ export interface AlertRecord {
   shiftLabel?: string;        // 班次（白班/夜班，如「7-19 白班」；批/班周期指标按触发时间推定，月度指标不生成）
   brand?: string;             // 牌号（如「娇子」；结果类指标为「—」）
   consecutiveShifts?: number; // 连续同向偏离周期数（飘移类记录；详情展示如「3个批次」，列表置顶排序）
+  baseTime?: string;          // 预测基准时间（数据截止时刻，仅缺陷预测类记录，追溯字段）
+  modelVersion?: string;      // 模型/标准版本（缺陷预测模型或工艺标准版本，追溯字段）
   // —— 判定依据 ——
   strategyName: string;       // 告警策略名称
   triggerCondition: string;   // 触发条件

@@ -1,15 +1,18 @@
 // 工艺质量 · 告警中心数据层
 // 口径：
 //  · 告警指标 = 12 个质量指标（9 个稳定性指标 SF01~SF09 + 包装卷制加权平均 + 优质品率成品/制丝），
-//    机台/单位/统计周期与稳定性预测页（quality-stability-forecast）对齐，等级阈值按告警策略体系独立配置
+//    机台/单位/统计周期与稳定性预测页（quality-stability-forecast）对齐，等级阈值按告警策略体系独立配置；
+//    另有 5 个缺陷预测指标（QUALITY_DEFECT_METRICS，预测风险类型专属），与缺陷预测页
+//    （quality-defect-forecast）同源：3 个风险评分 + 预测成品水分偏差 + 预计箱储总存储时长
 //  · 等级判定（产品规则）：指标越过基准阈值（上限/下限）后，按相对基准的偏离比例划分五级 ——
 //    偏离比例 =（实际值 − 基准）÷ |基准| × 100%。以松散回潮非稳态指数为例（产品示例，基准 4%）：
 //    ≥0%且＜5% 提示 / ≥5%且＜10% 关注 / ≥10%且＜20% 预警 / ≥20%且＜50% 告警 / ≥50% 危险
 //    （即 指数≥4.00% 提示 / ≥4.20% 关注 / ≥4.40% 预警 / ≥4.80% 告警 / ≥6.00% 危险）
 //  · 各指标等级边界沿用实际阈值配置（与稳定性预测页对齐）；基准 = 最轻级边界，
 //    各级偏离比例区间由边界相对基准换算得出（见 qualityDeviationBandOf）
-//  · 告警记录 = 实测异常（已越界）+ 预测风险（预计越界）两类；按 (指标, 机台) 生成；
-//    等级分布按列表首屏调优（危险/告警各 4 条 → 首屏 4危+4告+2预，其余降档分散，五级仍全覆盖）
+//  · 告警记录 = 实测异常（已越界）+ 预测风险（预计越界）两类；稳定性/结果类按 (指标, 机台) 生成，
+//    等级分布按列表首屏调优（危险/告警各 4 条 → 首屏 4危+4告+2预，其余降档分散，五级仍全覆盖）；
+//    另含 5 条缺陷预测记录（buildDefectAlertRecords，2026-10-19 最新一轮，全部「预测风险」）
 //  · 板块标记：记录 id 前缀 ZL、策略 id 前缀 QAS（能源告警中心按前缀排除，避免误伤同名旧数据）
 //  · 本模块不依赖 alerts.ts（ALERT_RECORDS 由 alerts.ts 反向聚合，避免循环依赖）
 import { LEVEL_RANK } from "./alert-levels";
@@ -30,6 +33,11 @@ export const QUALITY_TYPE_OPTIONS = ["实测异常", "预测风险"];
 
 export type QualityCycle = "每批次" | "每班次" | "每月";
 
+// 缺陷预测指标形态（预测风险类型专属的 5 个缺陷指标）：
+// score = 风险评分（0—100 分，判预测时间窗口内最高评分）/ moistureDev = 预测成品水分偏差 /
+// storageTotal = 预计箱储总存储时长（与储存时长上限比较）
+export type QualityDefectKind = "score" | "moistureDev" | "storageTotal";
+
 // 等级阈值（单侧型；levels 按严重度降序，末位（最轻级）阈值 = 基准值，即偏离比例 0% 点）
 export interface QualityLevelRule {
   op: ">=" | "<=";
@@ -39,12 +47,14 @@ export interface QualityLevelRule {
 export interface QualityAlertMetric {
   name: string;        // 指标名称（需求文案）
   sfCode?: string;     // 对应稳定性预测页指标编码（机台/阈值来源；结果类指标无）
+  defectCode?: string; // 对应缺陷预测页缺陷编码（CPSFBH/YZCB/XCCG；缺陷预测指标专用）
+  defectKind?: QualityDefectKind; // 缺陷预测指标形态（表单联动；稳定性/结果类指标无）
   process?: string;    // 来源工序（SF 稳定性指标关联，如「松散回潮」；结果类指标无 → 详情不展示）
-  unit: string;        // % / mg / 次 / 分
+  unit: string;        // % / mg / 次 / 分 / pct / 小时
   decimals: number;    // 数值展示小数位
   cycle: QualityCycle; // 检测周期（表单联动）
   objects: string[];   // 告警对象（机台）；结果类指标 = ["全厂"]
-  rule: QualityLevelRule | null; // null = 未配置阈值（不生成记录）
+  rule: QualityLevelRule | null; // null = 未配置阈值（阈值由策略条件配置，不走偏离比例分级）
 }
 
 export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
@@ -134,16 +144,76 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
 
 export const QUALITY_ALERT_METRIC_NAMES = new Set(QUALITY_ALERT_METRICS.map((m) => m.name));
 
-const METRIC_MAP = new Map(QUALITY_ALERT_METRICS.map((m) => [m.name, m]));
+/* ---------------- 5 个缺陷预测指标（预测风险类型专属） ---------------- */
+// 口径与缺陷预测页（quality-defect-forecast）对齐：风险评分 0—100 分制判窗口最高评分；
+// 预测成品水分偏差对标准水分 12.5% 的允差 ±0.3pct；预计箱储总存储时长与储存时长上限比较。
+// 阈值不在指标侧分级（rule = null），由策略条件配置（如 未来8小时内最高风险评分 ≥ 80分）。
+
+export const QUALITY_DEFECT_METRICS: QualityAlertMetric[] = [
+  {
+    name: "成品水分不合格风险评分", defectCode: "CPSFBH", defectKind: "score", process: "烘丝",
+    unit: "分", decimals: 1, cycle: "每批次",
+    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
+    rule: null,
+  },
+  {
+    name: "烟支刺破风险评分", defectCode: "YZCB", defectKind: "score", process: "卷制",
+    unit: "分", decimals: 1, cycle: "每批次",
+    objects: ["ZJ17-02卷接机组", "ZJ19-01卷接机组", "ZJ17-04卷接机组", "5#卷接包机组"],
+    rule: null,
+  },
+  {
+    name: "箱储存储时间超上限风险评分", defectCode: "XCCG", defectKind: "score", process: "仓储",
+    unit: "分", decimals: 1, cycle: "每批次",
+    objects: ["1#储丝柜", "2#储丝柜", "3#储丝柜"],
+    rule: null,
+  },
+  {
+    name: "预测成品水分偏差", defectCode: "CPSFBH", defectKind: "moistureDev", process: "烘丝",
+    unit: "pct", decimals: 1, cycle: "每批次",
+    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
+    rule: null,
+  },
+  {
+    name: "预计箱储总存储时长", defectCode: "XCCG", defectKind: "storageTotal", process: "仓储",
+    unit: "小时", decimals: 0, cycle: "每批次",
+    objects: ["1#储丝柜", "2#储丝柜", "3#储丝柜"],
+    rule: null,
+  },
+];
+
+export const QUALITY_DEFECT_METRIC_NAMES = new Set(QUALITY_DEFECT_METRICS.map((m) => m.name));
+
+// 查找表覆盖全部 17 个指标（12 稳定性/结果类 + 5 缺陷预测类）：
+// qualityMetricOf / qualityMetricDefOf / qualityObjectsOfMetric / qualityCycleUnitOf / qualityDefectKindOf 共用
+const METRIC_MAP = new Map([...QUALITY_ALERT_METRICS, ...QUALITY_DEFECT_METRICS].map((m) => [m.name, m]));
+
+// 风险评分指标的预测时间窗口候选（如「未来8小时内，最高风险评分≥80分 告警」）；
+// 水分偏差 / 箱储总时长指标的预测窗口由模型轮次隐含（8 小时），不单独选择
+export const DEFECT_FORECAST_WINDOWS = ["未来4小时", "未来8小时", "未来12小时", "未来24小时"];
+
+// 指标 → 缺陷预测形态（非缺陷指标返回 undefined；条件构造器据此切换预测时间窗口控件）
+export function qualityDefectKindOf(name: string): QualityDefectKind | undefined {
+  return METRIC_MAP.get(name)?.defectKind;
+}
+
+// 表单指标候选：实测异常 = 12 个稳定性/结果类指标；预测风险 = 12 + 5 个缺陷指标（缺陷追加在后）
+export function qualityMetricOptionsOf(type: AlertType): string[] {
+  const base = QUALITY_ALERT_METRICS.map((m) => m.name);
+  return type === "预测风险" ? [...base, ...QUALITY_DEFECT_METRICS.map((m) => m.name)] : base;
+}
 
 export function qualityMetricOf(name: string): QualityAlertMetric | undefined {
   return METRIC_MAP.get(name);
 }
 
-// 指标定义（id + 单位），供触发条件按指标带出单位（alert-strategies.metricDefOf 质量分支）
+// 指标定义（id + 单位），供触发条件按指标带出单位（alert-strategies.metricDefOf 质量分支）；
+// id 优先取稳定性编码 / 缺陷编码（用于目标值管理查询，缺陷指标无目标值配置 → 查询自然落空）
 export function qualityMetricDefOf(name: string): { id: string; unit: string } | undefined {
   const m = METRIC_MAP.get(name);
-  return m ? { id: m.sfCode ?? `QC-${String(QUALITY_ALERT_METRICS.indexOf(m) + 1).padStart(2, "0")}`, unit: m.unit } : undefined;
+  if (!m) return undefined;
+  const id = m.sfCode ?? m.defectCode ?? `QC-${String(QUALITY_ALERT_METRICS.indexOf(m) + 1).padStart(2, "0")}`;
+  return { id, unit: m.unit };
 }
 
 // 指标 → 告警对象（表单「告警对象」自动带入，仅展示）
@@ -185,10 +255,10 @@ export function qualityDeviationBandOf(rule: QualityLevelRule, level: AlertLevel
   return hi === null ? `≥${lo}%` : `${lo}%-${hi}%`;
 }
 
-// 机台筛选下拉：全厂 + 全部机台（按指标定义序去重）
+// 机台筛选下拉：全厂 + 全部机台（按指标定义序去重；含缺陷预测指标的卷接机组/储丝柜）
 export const QUALITY_MACHINES: string[] = (() => {
   const out = ["全厂"];
-  for (const m of QUALITY_ALERT_METRICS) {
+  for (const m of [...QUALITY_ALERT_METRICS, ...QUALITY_DEFECT_METRICS]) {
     for (const o of m.objects) {
       if (!out.includes(o)) out.push(o);
     }
@@ -213,6 +283,12 @@ export const QUALITY_DETAIL_FIELDS: Record<string, QualityDetailField[]> = {
   "烟支单支克重偏差(毫克)": ["machine", "brand"],
   "优质品率（成品）": ["brand"],
   "优质品率（制丝）": ["batch", "brand", "machine"],
+  // 缺陷预测指标：批次（预测页关联批次）/ 机台 / 班组 / 牌号 全展示
+  "成品水分不合格风险评分": ["batch", "machine", "shift", "brand"],
+  "烟支刺破风险评分": ["batch", "machine", "shift", "brand"],
+  "箱储存储时间超上限风险评分": ["batch", "machine", "shift", "brand"],
+  "预测成品水分偏差": ["batch", "machine", "shift", "brand"],
+  "预计箱储总存储时长": ["batch", "machine", "shift", "brand"],
 };
 export function qualityDetailFieldsOf(metricName: string): QualityDetailField[] {
   return QUALITY_DETAIL_FIELDS[metricName] ?? ALL_DETAIL_FIELDS;
@@ -337,6 +413,213 @@ function tsAt(offsetMin: number): string {
 }
 
 export function buildQualityAlertRecords(): AlertRecord[] {
+  return [...buildStabilityAlertRecords(), ...buildDefectAlertRecords()];
+}
+
+/* ---------------- 缺陷指标 · 预测风险告警记录（5 条，与缺陷预测页最新一轮对齐） ---------------- */
+// 口径：
+//  · 记录由缺陷预测结果触发 → type 固定「预测风险」；触发时间紧随本轮预测发布时刻（14:06）之后
+//  · 数值与缺陷预测页（quality-defect-forecast）同源：窗口最高评分 / 预测水分偏差 / 箱储时长核算
+//  · 追溯字段：对象（编码沿用预测页 HS-03/ZJ17-02/CG-01）、批次、评分或预测值、阈值、窗口、
+//    预测基准时间（baseTime）及模型/标准版本（modelVersion）
+//  · 剩余允许储存时间仅可用于临近截止提醒，不能直接视为必然超时：YS-1027B 剩余 16 小时但
+//    预计总储存时长 63 小时＜上限 72 小时 → 不生成超时记录
+//  · 同一风险事件连续满足条件时按告警中心既有规则去重，等级变化及恢复沿用既有规则
+//    （mock 单轮预测无历史轮次，去重口径不在数据层展开）
+//  · YS-1026A 暂无出库计划：预计总储存时长按「≥ 已储存 102 小时」下界判定超时，不编造精确值
+
+interface DefectRecordSpec {
+  id: string;
+  level: AlertLevel;
+  title: string;
+  objectCode: string;
+  objectName: string;
+  metricName: string;
+  triggerTime: string;
+  valueLabel: string;
+  baselineLabel: string;
+  deviationValue: string;
+  deviationRate: string;
+  batch: string;
+  shift: string;
+  brand: string;
+  process: string;
+  strategyName: string;
+  triggerCondition: string;
+  causeSummary: string;
+  suggestion: string;
+  receiver: string;
+  modelVersion: string;
+}
+
+const DEFECT_BASE_TIME = "2026-10-19 14:00"; // 预测基准时间（数据截止时刻，与缺陷预测页一致）
+const DEFECT_MODEL_VERSION = "缺陷风险滚动预测模型 v2.3";
+
+const DEFECT_SPECS: DefectRecordSpec[] = [
+  {
+    id: "ZL20261019001",
+    level: "告警",
+    title: "3#烘丝机成品水分不合格风险评分预计超过80分",
+    objectCode: "HS-03",
+    objectName: "3#烘丝机",
+    metricName: "成品水分不合格风险评分",
+    triggerTime: "2026-10-19 14:07",
+    valueLabel: "预测最高风险评分 82.5分（10-19 19:00）",
+    baselineLabel: "风险阈值 80分",
+    deviationValue: "+2.5分",
+    deviationRate: "+3.1%",
+    batch: "P20261019-03",
+    shift: "甲班",
+    brand: "娇子",
+    process: "烘丝",
+    strategyName: "成品水分不合格风险评分预警策略",
+    triggerCondition: "成品水分不合格风险评分 未来8小时内最高风险评分 ≥ 80分",
+    causeSummary:
+      "预测窗口内风险评分持续上升，加香水分均值与材料水分偏高为主要增险因素（贡献度前两位），具体原因需结合过程数据核实。",
+    suggestion: "建议核查加香出口水分设定、排潮风门开度及来料水分衔接，并跟踪后续批次风险评分变化。",
+    receiver: "吴敏",
+    modelVersion: DEFECT_MODEL_VERSION,
+  },
+  {
+    id: "ZL20261019002",
+    level: "预警",
+    title: "ZJ17-02卷接机组烟支刺破风险评分预计超过75分",
+    objectCode: "ZJ17-02",
+    objectName: "ZJ17-02卷接机组",
+    metricName: "烟支刺破风险评分",
+    triggerTime: "2026-10-19 14:08",
+    valueLabel: "预测最高风险评分 78.6分（10-19 17:00）",
+    baselineLabel: "风险阈值 75分",
+    deviationValue: "+3.6分",
+    deviationRate: "+4.8%",
+    batch: "P20261019-06",
+    shift: "丙班",
+    brand: "宽窄",
+    process: "卷制",
+    strategyName: "烟支刺破风险评分预警策略",
+    triggerCondition: "烟支刺破风险评分 未来8小时内最高风险评分 ≥ 75分",
+    causeSummary:
+      "制丝柔性风选剔除量与梗及梗中含丝量偏高为主要增险因素（贡献度前两位），具体原因需结合过程数据核实。",
+    suggestion: "建议核查柔性风选剔除量与卷烟机剔梗量是否超出标准值，并复核当前原料配方适应性。",
+    receiver: "周婷",
+    modelVersion: DEFECT_MODEL_VERSION,
+  },
+  {
+    id: "ZL20261019003",
+    level: "危险",
+    title: "1#储丝柜YS-1026A箱储存储时间超上限风险评分预计超过80分",
+    objectCode: "CG-01",
+    objectName: "1#储丝柜",
+    metricName: "箱储存储时间超上限风险评分",
+    triggerTime: "2026-10-19 14:09",
+    valueLabel: "预测最高风险评分 93.5分（10-19 22:00）",
+    baselineLabel: "风险阈值 80分",
+    deviationValue: "+13.5分",
+    deviationRate: "+16.9%",
+    batch: "YS-1026A",
+    shift: "甲班",
+    brand: "长城",
+    process: "仓储",
+    strategyName: "箱储存储时间超上限风险评分预警策略",
+    triggerCondition: "箱储存储时间超上限风险评分 未来8小时内最高风险评分 ≥ 80分",
+    causeSummary:
+      "该批次已储存102小时、超出储存时长上限72小时且暂无出库计划，已储存时长为最大增险因素，具体原因需结合出库计划核实。",
+    suggestion: "建议核查计划投料、当前库存与卷包消耗进度是否匹配，优先安排该批次出库或调整领用计划。",
+    receiver: "陈静",
+    modelVersion: DEFECT_MODEL_VERSION,
+  },
+  {
+    id: "ZL20261019004",
+    level: "告警",
+    title: "3#烘丝机预测成品水分偏差+0.7pct，超出允差±0.3pct",
+    objectCode: "HS-03",
+    objectName: "3#烘丝机",
+    metricName: "预测成品水分偏差",
+    triggerTime: "2026-10-19 14:10",
+    valueLabel: "预测偏差 +0.7pct（预测成品水分 13.2%）",
+    baselineLabel: "允差 ±0.3pct（标准水分 12.5%）",
+    deviationValue: "+0.4pct",
+    deviationRate: "+133.3%",
+    batch: "P20261019-03",
+    shift: "甲班",
+    brand: "娇子",
+    process: "烘丝",
+    strategyName: "预测成品水分偏差预警策略",
+    triggerCondition: "预测成品水分偏差 ≥+0.3pct 或 ＜-0.3pct",
+    causeSummary:
+      "预测窗口末段成品水分持续抬升（预计 13.2%），与加香水分均值偏高相关，具体原因需结合过程数据核实。",
+    suggestion: "建议核查加香出口水分设定与排潮风门开度，跟踪预测偏差是否回落至允差范围内。",
+    receiver: "王芳",
+    modelVersion: DEFECT_MODEL_VERSION,
+  },
+  {
+    id: "ZL20261019005",
+    level: "危险",
+    title: "1#储丝柜YS-1026A预计箱储总存储时长超过上限72小时",
+    objectCode: "CG-01",
+    objectName: "1#储丝柜",
+    metricName: "预计箱储总存储时长",
+    triggerTime: "2026-10-19 14:11",
+    valueLabel: "预计总储存时长 ≥102小时（暂无出库计划）",
+    baselineLabel: "储存时长上限 72小时",
+    deviationValue: "≥+30小时",
+    deviationRate: "+41.7%",
+    batch: "YS-1026A",
+    shift: "甲班",
+    brand: "长城",
+    process: "仓储",
+    strategyName: "预计箱储总存储时长预警策略",
+    triggerCondition: "预计箱储总存储时长 ＞ 储存时长上限 72小时",
+    causeSummary:
+      "该批次暂无出库计划，预计总储存时长不低于已储存的102小时、已超上限30小时，具体原因需结合领用计划核实。",
+    suggestion: "建议核查计划投料、当前库存与卷包消耗进度是否匹配，尽快落实该批次出库计划。",
+    receiver: "刘洋",
+    modelVersion: "箱储工艺标准 v1.6（储存时长上限 72小时）",
+  },
+];
+
+function buildDefectAlertRecords(): AlertRecord[] {
+  return DEFECT_SPECS.map((spec) => ({
+    id: spec.id,
+    level: spec.level,
+    title: spec.title,
+    type: "预测风险" as AlertType,
+    domain: "工艺质量",
+    objectCode: spec.objectCode,
+    objectName: spec.objectName,
+    metricName: spec.metricName,
+    triggerTime: spec.triggerTime,
+    // 核心告警数据
+    valueLabel: spec.valueLabel,
+    baselineLabel: spec.baselineLabel,
+    deviationValue: spec.deviationValue,
+    deviationRate: spec.deviationRate,
+    // 追溯字段（缺陷预测类记录专属）
+    batch: spec.batch,
+    forecastWindow: "未来8小时",
+    baseTime: DEFECT_BASE_TIME,
+    modelVersion: spec.modelVersion,
+    shift: spec.shift,
+    shiftLabel: "10-19 白班",
+    brand: spec.brand,
+    process: spec.process,
+    // 判定依据（策略快照，与 QAS-011~015 策略条件同文案）
+    strategyName: spec.strategyName,
+    triggerCondition: spec.triggerCondition,
+    // 原因与建议（预测解释由模型生成）
+    causeSummary: spec.causeSummary,
+    causeType: "AI生成" as const,
+    suggestion: spec.suggestion,
+    // 责任与处理情况（本轮预测刚发布，均未处理）
+    receiver: spec.receiver,
+    notifyMethods: ["邮件"],
+    notifyStatus: "已发送",
+  }));
+}
+
+/* ---------------- 稳定性/结果类指标 · 告警记录生成（确定性 31 条，五级全覆盖） ---------------- */
+
+function buildStabilityAlertRecords(): AlertRecord[] {
   return SPECS.map((spec, i) => {
     const metric = QUALITY_ALERT_METRICS[spec.m];
     const rule = metric.rule!;

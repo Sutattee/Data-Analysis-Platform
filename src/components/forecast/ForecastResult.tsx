@@ -12,8 +12,9 @@ const TONE_CLS: Record<string, string> = {
   muted: "text-gray-500",
 };
 
-// 核心预测结果：一句话结论 + 字段卡 + 类型专属图表
-export function ForecastResultView({ result }: { result: ForecastResult }) {
+// 核心预测结果：一句话结论 + 字段卡 + 类型专属图表；
+// showMeta = false 时隐藏图表标题右侧的模型/历史数据标注（条件区已展示的页面使用）
+export function ForecastResultView({ result, showMeta = true }: { result: ForecastResult; showMeta?: boolean }) {
   const { chart } = result;
 
   return (
@@ -41,9 +42,11 @@ export function ForecastResultView({ result }: { result: ForecastResult }) {
       <div className="w-full lg:w-1/2 rounded-lg border border-gray-100 bg-white p-4">
         <div className="mb-2 flex items-center justify-between">
           <h4 className="text-sm font-semibold text-gray-800">预测图表</h4>
-          <span className="text-xs text-gray-400">
-            模型：{result.meta.model}｜历史数据：{result.meta.historyRange}
-          </span>
+          {showMeta && (
+            <span className="text-xs text-gray-400">
+              模型：{result.meta.model}｜历史数据：{result.meta.historyRange}
+            </span>
+          )}
         </div>
 
         {(chart.kind === "trend" || chart.kind === "target") && (

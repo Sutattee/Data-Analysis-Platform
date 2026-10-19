@@ -236,6 +236,8 @@ export function AlertRecordDetail({
               {isQuality && record.type === "预测风险" && (
                 <Field label="预测窗口" value={record.forecastWindow} />
               )}
+              {/* 缺陷预测类记录：预测基准时间（数据截止时刻，追溯字段） */}
+              {record.baseTime && <Field label="预测基准时间" value={record.baseTime} />}
               <Field label="告警触发时间" value={record.triggerTime} />
             </div>
           ) : (
@@ -293,6 +295,8 @@ export function AlertRecordDetail({
               }
             />
             <Field label="触发条件" value={record.triggerCondition} />
+            {/* 缺陷预测类记录：模型/标准版本（追溯字段，如「缺陷风险滚动预测模型 v2.3」） */}
+            {record.modelVersion && <Field label="模型/标准版本" value={record.modelVersion} />}
             {/* 工艺质量口径：飘移类记录展示连续同向偏离（如「3个批次」，单位随指标周期） */}
             {isQuality && record.consecutiveShifts != null && (
               <Field label="连续同向偏离" value={`${record.consecutiveShifts}个${qualityCycleUnitOf(record.metricName)}`} />

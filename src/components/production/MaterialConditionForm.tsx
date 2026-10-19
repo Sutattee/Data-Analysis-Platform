@@ -7,17 +7,12 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { MATERIAL_BRANDS, MATERIAL_META, type MaterialKey } from "@/lib/mock-data/material-consumption";
 import {
-  BRAND_CONSUME_LEVELS,
   CONSUME_LEVEL_OPTIONS,
   DEFAULT_BRAND_PLANS,
-  END_OF_MONTH_LABEL,
-  MATERIAL_FORECAST_METRICS,
   MATERIAL_FORECAST_MODEL,
   MATERIAL_HISTORY_RANGE,
-  MONTH_BRAND_PLANS,
   NEXT_MONTH_LABEL,
   type ConsumeLevel,
-  type ForecastRange,
   type MaterialForecastInput,
 } from "@/lib/mock-data/material-forecast";
 
@@ -58,7 +53,8 @@ function Field({
 
 const METRIC_KEYS: MaterialKey[] = ["tipPaper", "boxLabel", "tobacco", "filterRod"];
 
-// 辅料预测条件区：通用预测条件 + 业务条件，内部持有全部状态（仅支持未来值预测，不再展示预测类型选择）
+// 辅料预测条件区：通用预测条件 + 业务条件，内部持有全部状态（仅支持未来值预测，不再展示预测类型选择）；
+// 各牌号历史单耗数据随预测结果一起产出，在结果区展示（条件区仅选择档位）
 export function MaterialConditionForm({
   onRun,
   running,
@@ -67,22 +63,10 @@ export function MaterialConditionForm({
   running: boolean;
 }) {
   const [metricKey, setMetricKey] = useState<MaterialKey>("tipPaper");
-  // 各牌号计划产量（系统自动带入，允许编辑；下月/本月两套独立，随时间范围切换）
-  const [plansByRange, setPlansByRange] = useState<Record<ForecastRange, string[]>>(() => ({
-    下个月: DEFAULT_BRAND_PLANS.map(String),
-    本月底: MONTH_BRAND_PLANS.map(String),
-  }));
-  // 各牌号历史单耗档位（自动带入，随指标联动）
+  // 各牌号下月计划产量（系统自动带入，允许编辑）
+  const [plans, setPlans] = useState<string[]>(DEFAULT_BRAND_PLANS.map(String));
+  // 各牌号历史单耗档位（3 个选项，自动带入，随指标联动）
   const [level, setLevel] = useState<ConsumeLevel>("均值");
-  // 预测时间范围：下个月 / 本月底
-  const [range, setRange] = useState<ForecastRange>("下个月");
-
-  const plans = plansByRange[range];
-  // 编辑当前档位的计划产量（两套互不影响）
-  const setPlans = (fn: (prev: string[]) => string[]) =>
-    setPlansByRange((prev) => ({ ...prev, [range]: fn(prev[range]) }));
-  // 计划产量表头文案：本月底档 = 本月，下月档 = 下个月
-  const planLabel = range === "本月底" ? "本月" : "下个月";
 
   const planNums = plans.map((p) => Number(p));
   const planErr = plans.some((p, i) => !/^\d+(\.\d+)?$/.test(p.trim()) || planNums[i] <= 0)
@@ -92,7 +76,7 @@ export function MaterialConditionForm({
 
   function handleSubmit() {
     if (planErr || running) return;
-    onRun({ metricKey, planOutput: planTotal, consumeLevel: level, range });
+    onRun({ metricKey, planOutput: planTotal, consumeLevel: level, range: "下个月" });
   }
 
   return (
@@ -127,31 +111,27 @@ export function MaterialConditionForm({
 
           <div className="my-4 border-t border-gray-100" />
 
-          {/* 业务条件：预测时间范围（首项）+ 各牌号计划产量表格（可编辑，随范围切换本月/下月）+ 各牌号历史单耗表格 */}
+          {/* 业务条件：预测时间范围（仅下个月）+ 各牌号计划产量表格（可编辑）+ 各牌号历史单耗档位 */}
           <div className="space-y-4">
             <Field label="预测时间范围" required>
-              <div className="flex flex-col gap-2">
-                {([["本月底", END_OF_MONTH_LABEL], ["下个月", NEXT_MONTH_LABEL]] as const).map(([value, label]) => (
-                  <label key={value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      name="material-forecast-range"
-                      checked={range === value}
-                      onChange={() => setRange(value)}
-                      className="h-4 w-4 accent-blue-600"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="material-forecast-range"
+                  checked
+                  readOnly
+                  className="h-4 w-4 accent-blue-600"
+                />
+                {NEXT_MONTH_LABEL}
+              </label>
             </Field>
 
-            <Field label={`各牌号${planLabel}计划产量`} error={planErr}>
+            <Field label="各牌号下个月计划产量" error={planErr}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-xs text-gray-400">
                     <th className="py-1.5 text-left font-normal">牌号</th>
-                    <th className="py-1.5 text-right font-normal">{planLabel}计划产量</th>
+                    <th className="py-1.5 text-right font-normal">下个月计划产量</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -182,35 +162,12 @@ export function MaterialConditionForm({
               </table>
             </Field>
 
-            <Field label="各牌号历史单耗数据">
+            <Field label="各牌号历史单耗数据（本年度）">
               <SearchSelect
                 options={CONSUME_LEVEL_OPTIONS}
                 value={level}
                 onChange={(v) => setLevel(v as ConsumeLevel)}
               />
-              {/* 选定档位后自动拉取各牌号单耗展示 */}
-              <table className="mt-2 w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs text-gray-400">
-                    <th className="py-1.5 text-left font-normal">牌号</th>
-                    <th className="py-1.5 text-right font-normal">历史单耗数据{level}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {BRAND_CONSUME_LEVELS[metricKey][level].map((v, i) => (
-                    <tr key={MATERIAL_BRANDS[i]} className="border-b border-gray-50 last:border-0">
-                      <td className="py-1.5 text-gray-600">{MATERIAL_BRANDS[i]}</td>
-                      <td className="py-1.5 text-right font-medium text-gray-800">
-                        {v.toLocaleString("en-US", {
-                          minimumFractionDigits: MATERIAL_FORECAST_METRICS[metricKey].decimals,
-                          maximumFractionDigits: MATERIAL_FORECAST_METRICS[metricKey].decimals,
-                        })}{" "}
-                        {MATERIAL_META[metricKey].unit}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </Field>
           </div>
 

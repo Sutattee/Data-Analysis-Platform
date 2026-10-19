@@ -11,6 +11,7 @@ import {
   activeTargetForMetric,
   historicalAvgForMetric,
 } from "@/lib/mock-data/alert-strategies";
+import { qualityDefectKindOf, DEFECT_FORECAST_WINDOWS } from "@/lib/mock-data/quality-alerts";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 
 const selectCls =
@@ -127,6 +128,7 @@ export function AlertConditionBuilder({
           const isRange = c.baselineType === "正常区间";
           const isTarget = c.baselineType === "目标值";
           const isHistoryAvg = c.baselineType === "历史均值";
+          const defectKind = qualityDefectKindOf(c.metric);
           const allowedBaselines = OPERATOR_BASELINE_MAP[c.operator];
           const [lo, hi] = rangeParts(c.baselineValue);
           const unit = metricDefOf(c.metric)?.unit ?? "";
@@ -172,9 +174,18 @@ export function AlertConditionBuilder({
             }
             update(i, patch);
           }
-          // 切换数据指标：目标值/历史均值类型时重新带入新指标的系统值
+          // 切换数据指标：目标值/历史均值类型时重新带入新指标的系统值；
+          // 缺陷预测指标归一预测范围（评分指标 → 小时制时间窗口，水分偏差/箱储时长不单独选窗口）
           function handleMetricChange(name: string) {
             const patch: Partial<AlertCondition> = { metric: name };
+            const kind = qualityDefectKindOf(name);
+            if (kind === "score") {
+              if (!DEFECT_FORECAST_WINDOWS.includes(c.forecastRange ?? "")) patch.forecastRange = "未来8小时";
+            } else if (kind) {
+              patch.forecastRange = undefined;
+            } else if (DEFECT_FORECAST_WINDOWS.includes(c.forecastRange ?? "")) {
+              patch.forecastRange = "未来7天";
+            }
             if (c.baselineType === "目标值") {
               const t = targetOf(name);
               if (t) {
@@ -324,16 +335,23 @@ export function AlertConditionBuilder({
                   </div>
                 )}
 
-                {/* 预测范围（仅预测风险）*/}
-                {isForecast && (
+                {/* 预测范围（仅预测风险）：缺陷风险评分指标 → 「预测时间窗口」（小时制）；
+                    水分偏差/箱储时长指标预测窗口由模型轮次隐含（8 小时），不单独选择 */}
+                {isForecast && defectKind !== "moistureDev" && defectKind !== "storageTotal" && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500">预测范围</span>
+                    <span className="text-xs text-gray-500">{defectKind === "score" ? "预测时间窗口" : "预测范围"}</span>
                     <select
                       className={selectCls}
-                      value={c.forecastRange ?? ""}
+                      value={
+                        defectKind === "score"
+                          ? DEFECT_FORECAST_WINDOWS.includes(c.forecastRange ?? "")
+                            ? c.forecastRange!
+                            : "未来8小时"
+                          : c.forecastRange ?? ""
+                      }
                       onChange={(e) => update(i, { forecastRange: e.target.value })}
                     >
-                      {FORECAST_RANGES.map((r) => (
+                      {(defectKind === "score" ? DEFECT_FORECAST_WINDOWS : FORECAST_RANGES).map((r) => (
                         <option key={r} value={r}>{r}</option>
                       ))}
                     </select>
