@@ -6,17 +6,13 @@ import { MATERIAL_DAILY, MATERIAL_META, type MaterialKey } from "./material-cons
 export const MATERIAL_FORECAST_MODEL = "辅料消耗时序预测模型 v1.2";
 export const MATERIAL_HISTORY_RANGE = "2024-01-01 至 2026-08-09"; // 历史数据范围（系统自动确定）
 export const MATERIAL_DATA_END = "2026-08-09"; // 数据截止日
-export const NEXT_MONTH_LABEL = "下个月（09-01 ~ 09-30）"; // 预测时间范围选项一：下月（9/1 ~ 9/30）
-export const END_OF_MONTH_LABEL = "本月底（8月31日）"; // 预测时间范围选项二：本月底（8/10 ~ 8/31）
+export const NEXT_MONTH_LABEL = "下个月（09-01 ~ 09-30）"; // 预测时间范围选项：下月（9/1 ~ 9/30）
 
 // 各牌号下个月计划产量（箱），系统自动带入（与 MATERIAL_BRANDS 对齐），允许编辑
 export const DEFAULT_BRAND_PLANS: number[] = [3000, 2400, 2600, 2000];
-// 各牌号本月计划产量（箱），「本月底」档自动带入（与 MATERIAL_BRANDS 对齐），允许编辑
-export const MONTH_BRAND_PLANS: number[] = [2800, 2250, 2450, 1950];
 
-// 预测时间范围：下个月（9/1~9/30 共 30 天）/ 本月底（8/10~8/31 共 22 天）；
-// 各档对应默认各牌号计划产量（规模效应基准随档位取）
-export type ForecastRange = "下个月" | "本月底";
+// 预测时间范围：下个月（9/1~9/30 共 30 天），对应默认各牌号计划产量（规模效应基准）
+export type ForecastRange = "下个月";
 const RANGE_CFG: Record<
   ForecastRange,
   {
@@ -29,7 +25,6 @@ const RANGE_CFG: Record<
   }
 > = {
   下个月: { days: 30, monthIdx: 8, startDay: 1, scope: "下月", peakDay: (i) => `9月${i + 1}日`, defaultPlans: DEFAULT_BRAND_PLANS },
-  本月底: { days: 22, monthIdx: 7, startDay: 10, scope: "本月底", peakDay: (i) => `8月${i + 10}日`, defaultPlans: MONTH_BRAND_PLANS },
 };
 
 // 三档历史单耗（最差 / 均值 / 最优），量级与辅料消耗页序列一致
@@ -100,7 +95,7 @@ export interface MaterialForecastInput {
 const round = (v: number, d: number) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
 const fmt = (v: number, d: number) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 
-// 预测期日期标签（格式 "9/1"；本月底档从 8/10 起）
+// 预测期日期标签（格式 "9/1"）
 function rangeDayLabel(cfg: { monthIdx: number; startDay: number }, j: number): string {
   const d = new Date(2026, cfg.monthIdx, cfg.startDay - 1 + j);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -125,7 +120,7 @@ export async function runMaterialForecast(input: MaterialForecastInput): Promise
   const defaultOutput = cfg.defaultPlans.reduce((s, v) => s + v, 0);
   const planFactor = 1 - ((input.planOutput - defaultOutput) / defaultOutput) * 0.05;
 
-  // 预测序列（下月 9/1~9/30 / 本月底 8/10~8/31，含区间与目标线）
+  // 预测序列（下月 9/1~9/30，含区间与目标线）
   const predicts: number[] = [];
   for (let j = 1; j <= days; j++) {
     const p = round(levelBase * (1 + Math.sin(m.seed * 1.3 + j * 0.5) * 0.015 + j * 0.0008) * planFactor, d);

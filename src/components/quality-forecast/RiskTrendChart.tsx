@@ -1,11 +1,11 @@
 "use client";
 
-// 风险预测趋势图：历史实线 + 未来虚线 + 中/高风险阈值参考线 + 预测区标注
-// 评分 0-1；横轴为批次号（近5个批次 … 基准批次 … 未来10个批次）
+import { useMemo } from "react";
 import {
   CartesianGrid,
+  ComposedChart,
+  Legend,
   Line,
-  LineChart,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -13,161 +13,157 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { catalogOf } from "@/lib/mock-data/quality-defect";
-import { PARAM_GROUPS, groupOf, levelOf, type DefectForecast, type TrendPoint } from "@/lib/mock-data/quality-defect-forecast";
+import { HIGH_THRESHOLD, MID_THRESHOLD, levelOf, type DefectForecast } from "@/lib/mock-data/quality-defect-forecast";
+
+// 风险预测趋势：横轴按实际日期时间的小时制刻度（本窗口不跨日；跨日时需在刻度补日期），
+// 纵轴 0—100 固定 + 中/高风险阈值参考线；历史实线 + 预测虚线（首点 = 基准点衔接），
+// 曲线不带常规数据点（仅峰值红点与基准点强调），基准时刻竖向参考线（标签置于区内顶部避免裁剪），
+// 预测区浅蓝底，窗口最高风险点红点重点标记；数据不足时不编造曲线，直接展示空态。
 
 interface Row {
-  label: string; // 批次号（横轴刻度）
-  histScore: number | null;
-  futureScore: number | null;
-  point?: TrendPoint; // 点位生产上下文（牌号 / 班组 / 班次；Tooltip 展示）
+  t: string;
+  hist: number | null;
+  future: number | null;
+  full?: string; // 完整时刻（Tooltip 展示）
+  biz?: string; // 业务预测值（仅预测点携带）
+  planned?: boolean; // 未来信息来自计划 → Tooltip 标注"（计划）"
 }
 
-export function RiskTrendChart({ forecast }: { forecast: DefectForecast }) {
-  // 工序 = 组工序；部位 = 缺陷档案部位（Tooltip 展示）
-  const process = PARAM_GROUPS[groupOf(forecast.code)].process;
-  const part = catalogOf(forecast.code)?.part ?? "—";
-  // 历史点（含基准批次）走实线；基准批次同时携带 futureScore 使虚线自此衔接；未来点走虚线
-  const data: Row[] = [
-    ...forecast.hist.map((p, i) => ({
-      label: p.label,
-      histScore: p.score,
-      futureScore: i === forecast.hist.length - 1 ? p.score : null,
-      point: p,
-    })),
-    ...forecast.future.slice(1).map((p) => ({
-      label: p.label,
-      histScore: null,
-      futureScore: p.score,
-      point: p,
-    })),
+interface DotProps {
+  cx?: number;
+  cy?: number;
+  payload?: Row;
+}
+
+function TrendTooltip({ active, payload, forecast }: { active?: boolean; payload?: { payload: Row }[]; forecast: DefectForecast }) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  const score = row.future ?? row.hist;
+  if (score === null) return null;
+  const lv = levelOf(score);
+  const items: [string, string][] = [
+    ["预测时间", row.full ?? row.t],
+    ["风险评分", `${score.toFixed(1)}（${lv.label}）`],
+    ["对象", forecast.objectKey],
+    ["关联批次", forecast.batch],
+    ["牌号", forecast.context.brand],
+    ["班次", forecast.context.shift],
+    ["班组", forecast.context.shiftGroup],
+    ["业务预测值", row.biz ? `${row.biz}${row.planned ? "（计划）" : ""}` : "—"],
   ];
-  const baseLabel = forecast.hist[forecast.hist.length - 1]?.label ?? "";
-  const lastLabel = data[data.length - 1]?.label ?? baseLabel;
+  return (
+    <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-lg">
+      {items.map(([k, v]) => (
+        <div key={k} className="flex gap-3 text-xs leading-5">
+          <span className="w-20 shrink-0 text-gray-400">{k}</span>
+          <span className={k === "风险评分" ? "font-medium text-gray-800" : "text-gray-700"}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
+  const { data, baseLabel, endLabel, peakLabel } = useMemo(() => {
+    // 历史与预测共用同一横轴：基准点（14:00）同时出现在两条曲线上保证衔接（数组去重，避免 Set 迭代受 target 限制）
+    const labels: string[] = [];
+    for (const p of f.hist) if (!labels.includes(p.t)) labels.push(p.t);
+    for (const p of f.future) if (!labels.includes(p.t)) labels.push(p.t);
+    const rows: Row[] = labels.map((t) => {
+      const h = f.hist.find((p) => p.t === t);
+      const u = f.future.find((p) => p.t === t);
+      return {
+        t,
+        hist: h ? h.score : null,
+        future: u ? u.score : null,
+        full: (u ?? h)?.full,
+        biz: u?.biz,
+        planned: u?.planned,
+      };
+    });
+    // 窗口最高风险点（多同分取最早）→ 红点重点标记
+    const peak = f.future.length > 0 ? f.future.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+    return {
+      data: rows,
+      baseLabel: f.future[0]?.t ?? f.hist[f.hist.length - 1]?.t ?? "",
+      endLabel: labels[labels.length - 1] ?? "",
+      peakLabel: peak?.t,
+    };
+  }, [f]);
+
+  if (data.length === 0) {
+    return <div className="flex h-64 items-center justify-center text-sm text-gray-400">数据不足，暂无预测曲线</div>;
+  }
+
+  // 窗口最高风险点：红点重点标记；基准点：白心蓝边强调；其余数据点不渲染（保持曲线简洁）
+  const futureDot = (props: DotProps) => {
+    const { cx, cy, payload } = props;
+    if (peakLabel && payload?.t === peakLabel)
+      return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
+    if (payload?.t === baseLabel) return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
+    return null;
+  };
 
   return (
-    <div className="h-[250px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 24, right: 16, left: -8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="#9ca3af" interval={0} minTickGap={20} />
-          <YAxis
-            domain={[0, 1]}
-            ticks={[0, 0.2, 0.4, 0.6, 0.8, 1]}
-            tickFormatter={(v: number) => v.toFixed(1)}
-            tick={{ fontSize: 10 }}
-            stroke="#9ca3af"
-          />
-          {/* 预测区（基准批次 → 窗口末）浅色底标注 */}
-          <ReferenceArea x1={baseLabel} x2={lastLabel} fill="#2563eb" fillOpacity={0.04} label={{ value: "预测区", position: "insideTopLeft", fontSize: 10, fill: "#93c5fd" }} />
-          {/* 阈值参考线：中风险 0.40 橙 / 高风险 0.70 红（说明文字统一放在线上方） */}
-          <ReferenceLine
-            y={0.4}
-            stroke="#f97316"
-            strokeDasharray="4 4"
-            label={{ value: "中风险阈值 0.40", position: "insideTopRight", fontSize: 10, fill: "#f97316" }}
-          />
-          <ReferenceLine
-            y={0.7}
-            stroke="#ef4444"
-            strokeDasharray="4 4"
-            label={{ value: "高风险阈值 0.70", position: "insideTopRight", fontSize: 10, fill: "#ef4444" }}
-          />
-          {/* 历史风险：实线；基准批次点用蓝圈（白心蓝边）放大；值为 null 的点不渲染 dot（避免半圆残影） */}
-          <Line
-            dataKey="histScore"
-            stroke="#2563eb"
-            strokeWidth={2}
-            dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
-              const v = props.payload?.histScore;
-              if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
-                return <g key={props.payload?.label} />;
-              }
-              const isBase = props.payload?.label === baseLabel;
-              return (
-                <circle
-                  key={props.payload?.label}
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={isBase ? 5 : 3}
-                  fill={isBase ? "#fff" : "#2563eb"}
-                  stroke={isBase ? "#1d4ed8" : "#fff"}
-                  strokeWidth={isBase ? 2 : 1}
-                />
-              );
-            }}
-            activeDot={{ r: 4 }}
-            isAnimationActive={false}
-          />
-          {/* 未来预测：虚线（首点=基准批次，与历史衔接）；值为 null 的点不渲染 dot */}
-          <Line
-            dataKey="futureScore"
-            stroke="#2563eb"
-            strokeWidth={2}
-            strokeDasharray="6 4"
-            dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
-              const v = props.payload?.futureScore;
-              if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
-                return <g key={props.payload?.label} />;
-              }
-              return (
-                <circle
-                  key={props.payload?.label}
-                  cx={props.cx}
-                  cy={props.cy}
-                  r={3}
-                  fill="#2563eb"
-                  stroke="#fff"
-                  strokeWidth={1}
-                />
-              );
-            }}
-            activeDot={{ r: 4 }}
-            isAnimationActive={false}
-          />
-          <Tooltip
-            content={({ active, payload }: any) => {
-              if (!active || !payload?.length) return null;
-              const row: Row = payload[0].payload;
-              const score = row.histScore ?? row.futureScore ?? 0;
-              const lv = levelOf(score);
-              const pt = row.point;
-              return (
-                <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs shadow-md">
-                  <p className="font-medium text-gray-800">风险评分：{score.toFixed(2)}</p>
-                  <p className="mt-0.5 flex items-center gap-1 text-gray-600">
-                    风险等级：
-                    <span className="font-medium" style={{ color: lv.color }}>
-                      {lv.label}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-gray-500">批次：{row.label}</p>
-                  {pt?.brand && <p className="mt-0.5 text-gray-500">牌号：{pt.brand}</p>}
-                  {pt?.shiftGroup && <p className="mt-0.5 text-gray-500">班组：{pt.shiftGroup}</p>}
-                  {pt?.shiftLabel && <p className="mt-0.5 text-gray-500">班次：{pt.shiftLabel}</p>}
-                  <p className="mt-0.5 text-gray-500">工序：{process}</p>
-                  <p className="mt-0.5 text-gray-500">部位：{part}</p>
-                </div>
-              );
-            }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-      {/* 图例 */}
-      <div className="mt-1 flex items-center justify-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-5 bg-primary-600" />
-          历史风险
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-0.5 w-5 border-t-2 border-dashed border-primary-600" />
-          预测趋势
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full border-2 border-blue-700 bg-white" />
-          基准批次
-        </span>
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height={300}>
+      <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+        <XAxis dataKey="t" tick={{ fontSize: 11, fill: "#6b7280" }} interval={1} axisLine={{ stroke: "#e5e7eb" }} tickLine={false} />
+        <YAxis
+          domain={[0, 100]}
+          ticks={[0, 20, 40, 60, 80, 100]}
+          tick={{ fontSize: 11, fill: "#6b7280" }}
+          axisLine={false}
+          tickLine={false}
+          width={32}
+        />
+        <Tooltip content={<TrendTooltip forecast={f} />} />
+        <Legend verticalAlign="bottom" height={24} iconSize={14} wrapperStyle={{ fontSize: 11, color: "#6b7280" }} />
+
+        {/* 预测区（基准时刻 → 窗口末点）与阈值参考线 */}
+        <ReferenceArea x1={baseLabel} x2={endLabel} fill="#eff6ff" />
+        <ReferenceLine
+          y={MID_THRESHOLD}
+          stroke="#f97316"
+          strokeDasharray="4 4"
+          label={{ value: `中风险阈值 ${MID_THRESHOLD}`, position: "insideTopLeft", fontSize: 10, fill: "#f97316" }}
+        />
+        <ReferenceLine
+          y={HIGH_THRESHOLD}
+          stroke="#ef4444"
+          strokeDasharray="4 4"
+          label={{ value: `高风险阈值 ${HIGH_THRESHOLD}`, position: "insideTopRight", fontSize: 10, fill: "#ef4444" }}
+        />
+        <ReferenceLine
+          x={baseLabel}
+          stroke="#9ca3af"
+          strokeDasharray="3 3"
+          label={{ value: "基准时刻", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
+        />
+
+        <Line
+          type="monotone"
+          dataKey="hist"
+          name="历史评分"
+          stroke="#2563eb"
+          strokeWidth={2}
+          dot={false}
+          activeDot={false}
+          connectNulls={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="future"
+          name="预测评分"
+          stroke="#2563eb"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          dot={futureDot}
+          activeDot={{ r: 4 }}
+          connectNulls={false}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }
