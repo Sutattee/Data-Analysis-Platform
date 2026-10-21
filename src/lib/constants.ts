@@ -60,10 +60,8 @@ export const PRIMARY_NAV: NavItem[] = [
       { label: "告警记录", href: "/quality/alert/records",    icon: "📋" },
       { label: "告警管理", href: "/quality/alert/management", icon: "🛠️" },
     ]},
-    { label: "缺陷诊断", href: "/quality/diagnosis", icon: "🩺", children: [
-      { label: "缺陷诊断",   href: "/quality/diagnosis/defect",   icon: "🔍" },
-      { label: "诊断记录",   href: "/quality/diagnosis/records",   icon: "📋" },
-    ]},
+    // 诊断记录页（/quality/diagnosis/records）暂时隐藏，页面保留
+    { label: "缺陷诊断", href: "/quality/diagnosis/defect", icon: "🩺" },
     { label: "工艺参数推荐", href: "/quality/parameter-recommend", icon: "🎚️" },
     { label: "智能问数", href: "/quality/qa", icon: "💬" },
   ], matchPrefixes: ["/quality"] },
