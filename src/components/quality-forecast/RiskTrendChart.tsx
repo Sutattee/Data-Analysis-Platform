@@ -13,12 +13,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { HIGH_THRESHOLD, MID_THRESHOLD, levelOf, type DefectForecast } from "@/lib/mock-data/quality-defect-forecast";
+import {
+  HIGH_THRESHOLD,
+  MID_THRESHOLD,
+  levelOf,
+  type DefectForecast,
+  type TrendPoint,
+} from "@/lib/mock-data/quality-defect-forecast";
 
 // 风险预测趋势：横轴按实际日期时间的小时制刻度（本窗口不跨日；跨日时需在刻度补日期），
 // 纵轴 0—100 固定 + 中/高风险阈值参考线；历史实线 + 预测虚线（首点 = 基准点衔接），
 // 曲线不带常规数据点（仅峰值红点与基准点强调），基准时刻竖向参考线（标签置于区内顶部避免裁剪），
-// 预测区浅蓝底，窗口最高风险点红点重点标记；数据不足时不编造曲线，直接展示空态。
+// 预测区浅蓝底，窗口最高风险点红点重点标记；标记点可点击滑出异常详情抽屉（峰值点恒可点，
+// 基准点已达中风险阈值才可点）；数据不足时不编造曲线，直接展示空态。
 
 interface Row {
   t: string;
@@ -64,7 +71,14 @@ function TrendTooltip({ active, payload, forecast }: { active?: boolean; payload
   );
 }
 
-export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
+export function RiskTrendChart({
+  forecast: f,
+  onPointClick,
+}: {
+  forecast: DefectForecast;
+  // 标记点点击：peak = 窗口最高风险点；base = 已达中风险阈值的基准点
+  onPointClick?: (point: TrendPoint, kind: "peak" | "base") => void;
+}) {
   const { data, baseLabel, endLabel, peakLabel } = useMemo(() => {
     // 历史与预测共用同一横轴：基准点（14:00）同时出现在两条曲线上保证衔接（数组去重，避免 Set 迭代受 target 限制）
     const labels: string[] = [];
@@ -96,12 +110,41 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
     return <div className="flex h-64 items-center justify-center text-sm text-gray-400">数据不足，暂无预测曲线</div>;
   }
 
-  // 窗口最高风险点：红点重点标记；基准点：白心蓝边强调；其余数据点不渲染（保持曲线简洁）
+  // 窗口最高风险点：红点重点标记，点击 → 异常详情抽屉（预测风险）；基准点：已达中风险阈值时
+  // 橙点强调可点击（当前异常），未达阈值保持白心蓝边不可点；其余数据点不渲染（保持曲线简洁）
   const futureDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
-    if (peakLabel && payload?.t === peakLabel)
-      return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
-    if (payload?.t === baseLabel) return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
+    const pt = payload ? f.future.find((x) => x.t === payload.t) : undefined;
+    if (peakLabel && payload?.t === peakLabel && pt)
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={5}
+          fill="#ef4444"
+          stroke="#fff"
+          strokeWidth={2}
+          style={{ cursor: "pointer" }}
+          onClick={() => onPointClick?.(pt, "peak")}
+        />
+      );
+    if (payload?.t === baseLabel) {
+      const base = pt ?? f.hist[f.hist.length - 1];
+      if (base && base.score >= MID_THRESHOLD)
+        return (
+          <circle
+            cx={cx}
+            cy={cy}
+            r={4.5}
+            fill="#f97316"
+            stroke="#fff"
+            strokeWidth={2}
+            style={{ cursor: "pointer" }}
+            onClick={() => onPointClick?.(base, "base")}
+          />
+        );
+      return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
+    }
     return null;
   };
 

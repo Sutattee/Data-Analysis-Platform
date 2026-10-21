@@ -5,9 +5,14 @@ import { Card } from "@/components/ui/Card";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { RiskTrendChart } from "./RiskTrendChart";
 import { RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
+import { StabilityAnomalyDrawer } from "@/components/quality-stability-forecast/StabilityAnomalyDrawer";
+import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import type { AlertRecord } from "@/types";
 import {
   BASE_TIME,
   FORECAST_DEFECTS,
+  HIGH_THRESHOLD,
+  MID_THRESHOLD,
   UPDATED_AT,
   aiInterpretation,
   defaultBatchOf,
@@ -20,6 +25,7 @@ import {
   peakOf,
   windowTextOf,
   type ParamCell,
+  type TrendPoint,
 } from "@/lib/mock-data/quality-defect-forecast";
 
 const selectCls =
@@ -32,7 +38,7 @@ const FORECAST_DEFECT_OPTIONS = FORECAST_DEFECTS.map((d) => ({ value: d.code, la
 // AI 解读三段固定小标题
 const AI_SECTION_TITLES = ["预测概况", "参数关注", "核查重点"];
 
-// 摘要信息格：字段与值同行（如「预测最高风险评分：54.8」），备注行在下方
+// 摘要信息格：label 上 / 值下两行式（各列起点对齐，长文本换行完整展示），备注行在下方
 function SummaryItem({
   label,
   value,
@@ -46,11 +52,9 @@ function SummaryItem({
 }) {
   return (
     <div className="min-w-0">
-      <div className="flex items-baseline gap-1.5 text-xs text-gray-400">
-        <span className="shrink-0">{label}：</span>
-        <span className={`truncate text-sm font-semibold ${valueCls}`}>{value}</span>
-      </div>
-      {sub && <div className="mt-0.5 text-xs text-gray-400">{sub}</div>}
+      <div className="text-xs text-gray-400">{label}</div>
+      <div className={`mt-1 text-sm font-semibold leading-5 ${valueCls}`}>{value}</div>
+      {sub && <div className="mt-0.5 text-xs leading-4 text-gray-400">{sub}</div>}
     </div>
   );
 }
@@ -85,6 +89,8 @@ export function DefectForecastView() {
   const [code, setCode] = useState(() => defaultTargetOf().code);
   const [objectKey, setObjectKey] = useState(() => defaultTargetOf().objectKey);
   const [batch, setBatch] = useState(() => defaultTargetOf().batch);
+  // 点击趋势图标记点（窗口最高风险点 / 已达阈值的基准点）→ 构造告警记录，滑出异常详情抽屉
+  const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
 
   const defect = forecastDefectOf(code);
   const objects = forecastObjectsOf(code);
@@ -108,6 +114,44 @@ export function DefectForecastView() {
   function handleChangeObject(nextKey: string) {
     setObjectKey(nextKey);
     setBatch(defaultBatchOf(code, nextKey));
+  }
+
+  // 趋势图标记点点击 → 异常详情抽屉：等级 / 告警值 / 基准 / 偏离 / 批次 / 牌号 / 班次等数值字段
+  // 按点位与预测上下文覆写（峰值点 = 预测风险，基准点 = 当前异常）；策略 / 原因 / 建议等无法由
+  // 点位派生的字段借用工艺质量域告警记录（兼作「查看告警详情」跳转目标）
+  function openAnomalyDrawer(point: TrendPoint, kind: "peak" | "base") {
+    const base = ALERT_RECORDS.find((r) => r.domain === "工艺质量");
+    if (!base) return;
+    const lv = levelOf(point.score);
+    const threshold = point.score >= HIGH_THRESHOLD ? HIGH_THRESHOLD : MID_THRESHOLD;
+    const alertLevel: AlertRecord["level"] =
+      point.score >= HIGH_THRESHOLD ? "告警" : point.score >= MID_THRESHOLD ? "预警" : "关注";
+    const delta = point.score - threshold;
+    const sign = delta >= 0 ? "+" : "-";
+    setAnomalyAlert({
+      ...base,
+      level: alertLevel,
+      title: `${defect.name}风险评分${kind === "peak" ? "预计达窗口峰值" : `已达${lv.label}阈值`}`,
+      type: kind === "peak" ? "预测风险" : "当前异常",
+      objectName: activeObject.label,
+      metricName: `${defect.name}风险评分`,
+      triggerTime: point.full,
+      valueLabel: `${kind === "peak" ? "预测值" : "当前值"}${point.score.toFixed(1)}`,
+      baselineLabel: `${lv.label}阈值 ${threshold}`,
+      deviationValue: `${sign}${Math.abs(delta).toFixed(1)}`,
+      deviationRate: `${sign}${((Math.abs(delta) / threshold) * 100).toFixed(1)}%`,
+      batch: forecast.batch,
+      brand: ctx.brand,
+      shift: ctx.shiftGroup,
+      shiftLabel: ctx.shift,
+      process: ctx.process,
+      forecastWindow: kind === "peak" ? windowTextOf(forecast) : undefined,
+      consecutiveShifts: undefined,
+      confidenceRange: undefined,
+      duration: undefined,
+      forecastTime: undefined,
+      riskProb: undefined,
+    });
   }
 
   // 高风险预测口径配色：已达/预计达阈值 红，单点无时序 灰，数据不足 浅灰
@@ -208,17 +252,17 @@ export function DefectForecastView() {
             sub={peak ? undefined : "数据不足，未生成有效预测"}
             valueCls={lv ? lv.textCls : "text-gray-400"}
           />
-          <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-400">
-            <span className="shrink-0">风险等级：</span>
-            {lv ? (
-              <span
-                className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-xs font-medium ${lv.badgeCls}`}
-              >
-                {lv.label}
-              </span>
-            ) : (
-              <span className="text-sm font-semibold text-gray-400">—</span>
-            )}
+          <div className="min-w-0">
+            <div className="text-xs text-gray-400">风险等级</div>
+            <div className="mt-1">
+              {lv ? (
+                <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${lv.badgeCls}`}>
+                  {lv.label}
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-gray-400">—</span>
+              )}
+            </div>
           </div>
           <SummaryItem label="高风险预测" value={eta.text} valueCls={etaCls} sub={forecast.status === "ok" ? undefined : "必需输入不足，本轮未生成预测"} />
           <SummaryItem label="预测窗口" value={windowTextOf(forecast)} />
@@ -254,7 +298,7 @@ export function DefectForecastView() {
         {/* 左侧主区域：预测趋势 / 关联参数表 */}
         <div className="space-y-3 xl:col-span-2">
           <Card title={`${defect.name}风险预测趋势`}>
-            <RiskTrendChart forecast={forecast} />
+            <RiskTrendChart forecast={forecast} onPointClick={openAnomalyDrawer} />
           </Card>
 
           <Card title="关联工序及环境参数" padding={false}>
@@ -322,6 +366,9 @@ export function DefectForecastView() {
           )}
         </div>
       </div>
+
+      {/* 异常详情抽屉（点击趋势图标记点：窗口最高风险点 / 已达阈值的基准点） */}
+      <StabilityAnomalyDrawer record={anomalyAlert} onClose={() => setAnomalyAlert(null)} />
     </div>
   );
 }
