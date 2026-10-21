@@ -1,5 +1,5 @@
-// 缺陷诊断任务流（会话级 store）：列表页（卡片/表格）与详情页（AI 诊断 / 人工判定）共用。
-// Agent 四节点用 setTimeout 链模拟推进（数据准备 → 归因分析 ∥ 案例检索 → 建议生成），
+// 缺陷诊断任务流（会话级 store）：列表页（卡片/表格）与详情页（智能诊断 / 人工判定）共用。
+// Agent 四节点用 setTimeout 链模拟推进（数据准备 → 归因分析 ∥ 案例检索 → 结论生成），
 // 通过 listeners + useSyncExternalStore 通知视图刷新；判定结果桥接写回 quality-defect 的
 // diagnoses store（诊断记录页 / 缺陷分析抽屉零改动同源同步）。
 
@@ -141,7 +141,7 @@ export interface DiagTask {
   storage?: StorageInfo; // 箱储任务的对象信息
   scenario: DiagScenario;
   status: DiagTaskStatus;
-  aiVersions: AiVersion[]; // 多次 AI 诊断产生多版本
+  aiVersions: AiVersion[]; // 多次智能诊断产生多版本
   draft?: JudgmentDraft;
   judgments: Judgment[]; // 多次修订产生多版本
 }
@@ -170,7 +170,7 @@ const NODE_DEFS: { key: AgentNodeKey; name: string; ms: number }[] = [
   { key: "data-prep", name: "数据准备", ms: 1500 },
   { key: "attribution", name: "归因分析", ms: 2200 },
   { key: "case-search", name: "案例检索", ms: 1800 },
-  { key: "advice", name: "建议生成", ms: 1400 },
+  { key: "advice", name: "结论生成", ms: 1400 },
 ];
 
 function freshNodes(): AgentNode[] {
@@ -459,7 +459,7 @@ function doneVersion(
       details: cases.map((c) => `${c.title}（${c.source}）`),
     },
     {
-      key: "advice", name: "建议生成", status: "完成", startedAt: clockStr(startedAt, 5), finishedAt: clockStr(startedAt, 7),
+      key: "advice", name: "结论生成", status: "完成", startedAt: clockStr(startedAt, 5), finishedAt: clockStr(startedAt, 7),
       ms: NODE_DEFS[3].ms,
       summary: `生成 ${t.scenario === "dataFail" ? "受限" : ""}诊断建议（候选原因 ${t.scenario === "dataFail" ? 0 : (t.code === "XCCG" ? 2 : 3)} 项）`.replace("（）", ""),
     },
@@ -485,7 +485,7 @@ function runningVersion(t: DiagTask, version: number, startedAt: string): AiVers
       { key: "data-prep", name: "数据准备", status: "完成", startedAt, finishedAt: clockStr(startedAt, 2), ms: NODE_DEFS[0].ms, summary: `获取 ${evidences.length} 项关联数据` },
       { key: "attribution", name: "归因分析", status: "执行中", startedAt: clockStr(startedAt, 2) },
       { key: "case-search", name: "案例检索", status: "执行中", startedAt: clockStr(startedAt, 2) },
-      { key: "advice", name: "建议生成", status: "待执行" },
+      { key: "advice", name: "结论生成", status: "待执行" },
     ],
     evidences, cases: [],
   };
@@ -574,7 +574,7 @@ let tasks: DiagTask[] = [
 (function seedVersions() {
   for (const t of tasks) {
     if (t.judgments.length > 0 && t.code !== "XCCG") {
-      // 已判定且走过 AI 诊断：补已完成 v1（aiVersion=1）；版本时间早于判定时间
+      // 已判定且走过智能诊断：补已完成 v1（aiVersion=1）；版本时间早于判定时间
       if (t.judgments[0].aiVersion > 0) {
         t.aiVersions.push(doneVersion(t, 1, `${t.occurrence.date.replace(/-/g, "/")} 08:30:00`, false));
       }
@@ -758,7 +758,7 @@ function finishNode(t: DiagTask, v: AiVersion, key: AgentNodeKey, ms: number): v
     afterParallel(t, v);
     return;
   }
-  // advice：建议生成
+  // advice：结论生成
   update(() => {
     const prep = nodeOf(v, "data-prep")!;
     const advice = prep.status === "失败" ? buildFailAdvice(t) : buildAdvice(t, v.evidences, v.cases);
@@ -771,7 +771,7 @@ function finishNode(t: DiagTask, v: AiVersion, key: AgentNodeKey, ms: number): v
   });
 }
 
-// 归因与案例检索均终结后推进建议生成
+// 归因与案例检索均终结后推进结论生成
 function afterParallel(t: DiagTask, v: AiVersion): void {
   const attr = nodeOf(v, "attribution");
   const cs = nodeOf(v, "case-search");
@@ -790,7 +790,7 @@ export function retryNode(taskId: string, key: AgentNodeKey): void {
     n.status = "待执行";
     n.error = undefined;
     v.finishedAt = undefined;
-    // 归因从“跳过”恢复重跑；建议生成重新生成（覆盖受限版建议）
+    // 归因从“跳过”恢复重跑；结论生成重新生成（覆盖受限版建议）
     const attr = nodeOf(v, "attribution");
     if (attr && attr.status === "跳过") attr.status = "待执行";
     const adv = nodeOf(v, "advice");
@@ -813,7 +813,7 @@ export function saveDraft(taskId: string, draft: JudgmentDraft): void {
   });
 }
 
-// 采纳 AI 诊断原因：取最新版本候选原因拼接文本（无有效候选返回 undefined）
+// 采纳智能诊断原因：取最新版本候选原因拼接文本（无有效候选返回 undefined）
 export function adoptAiText(taskId: string): string | undefined {
   const t = getTask(taskId);
   if (!t) return undefined;
@@ -843,7 +843,7 @@ function upsertKnowledgeCase(t: DiagTask, conclusion: "原因已确定" | "暂�
     title: `${t.occurrence.machine}·${t.occurrence.batch} ${t.occurrence.name}`,
     grade, formedAt: judgedAt, scope: `${cat?.process ?? "—"}·${t.storage ? t.storage.object : t.occurrence.machine}`,
     cause: finalCause ?? "暂未查明",
-    keyEvidence: t.aiVersions.length ? `AI 诊断 v${latestVersion(t)?.version} 依据 + 人工核查确认` : "人工核查确认（无 AI 诊断）",
+    keyEvidence: t.aiVersions.length ? `智能诊断 v${latestVersion(t)?.version} 依据 + 人工核查确认` : "人工核查确认（无智能诊断）",
     source: "历史诊断案例", taskId: t.id, judge, active: conclusion === "原因已确定",
   });
   return id;
@@ -907,14 +907,10 @@ export function gradeLabelOf(t: DiagTask): string {
   return `${diagCatalogOf(t.code)?.grade ?? "—"}类`;
 }
 
-// 诊断摘要（卡片一行展示）：未诊断=请启动 AI 分析；已生成结果=一句候选原因；已判定=最终结论
+// 诊断摘要（卡片一行展示）：未诊断=请启动智能分析；已生成结果=一句候选原因；已判定=最终结论
 export function summaryOf(t: DiagTask): string {
-  if (t.status === "未诊断") return "请启动 AI 分析";
-  if (t.status === "诊断中") {
-    const v = latestVersion(t);
-    const done = v ? v.nodes.filter(isTerminal).length : 0;
-    return `AI 诊断执行中（${done}/4）`;
-  }
+  if (t.status === "未诊断") return "请启动智能分析";
+  if (t.status === "诊断中") return "智能诊断中......";
   if (t.status === "待判定") {
     const cands = latestVersion(t)?.advice?.candidates ?? [];
     if (cands.length === 0) return "AI 依据不足，待人工核查判定";
@@ -925,9 +921,9 @@ export function summaryOf(t: DiagTask): string {
   return j.conclusion === "原因已确定" ? j.finalCause ?? "—" : "暂未查明";
 }
 
-// 主按钮（卡片 / 表格操作列）：按处理状态两档——待判定（含未诊断/诊断中）打开 AI 诊断
+// 主按钮（卡片 / 表格操作列）：按处理状态两档——待判定（含未诊断/诊断中）打开智能诊断
 // （未诊断自动启动），已判定默认进入人工判定工作区只读查看
 export function primaryActionOf(t: DiagTask): { label: string; query: string } {
   if (t.status === "已判定") return { label: "查看结果", query: "?tab=judge" };
-  return { label: "查看AI诊断", query: "?start=1" };
+  return { label: "智能诊断", query: "?start=1" };
 }

@@ -19,7 +19,7 @@ function formatNow(): string {
 }
 
 // 人工判定工作区：单选「原因已确定 / 暂未查明」（首次不默认）；
-// 切换保留草稿；采纳 AI 诊断原因一键填入（已有内容时追加或替换）；确认后产生判定版本并可入库
+// 切换保留草稿；采纳智能诊断原因一键填入（已有内容时追加或替换）；确认后产生判定版本并可入库
 export function HumanJudgmentWorkspace({
   task,
   canOperate,
@@ -64,7 +64,7 @@ export function HumanJudgmentWorkspace({
       return;
     }
     setFinalCause(text);
-    toast("已采纳 AI 诊断原因", "success");
+    toast("已采纳智能诊断原因", "success");
   }
 
   function handleConfirm() {
@@ -131,7 +131,7 @@ export function HumanJudgmentWorkspace({
             <div className="flex flex-wrap gap-x-6 gap-y-1.5 border-t border-gray-50 pt-3 text-xs text-gray-400">
               <span>判定人：<span className="text-gray-600">{last.judge}</span></span>
               <span>判定时间：<span className="text-gray-600">{last.judgedAt}</span></span>
-              <span>参考 AI 诊断：<span className="text-gray-600">{last.aiVersion > 0 ? "已参考" : "—（人工独立判定）"}</span></span>
+              <span>参考智能诊断：<span className="text-gray-600">{last.aiVersion > 0 ? "已参考" : "—（人工独立判定）"}</span></span>
               {last.kbCaseId && <span className="text-cyan-700">📚 已入知识库（{last.kbCaseId}）</span>}
             </div>
           </div>
@@ -204,7 +204,7 @@ export function HumanJudgmentWorkspace({
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{finalCause.length}/500</span>
                 <Button size="sm" disabled={disabled} onClick={handleAdopt}>
-                  采纳AI诊断建议
+                  采纳智能诊断结论
                 </Button>
               </div>
             </div>
@@ -260,7 +260,7 @@ export function HumanJudgmentWorkspace({
       </div>
 
       {/* 采纳 AI 原因：已有内容时选择追加或替换 */}
-      <Modal open={adoptOpen} onClose={() => setAdoptOpen(false)} title="采纳 AI 诊断原因">
+      <Modal open={adoptOpen} onClose={() => setAdoptOpen(false)} title="采纳智能诊断原因">
         <p className="text-sm leading-6 text-gray-600">
           输入框已有内容，选择<b className="text-gray-800">追加</b>将保留原文并在末尾续写 AI 建议原因；选择<b className="text-gray-800">替换</b>将以 AI 建议原因覆盖原文。
         </p>
@@ -274,7 +274,7 @@ export function HumanJudgmentWorkspace({
             onClick={() => {
               setFinalCause((prev) => `${prev}\n${adoptPending}`.trim());
               setAdoptOpen(false);
-              toast("已追加 AI 诊断原因", "success");
+              toast("已追加智能诊断原因", "success");
             }}
           >
             追加
@@ -283,7 +283,7 @@ export function HumanJudgmentWorkspace({
             onClick={() => {
               setFinalCause(adoptPending);
               setAdoptOpen(false);
-              toast("已替换为 AI 诊断原因", "success");
+              toast("已替换为智能诊断原因", "success");
             }}
           >
             替换

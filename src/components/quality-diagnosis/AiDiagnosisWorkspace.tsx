@@ -18,8 +18,8 @@ function compareCls(compare: string): string {
   return "text-gray-400";
 }
 
-// AI 诊断工作区：Agent 执行过程（仅此处展示）+ 左列（诊断依据 + 贡献度/规则说明 + 相似历史案例）
-// + 右列（AI 诊断建议，候选原因以文字行展示；底部「重新诊断 / 进入人工判定」）
+//智能诊断工作区：Agent 执行过程（仅此处展示）+ 左列（诊断依据 + 贡献度/规则说明 + 相似历史案例）
+// + 右列（智能诊断结论，候选原因以文字行展示；底部「重新诊断 / 进入人工判定」）
 export function AiDiagnosisWorkspace({
   task,
   onEnterJudgment,
@@ -38,17 +38,17 @@ export function AiDiagnosisWorkspace({
     return (
       <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-white py-16">
         <span className="text-2xl">🤖</span>
-        <p className="text-sm text-gray-500">{task.status === "已判定" ? "未进行 AI 诊断" : "尚未启动 AI 诊断"}</p>
+        <p className="text-sm text-gray-500">{task.status === "已判定" ? "未进行智能诊断" : "尚未启动智能诊断"}</p>
         {task.status === "已判定" ? (
-          <p className="max-w-md text-center text-xs leading-5 text-gray-400">本任务为人工独立判定，未进行 AI 诊断。</p>
+          <p className="max-w-md text-center text-xs leading-5 text-gray-400">本任务为人工独立判定，未进行智能诊断。</p>
         ) : (
           <>
             <p className="max-w-md text-center text-xs leading-5 text-gray-400">
               AI 将自动获取该条记录的关联数据（质检平台 / MES / 卷包数采 / 车间环境），
-              完成归因分析、相似案例检索与诊断建议生成。
+              完成归因分析、相似案例检索与诊断结论生成。
             </p>
             {canOperate ? (
-              <Button onClick={onStart}>启动 AI 诊断</Button>
+              <Button onClick={onStart}>启动智能诊断</Button>
             ) : (
               <p className="text-xs text-gray-400">当前角色无诊断操作权限，请联系管理员</p>
             )}
@@ -63,7 +63,7 @@ export function AiDiagnosisWorkspace({
 
   return (
     <div className="space-y-4">
-      {/* Agent 执行过程（仅 AI 诊断工作区展示） */}
+      {/* Agent 执行过程（仅智能诊断工作区展示） */}
       <AgentStatusPanel
         version={latest}
         onRetry={() => retryNode(task.id, "data-prep")}
@@ -214,11 +214,11 @@ export function AiDiagnosisWorkspace({
               </div>
             </div>
 
-            {/* 右列：AI 诊断建议 */}
+            {/* 右列：智能诊断结论 */}
             <div className="lg:col-span-2">
               <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
                 <div className="border-b border-gray-50 px-5 py-3.5">
-                  <h3 className="text-sm font-semibold text-gray-800">AI 诊断建议</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">智能诊断结论</h3>
                 </div>
                 <div className="space-y-4 p-5">
                   <div>

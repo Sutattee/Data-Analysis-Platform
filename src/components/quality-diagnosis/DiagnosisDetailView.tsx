@@ -23,8 +23,8 @@ import { judgeBadgeOf } from "./DiagnosisTaskCard";
 const num = (n: number) => n.toLocaleString("en-US");
 
 // 诊断详情页：紧凑摘要（标题+处理状态 / 灰色小字信息行 / 浅蓝条异常表现）+ 更多基本信息折叠 +
-// 步骤指引（① AI 诊断 —— ② 人工判定）+ 双工作区（切换保留状态，Agent 执行过程仅 AI 诊断页展示）；
-// ?start=1 进入即自动启动 AI 诊断；?tab=judge 直达人工判定
+// 步骤指引（①智能诊断 —— ② 人工判定）+ 双工作区（切换保留状态，Agent 执行过程仅智能诊断页展示）；
+// ?start=1 进入即自动启动智能诊断；?tab=judge 直达人工判定
 export function DiagnosisDetailView() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -46,7 +46,7 @@ export function DiagnosisDetailView() {
     if (searchParams.get("start") === "1") {
       if (task.status === "未诊断" && canOperate) {
         startDiagnosis(task.id);
-        toast("已启动 AI 诊断", "success");
+        toast("已启动智能诊断", "success");
       }
       router.replace(`/quality/diagnosis/defect/${task.id}?tab=ai`);
     }
@@ -81,7 +81,7 @@ export function DiagnosisDetailView() {
 
   function handleStart() {
     startDiagnosis(task!.id);
-    toast(task!.aiVersions.length > 0 ? "已重新启动 AI 诊断" : "已启动 AI 诊断", "success");
+    toast(task!.aiVersions.length > 0 ? "已重新启动智能诊断" : "已启动智能诊断", "success");
   }
 
   const summaryField = (label: string, value: string) => (
@@ -150,7 +150,7 @@ export function DiagnosisDetailView() {
         </div>
       </div>
 
-      {/* 步骤指引：① AI 诊断 —— ② 人工判定（可点击切换，hidden 切换保留双方状态） */}
+      {/* 步骤指引：①智能诊断 —— ② 人工判定（可点击切换，hidden 切换保留双方状态） */}
       <div className="flex items-center">
         <button onClick={() => setTab("ai")} className="group flex items-center gap-2">
           <span
@@ -163,7 +163,7 @@ export function DiagnosisDetailView() {
             {tab === "judge" ? "✓" : "1"}
           </span>
           <span className={`text-sm ${tab === "ai" ? "font-medium text-gray-900" : "text-gray-500 group-hover:text-gray-700"}`}>
-            AI 诊断
+           智能诊断
           </span>
         </button>
         <span className={`mx-4 h-px w-12 ${tab === "judge" ? "bg-primary-400" : "bg-gray-300"}`} />

@@ -59,7 +59,7 @@ function loadSaved(): SavedState | null {
 }
 
 // 缺陷诊断任务列表：状态 tab（待处理/已判定/全部）+ 卡片/表格视图 + 基础/展开筛选；
-// AI 诊断状态实时刷新（useSyncExternalStore 订阅会话级 store）
+//智能诊断状态实时刷新（useSyncExternalStore 订阅会话级 store）
 export function DefectDiagnosisView() {
   const router = useRouter();
   const searchParams = useSearchParams();

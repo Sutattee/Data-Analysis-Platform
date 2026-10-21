@@ -16,7 +16,7 @@ function secsOf(ms?: number): string {
   return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
-// Agent 执行过程（仅 AI 诊断工作区展示）：执行中 / 失败自动展开，完成收起为「查看执行过程」；
+// Agent 执行过程（仅智能诊断工作区展示）：执行中 / 失败自动展开，完成收起为「查看执行过程」；
 // 步骤以纯文字行展示「节点：状态（耗时）」，失败节点内嵌「重试」
 export function AgentStatusPanel({
   version,
@@ -39,7 +39,7 @@ export function AgentStatusPanel({
   if (!version) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-4 text-sm text-gray-400">
-        尚未启动 AI 诊断
+        尚未启动智能诊断
       </div>
     );
   }
@@ -58,10 +58,10 @@ export function AgentStatusPanel({
         )}
         {running && (
           <span className="text-sm text-primary-700">
-            AI 诊断执行中<span className="ml-0.5 inline-block animate-pulse">…</span>
+            智能诊断中<span className="ml-0.5 inline-block animate-pulse">......</span>
           </span>
         )}
-        {hasFail && <span className="text-sm text-red-600">AI 诊断未完成（数据获取失败）</span>}
+        {hasFail && <span className="text-sm text-red-600">智能诊断未完成（数据获取失败）</span>}
       </div>
 
       {open && (
