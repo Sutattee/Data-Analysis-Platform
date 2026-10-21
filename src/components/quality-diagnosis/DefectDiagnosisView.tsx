@@ -121,7 +121,7 @@ export function DefectDiagnosisView() {
     []
   );
 
-  // 过滤：应用态筛选 + tab + 检验发现时间倒序
+  // 过滤：应用态筛选 + tab；排序：成品水分不合格任务固定置顶（组内及其余按检验发现时间倒序）
   const rows = useMemo(() => {
     return all
       .filter((t) => {
@@ -140,7 +140,12 @@ export function DefectDiagnosisView() {
           (tab === "all" || (tab === "judged" ? t.status === "已判定" : t.status !== "已判定"))
         );
       })
-      .sort((a, b) => `${b.occurrence.date} ${b.occurrence.time}`.localeCompare(`${a.occurrence.date} ${a.occurrence.time}`));
+      .sort((a, b) => {
+        const pa = a.code === "CPSFBH" ? 0 : 1;
+        const pb = b.code === "CPSFBH" ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return `${b.occurrence.date} ${b.occurrence.time}`.localeCompare(`${a.occurrence.date} ${a.occurrence.time}`);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applied, tab, version]);
 
