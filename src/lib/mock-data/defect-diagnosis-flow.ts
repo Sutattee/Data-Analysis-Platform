@@ -54,8 +54,7 @@ export interface KbCase {
   formedAt: string; // 形成（判定）时间
   scope: string; // 适用范围
   cause: string; // 已确定原因
-  keyEvidence: string; // 核查依据
-  measures?: string; // 处置措施
+  checkNote: string; // 核查说明（核查依据 + 处置措施）
   source: "专家案例" | "历史诊断案例";
   taskId?: string; // 来源任务（历史诊断案例）
   judge?: string;
@@ -319,15 +318,15 @@ function punctureContributions(missingStem: boolean): AiContribution[] | undefin
 
 let kbCases: KbCase[] = [
   // 专家案例 6 条
-  { id: "kb-001", code: "CPSFBH", title: "烘丝出口水分仪标定漂移致水分超标", grade: "A类", formedAt: "2025/11/18", scope: "烘丝工序·出口水分仪", cause: "出口水分仪标定漂移，显示值偏低导致实际水分超出上限。", keyEvidence: "标定液复核偏移 -0.4%，人工化验值高于仪表值。", measures: "重新标定仪表并按周期点检，复检 3 批合格。", source: "专家案例", active: true },
-  { id: "kb-002", code: "CPSFBH", title: "排潮风门开度未随来料水分调整", grade: "A类", formedAt: "2026/03/07", scope: "烘丝工序·排潮系统", cause: "来料水分升高后排潮风门开度未同步调整，出口水分偏高。", keyEvidence: "来料水分 13.4%，出口均值 13.1%，风门开度与参数卡不符。", measures: "更新参数卡并按来料水分分档设定风门开度。", source: "专家案例", active: true },
-  { id: "kb-003", code: "YZCB", title: "烟支通道导板毛刺刮破卷烟纸", grade: "C/D类", formedAt: "2025/09/12", scope: "卷制工序·烟支通道", cause: "导板边缘毛刺刮伤卷烟纸形成刺破。", keyEvidence: "触摸确认毛刺；同位置重复刺破占比高。", measures: "修磨抛光导板，首件全检确认。", source: "专家案例", active: true },
-  { id: "kb-004", code: "YZCB", title: "烙铁边角磨损刮伤烟支", grade: "C/D类", formedAt: "2026/01/15", scope: "卷制工序·烙铁组件", cause: "烙铁边角磨损后刮伤烟支表面产生刺破。", keyEvidence: "烙铁边角圆角超标，更换后缺陷消除。", measures: "更换烙铁组件并纳入班组点检。", source: "专家案例", active: true },
-  { id: "kb-005", code: "XCCG", title: "先进先出执行不到位致批次滞留", grade: "B类", formedAt: "2025/12/03", scope: "仓储·储丝柜", cause: "库房先进先出执行不到位，角落批次滞留超期。", keyEvidence: "货位台账与批次标识顺序不一致。", measures: "重新规划货位并按批次标识顺序出库。", source: "专家案例", active: true },
-  { id: "kb-006", code: "XCCG", title: "库容集中周转调度滞后", grade: "B类", formedAt: "2026/04/21", scope: "仓储·库容调度", cause: "库容压力集中、周转调度滞后造成局部批次超期。", keyEvidence: "同期入库量高出均衡值 18%，出库计划未联动。", measures: "与生产计划联动均衡出库。", source: "专家案例", active: true },
+  { id: "kb-001", code: "CPSFBH", title: "烘丝出口水分仪标定漂移致水分超标", grade: "A类", formedAt: "2025/11/18", scope: "烘丝工序·出口水分仪", cause: "出口水分仪标定漂移，显示值偏低导致实际水分超出上限。", checkNote: "标定液复核偏移 -0.4%，人工化验值高于仪表值；重新标定仪表并按周期点检，复检 3 批合格。", source: "专家案例", active: true },
+  { id: "kb-002", code: "CPSFBH", title: "排潮风门开度未随来料水分调整", grade: "A类", formedAt: "2026/03/07", scope: "烘丝工序·排潮系统", cause: "来料水分升高后排潮风门开度未同步调整，出口水分偏高。", checkNote: "来料水分 13.4%，出口均值 13.1%，风门开度与参数卡不符；更新参数卡并按来料水分分档设定风门开度。", source: "专家案例", active: true },
+  { id: "kb-003", code: "YZCB", title: "烟支通道导板毛刺刮破卷烟纸", grade: "C/D类", formedAt: "2025/09/12", scope: "卷制工序·烟支通道", cause: "导板边缘毛刺刮伤卷烟纸形成刺破。", checkNote: "触摸确认毛刺，同位置重复刺破占比高；修磨抛光导板，首件全检确认。", source: "专家案例", active: true },
+  { id: "kb-004", code: "YZCB", title: "烙铁边角磨损刮伤烟支", grade: "C/D类", formedAt: "2026/01/15", scope: "卷制工序·烙铁组件", cause: "烙铁边角磨损后刮伤烟支表面产生刺破。", checkNote: "烙铁边角圆角超标，更换后缺陷消除；更换烙铁组件并纳入班组点检。", source: "专家案例", active: true },
+  { id: "kb-005", code: "XCCG", title: "先进先出执行不到位致批次滞留", grade: "B类", formedAt: "2025/12/03", scope: "仓储·储丝柜", cause: "库房先进先出执行不到位，角落批次滞留超期。", checkNote: "货位台账与批次标识顺序不一致；重新规划货位并按批次标识顺序出库。", source: "专家案例", active: true },
+  { id: "kb-006", code: "XCCG", title: "库容集中周转调度滞后", grade: "B类", formedAt: "2026/04/21", scope: "仓储·库容调度", cause: "库容压力集中、周转调度滞后造成局部批次超期。", checkNote: "同期入库量高出均衡值 18%，出库计划未联动；与生产计划联动均衡出库。", source: "专家案例", active: true },
   // 历史诊断案例 2 条（dr-001 / dr-006 判定入库）
-  { id: "kb-007", code: "CPSFBH", title: "3#烘丝机出口水分仪标定漂移", grade: "A类", formedAt: "2026/08/27 10:41", scope: "烘丝工序·3#烘丝机", cause: "3#烘丝机出口水分仪标定漂移，显示值偏低导致实际水分超出上限。", keyEvidence: "标定记录复核偏移 -0.4%；人工化验 3 子样均高于仪表值。", measures: "重新标定后复检合格。", source: "历史诊断案例", taskId: "dr-001", judge: "苏恒", active: true },
-  { id: "kb-008", code: "YZCB", title: "ZJ17-02 烟支通道导板毛刺", grade: "C/D类", formedAt: "2026/08/30 14:23", scope: "卷制工序·卷接机组ZJ17-02", cause: "ZJ17-02 烟支通道导板有毛刺刮破卷烟纸。", keyEvidence: "触摸导板边缘确认毛刺；抛光后首件 200 支全检无刺破。", measures: "修磨抛光后缺陷未再发生。", source: "历史诊断案例", taskId: "dr-006", judge: "苏恒", active: true },
+  { id: "kb-007", code: "CPSFBH", title: "3#烘丝机出口水分仪标定漂移", grade: "A类", formedAt: "2026/08/27 10:41", scope: "烘丝工序·3#烘丝机", cause: "3#烘丝机出口水分仪标定漂移，显示值偏低导致实际水分超出上限。", checkNote: "标定记录复核偏移 -0.4%，人工化验 3 子样均高于仪表值；重新标定后复检合格。", source: "历史诊断案例", taskId: "dr-001", judge: "苏恒", active: true },
+  { id: "kb-008", code: "YZCB", title: "ZJ17-02 烟支通道导板毛刺", grade: "C/D类", formedAt: "2026/08/30 14:23", scope: "卷制工序·卷接机组ZJ17-02", cause: "ZJ17-02 烟支通道导板有毛刺刮破卷烟纸。", checkNote: "触摸导板边缘确认毛刺，抛光后首件 200 支全检无刺破；修磨抛光后缺陷未再发生。", source: "历史诊断案例", taskId: "dr-006", judge: "苏恒", active: true },
 ];
 
 // 案例检索：同缺陷代码 + 启用中 + 排除本任务自身入库的案例，最多 3 条（caseMiss 剧本 0 命中）
@@ -843,7 +842,7 @@ function upsertKnowledgeCase(t: DiagTask, conclusion: "原因已确定" | "暂�
     title: `${t.occurrence.machine}·${t.occurrence.batch} ${t.occurrence.name}`,
     grade, formedAt: judgedAt, scope: `${cat?.process ?? "—"}·${t.storage ? t.storage.object : t.occurrence.machine}`,
     cause: finalCause ?? "暂未查明",
-    keyEvidence: t.aiVersions.length ? `智能诊断 v${latestVersion(t)?.version} 依据 + 人工核查确认` : "人工核查确认（无智能诊断）",
+    checkNote: t.aiVersions.length ? `智能诊断 v${latestVersion(t)?.version} 依据 + 人工核查确认` : "人工核查确认（无智能诊断）",
     source: "历史诊断案例", taskId: t.id, judge, active: conclusion === "原因已确定",
   });
   return id;

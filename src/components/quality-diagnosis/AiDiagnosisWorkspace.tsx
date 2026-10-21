@@ -150,9 +150,6 @@ export function AiDiagnosisWorkspace({
                       </div>
                     ))}
                   </div>
-                  <p className="mt-3 text-[11px] leading-4 text-gray-400">
-                    口径：{v.contributions.map((c) => `${c.name} ${c.pct}`).join(" / ")}；{v.contributions[0]?.note}
-                  </p>
                 </div>
               )}
               {v.ruleNote && (
@@ -202,10 +199,7 @@ export function AiDiagnosisWorkspace({
                         </div>
                         <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
                           <p className="text-xs leading-5"><span className="font-medium text-gray-700">已确定原因：</span><span className="text-gray-600">{c.cause}</span></p>
-                          <p className="text-xs leading-5"><span className="font-medium text-gray-700">核查依据：</span><span className="text-gray-600">{c.keyEvidence}</span></p>
-                          {c.measures && (
-                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">处置措施：</span><span className="text-gray-600">{c.measures}</span></p>
-                          )}
+                          <p className="text-xs leading-5"><span className="font-medium text-gray-700">核查说明：</span><span className="text-gray-600">{c.checkNote}</span></p>
                         </div>
                       </div>
                     ))
