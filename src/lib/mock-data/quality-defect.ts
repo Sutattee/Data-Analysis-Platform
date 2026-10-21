@@ -984,19 +984,20 @@ export function heatmapOf(records: DefectRecord[], dim: HeatDim): HeatmapData {
 
 // 诊断域（缺陷诊断页 / 诊断记录页 / 诊断抽屉）围绕 3 个重点缺陷组织，
 // 与缺陷分析页的全量缺陷档案（DEFECT_CATALOG）分属不同口径。
+// 质量类别与缺陷预测页口径对齐：成品水分 A类 / 烟支刺破 C/D类 / 箱储 B类
 export const DIAG_CATALOG: DefectCatalogItem[] = [
   {
-    code: "CPSFBH", name: "成品水分不合格", part: "成品", grade: "B",
+    code: "CPSFBH", name: "成品水分不合格", part: "成品", grade: "A",
     process: "烘丝", post: "烘丝机组操作",
     aiCause: "烘丝出口水分设定偏差 / 排潮风门开度不当",
   },
   {
-    code: "YZCB", name: "烟支刺破", part: "烟支", grade: "C",
+    code: "YZCB", name: "烟支刺破", part: "烟支", grade: "C/D",
     process: "卷制", post: "卷接机组操作",
     aiCause: "烟支通道导板毛刺 / 烙铁边角刮伤",
   },
   {
-    code: "XCCG", name: "箱储存储时间超上限", part: "箱储", grade: "A",
+    code: "XCCG", name: "箱储存储时间超上限", part: "箱储", grade: "B",
     process: "仓储", post: "库房管理",
     aiCause: "先进先出执行不到位 / 库房周转调度滞后",
   },
@@ -1176,6 +1177,35 @@ export function upsertDiagnosisCause(code: string, causeText: string, ctx: { use
     post: c.post,
     aiCause: c.aiCause,
     recordDate: ANCHOR,
+    causeText,
+    diagnoser: ctx.user,
+    diagnosedAt: ctx.now,
+  };
+  diagnoses = [created, ...diagnoses];
+  return created;
+}
+
+// 按 缺陷代码 + 登记日期 精确保存原因（缺陷诊断任务流桥接）：
+// 同代码同日的诊断项则原位更新，否则按登记日期新建（区别于按代码 upsert）。
+export function saveDiagnosisCauseByCodeDate(
+  code: string,
+  recordDate: string,
+  causeText: string,
+  ctx: { user: string; now: string }
+): DiagnosisItem {
+  const hit = diagnoses.find((d) => d.code === code && d.recordDate === recordDate);
+  if (hit) return saveDiagnosisCauseById(hit.id, causeText, ctx);
+  const c = diagCatalogOf(code) ?? catalogOf(code);
+  if (!c) throw new Error("缺陷代码不存在");
+  diagSeq += 1;
+  const created: DiagnosisItem = {
+    id: `dg-${String(diagSeq).padStart(3, "0")}`,
+    code,
+    process: c.process,
+    machine: "-",
+    post: c.post,
+    aiCause: c.aiCause,
+    recordDate,
     causeText,
     diagnoser: ctx.user,
     diagnosedAt: ctx.now,

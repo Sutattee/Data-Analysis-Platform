@@ -7,6 +7,7 @@ interface PaginationProps {
   pageSizeOptions?: number[];
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
+  showRange?: boolean; // 是否展示当前页条目区间（如 1-7）；默认展示
 }
 
 /**
@@ -19,6 +20,7 @@ export function Pagination({
   pageSizeOptions = [10, 20, 50],
   onPageChange,
   onPageSizeChange,
+  showRange = true,
 }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -65,7 +67,7 @@ export function Pagination({
             </select>
           </span>
         )}
-        {total > 0 && (
+        {showRange && total > 0 && (
           <span className="text-xs text-gray-400">
             {from}-{to}
           </span>
