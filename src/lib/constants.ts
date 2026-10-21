@@ -56,7 +56,6 @@ export const PRIMARY_NAV: NavItem[] = [
       { label: "稳定性预测", href: "/quality/forecast/stability", icon: "📉" },
       { label: "缺陷预测",   href: "/quality/forecast/defect",    icon: "🔮" },
     ]},
-    { label: "工艺参数推荐", href: "/quality/parameter-recommend", icon: "🎚️" },
     { label: "告警中心", href: "/quality/alert", icon: "⚠️", children: [
       { label: "告警记录", href: "/quality/alert/records",    icon: "📋" },
       { label: "告警管理", href: "/quality/alert/management", icon: "🛠️" },
@@ -65,6 +64,7 @@ export const PRIMARY_NAV: NavItem[] = [
       { label: "缺陷诊断",   href: "/quality/diagnosis/defect",   icon: "🔍" },
       { label: "诊断记录",   href: "/quality/diagnosis/records",   icon: "📋" },
     ]},
+    { label: "工艺参数推荐", href: "/quality/parameter-recommend", icon: "🎚️" },
     { label: "智能问数", href: "/quality/qa", icon: "💬" },
   ], matchPrefixes: ["/quality"] },
   {
