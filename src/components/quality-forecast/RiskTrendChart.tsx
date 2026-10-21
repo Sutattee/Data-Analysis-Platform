@@ -110,42 +110,60 @@ export function RiskTrendChart({
     return <div className="flex h-64 items-center justify-center text-sm text-gray-400">数据不足，暂无预测曲线</div>;
   }
 
-  // 窗口最高风险点：红点重点标记，点击 → 异常详情抽屉（预测风险）；基准点：已达中风险阈值时
-  // 橙点强调可点击（当前异常），未达阈值保持白心蓝边不可点；其余数据点不渲染（保持曲线简洁）
+  // 标记点判定：窗口最高风险点恒可点击（红点，预测风险）；基准点已达中风险阈值时可点击
+  // （橙点，当前异常），未达阈值仅白心蓝边强调不可点
+  const markOf = (t?: string): { point: TrendPoint; kind: "peak" | "base" } | undefined => {
+    if (!t) return undefined;
+    const pt = f.future.find((x) => x.t === t);
+    if (peakLabel && t === peakLabel && pt) return { point: pt, kind: "peak" };
+    if (t === baseLabel) {
+      const base = pt ?? f.hist[f.hist.length - 1];
+      if (base && base.score >= MID_THRESHOLD) return { point: base, kind: "base" };
+    }
+    return undefined;
+  };
+
+  // 数据点：可点击标记点着色强调，基准点未达阈值白心蓝边，其余不渲染（保持曲线简洁）
   const futureDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
-    const pt = payload ? f.future.find((x) => x.t === payload.t) : undefined;
-    if (peakLabel && payload?.t === peakLabel && pt)
+    const m = markOf(payload?.t);
+    if (m)
       return (
         <circle
           cx={cx}
           cy={cy}
-          r={5}
-          fill="#ef4444"
+          r={m.kind === "peak" ? 5 : 4.5}
+          fill={m.kind === "peak" ? "#ef4444" : "#f97316"}
           stroke="#fff"
           strokeWidth={2}
           style={{ cursor: "pointer" }}
-          onClick={() => onPointClick?.(pt, "peak")}
+          onClick={() => onPointClick?.(m.point, m.kind)}
         />
       );
-    if (payload?.t === baseLabel) {
-      const base = pt ?? f.hist[f.hist.length - 1];
-      if (base && base.score >= MID_THRESHOLD)
-        return (
-          <circle
-            cx={cx}
-            cy={cy}
-            r={4.5}
-            fill="#f97316"
-            stroke="#fff"
-            strokeWidth={2}
-            style={{ cursor: "pointer" }}
-            onClick={() => onPointClick?.(base, "base")}
-          />
-        );
+    if (payload?.t === baseLabel)
       return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
-    }
     return null;
+  };
+
+  // hover 光晕：标记点携带点击（默认 activeDot 渲染在上层会拦截热区点击，参考稳定性预测趋势图）
+  const activeDot = (props: DotProps) => {
+    const { cx, cy, payload } = props;
+    const m = markOf(payload?.t);
+    if (m && Number.isFinite(cx) && Number.isFinite(cy))
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={7}
+          fill={m.kind === "peak" ? "#ef4444" : "#f97316"}
+          fillOpacity={0.3}
+          stroke={m.kind === "peak" ? "#ef4444" : "#f97316"}
+          strokeWidth={1.5}
+          style={{ cursor: "pointer" }}
+          onClick={() => onPointClick?.(m.point, m.kind)}
+        />
+      );
+    return <circle cx={cx} cy={cy} r={4.5} fill="#2563eb" fillOpacity={0.3} />;
   };
 
   return (
@@ -203,7 +221,7 @@ export function RiskTrendChart({
           strokeWidth={2}
           strokeDasharray="6 4"
           dot={futureDot}
-          activeDot={{ r: 4 }}
+          activeDot={activeDot}
           connectNulls={false}
         />
       </ComposedChart>
