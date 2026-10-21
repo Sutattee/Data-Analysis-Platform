@@ -4,7 +4,12 @@ import { useState } from "react";
 import {
   EFFICIENCY_CARDS,
   EQUIPMENT_UNITS,
+  PACK_MACHINES,
+  ROLL_MACHINES,
   hourlyCardOf,
+  netCardOf,
+  packCardOf,
+  rollCardOf,
   type EfficiencyCard,
 } from "@/lib/mock-data/equipment-efficiency";
 
@@ -32,16 +37,56 @@ function CompareLine({ label, base, card }: { label: string; base: number; card:
   );
 }
 
+// 卡片右上角单机筛选下拉（机组 / 包装机 / 卷接机共用样式）
+function MachineSelect({
+  value,
+  onChange,
+  options,
+  title,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  title: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      title={title}
+      className="max-w-[92px] shrink-0 truncate rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600 outline-none focus:ring-1 focus:ring-primary-400"
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // 顶部 4 张指标卡：白底，当前值突出显示，昨日口径（效率类 ↓ 橙 / ↑ 绿）
-// 台时产量卡支持机组下拉筛选（默认 1#卷接包装机组），切换后展示该机组实际值 / 目标值 / 历史均值
+// 台时产量卡支持机组筛选（默认 1#卷接包装机组）；包装 / 卷接 / 净效率卡支持单机筛选
+// （默认 1#包装机 / ZJ17-01），净效率选项为包装机 + 卷接机分组；切换后展示该机台实际值 / 历史均值 / 同比环比
 export function EquipmentMetricCards() {
   const [unit, setUnit] = useState(EQUIPMENT_UNITS[0]);
+  const [packM, setPackM] = useState(PACK_MACHINES[0]);
+  const [rollM, setRollM] = useState(ROLL_MACHINES[0]);
+  const [netM, setNetM] = useState(PACK_MACHINES[0]);
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
       {EFFICIENCY_CARDS.map((raw) => {
         const c: EfficiencyCard =
-          raw.key === "hourly" ? { ...raw, ...hourlyCardOf(unit) } : raw;
+          raw.key === "hourly"
+            ? { ...raw, ...hourlyCardOf(unit) }
+            : raw.key === "pack"
+              ? { ...raw, ...packCardOf(packM) }
+              : raw.key === "roll"
+                ? { ...raw, ...rollCardOf(rollM) }
+                : raw.key === "net"
+                  ? { ...raw, ...netCardOf(netM) }
+                  : raw;
         return (
           <div
             key={c.key}
@@ -50,17 +95,31 @@ export function EquipmentMetricCards() {
             <div className="mb-1 flex items-center justify-between gap-1">
               <span className="truncate text-xs text-gray-500">{c.label}</span>
               {raw.key === "hourly" && (
+                <MachineSelect value={unit} onChange={setUnit} options={EQUIPMENT_UNITS} title="选择机组" />
+              )}
+              {raw.key === "pack" && (
+                <MachineSelect value={packM} onChange={setPackM} options={PACK_MACHINES} title="选择包装机" />
+              )}
+              {raw.key === "roll" && (
+                <MachineSelect value={rollM} onChange={setRollM} options={ROLL_MACHINES} title="选择卷接机" />
+              )}
+              {raw.key === "net" && (
                 <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  title="选择机组"
+                  value={netM}
+                  onChange={(e) => setNetM(e.target.value)}
+                  title="选择包装机 / 卷接机"
                   className="max-w-[92px] shrink-0 truncate rounded-md border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600 outline-none focus:ring-1 focus:ring-primary-400"
                 >
-                  {EQUIPMENT_UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
+                  <optgroup label="包装机">
+                    {PACK_MACHINES.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="卷接机">
+                    {ROLL_MACHINES.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </optgroup>
                 </select>
               )}
             </div>

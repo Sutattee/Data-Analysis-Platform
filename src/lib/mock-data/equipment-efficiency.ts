@@ -60,6 +60,46 @@ export const EFFICIENCY_CARDS: EfficiencyCard[] = [
   },
 ];
 
+// ===== 包装机 / 卷接机（指标卡单机下钻口径）=====
+// 卷接包装机组由卷接机（ZJ17/ZJ19 型）与包装机（编号）配组构成；效率卡支持按单机筛选
+export const PACK_MACHINES = Array.from({ length: 8 }, (_, i) => `${i + 1}#包装机`);
+export const ROLL_MACHINES = [
+  "ZJ17-01", "ZJ17-02", "ZJ17-03", "ZJ17-04",
+  "ZJ19-01", "ZJ19-02", "ZJ19-03", "ZJ19-04",
+];
+
+// 净效率卡筛选选项：包装机 + 卷接机合并（下拉分组展示）
+export const NET_MACHINES = [...PACK_MACHINES, ...ROLL_MACHINES];
+
+// 包装 / 卷接 / 净效率卡（昨日口径，按单机下钻）：围绕全厂基准确定性偏移
+export interface MachineEffCard {
+  value: number;
+  avg: number;
+  yoy: number;
+  mom: number;
+}
+function machineEffCard(baseKey: "pack" | "roll" | "net", machine: string): MachineEffCard {
+  const list = baseKey === "net" ? NET_MACHINES : baseKey === "pack" ? PACK_MACHINES : ROLL_MACHINES;
+  const base = EFFICIENCY_CARDS.find((c) => c.key === baseKey)!;
+  const i = Math.max(0, list.indexOf(machine));
+  const off = ((i * 13) % 9) - 4; // -4 ~ 4 确定性偏移
+  return {
+    value: round(base.value + off * 0.35, 1),
+    avg: round(base.avg! + off * 0.2, 1),
+    yoy: parseFloat((base.yoy + ((i % 5) - 2) * 0.6).toFixed(1)),
+    mom: parseFloat((base.mom + ((i % 3) - 1) * 0.4).toFixed(1)),
+  };
+}
+export function packCardOf(machine: string): MachineEffCard {
+  return machineEffCard("pack", machine);
+}
+export function rollCardOf(machine: string): MachineEffCard {
+  return machineEffCard("roll", machine);
+}
+export function netCardOf(machine: string): MachineEffCard {
+  return machineEffCard("net", machine);
+}
+
 // ===== 台时产量日度序列（16 机组）=====
 // 与单耗类相反：实际值低于目标值（欠产）时标记异常
 export const HOURLY_TARGET = 1100; // 台时产量目标（箱/台，各机组一致）
