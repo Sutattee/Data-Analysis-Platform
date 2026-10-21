@@ -3,7 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { diagCatalogOf } from "@/lib/mock-data/quality-defect";
 import {
@@ -29,7 +28,6 @@ export function DiagnosisDetailView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { state } = useApp();
-  const toast = useToast();
 
   useSyncExternalStore(subscribeDiag, getDiagVersion);
 
@@ -44,7 +42,6 @@ export function DiagnosisDetailView() {
     if (searchParams.get("start") === "1") {
       if (task.status === "未诊断" && canOperate) {
         startDiagnosis(task.id);
-        toast("已启动智能诊断", "success");
       }
       router.replace(`/quality/diagnosis/defect/${task.id}?tab=ai`);
     }
@@ -75,7 +72,6 @@ export function DiagnosisDetailView() {
 
   function handleStart() {
     startDiagnosis(task!.id);
-    toast(task!.aiVersions.length > 0 ? "已重新启动智能诊断" : "已启动智能诊断", "success");
   }
 
   return (

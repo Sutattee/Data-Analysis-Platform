@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import {
@@ -19,7 +18,7 @@ function formatNow(): string {
 }
 
 // 人工判定工作区：单选「原因已确定 / 暂未查明」（首次不默认）；
-// 切换保留草稿；采纳智能诊断原因一键填入（已有内容时追加或替换）；确认后产生判定版本并可入库
+// 切换保留草稿；采纳智能诊断结论一键填入（已有内容时直接在末尾追加，无弹窗）；确认后产生判定版本并可入库
 export function HumanJudgmentWorkspace({
   task,
   canOperate,
@@ -36,8 +35,6 @@ export function HumanJudgmentWorkspace({
   const [finalCause, setFinalCause] = useState(task.draft?.finalCause ?? "");
   const [checkNote, setCheckNote] = useState(task.draft?.checkNote ?? "");
   const [addToKb, setAddToKb] = useState(task.draft?.addToKb ?? false);
-  const [adoptOpen, setAdoptOpen] = useState(false);
-  const [adoptPending, setAdoptPending] = useState("");
   const [revising, setRevising] = useState(false);
 
   const last = task.judgments[task.judgments.length - 1];
@@ -58,13 +55,8 @@ export function HumanJudgmentWorkspace({
       toast("暂无可采纳的 AI 候选原因（未诊断或依据不足）", "warning");
       return;
     }
-    if (finalCause.trim()) {
-      setAdoptPending(text);
-      setAdoptOpen(true);
-      return;
-    }
-    setFinalCause(text);
-    toast("已采纳智能诊断原因", "success");
+    // 已有内容时直接在末尾追加，不弹窗
+    setFinalCause((prev) => (prev.trim() ? `${prev}\n${text}` : text));
   }
 
   function handleConfirm() {
@@ -258,38 +250,6 @@ export function HumanJudgmentWorkspace({
         <Button variant="secondary" onClick={onBackToAi}>上一步</Button>
         <Button disabled={disabled || !conclusion} onClick={handleConfirm}>确认判定</Button>
       </div>
-
-      {/* 采纳 AI 原因：已有内容时选择追加或替换 */}
-      <Modal open={adoptOpen} onClose={() => setAdoptOpen(false)} title="采纳智能诊断原因">
-        <p className="text-sm leading-6 text-gray-600">
-          输入框已有内容，选择<b className="text-gray-800">追加</b>将保留原文并在末尾续写 AI 建议原因；选择<b className="text-gray-800">替换</b>将以 AI 建议原因覆盖原文。
-        </p>
-        <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-xs leading-5 text-gray-500">
-          {adoptPending}
-        </pre>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setAdoptOpen(false)}>取消</Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setFinalCause((prev) => `${prev}\n${adoptPending}`.trim());
-              setAdoptOpen(false);
-              toast("已追加智能诊断原因", "success");
-            }}
-          >
-            追加
-          </Button>
-          <Button
-            onClick={() => {
-              setFinalCause(adoptPending);
-              setAdoptOpen(false);
-              toast("已替换为智能诊断原因", "success");
-            }}
-          >
-            替换
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }
