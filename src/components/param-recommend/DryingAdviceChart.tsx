@@ -111,13 +111,14 @@ export function DryingAdviceChart({
                         <p className="font-medium text-gray-800">
                           {row.next !== null ? "下一批次（待生产）" : `批次：${b.batch}`}
                         </p>
-                        <p className="mt-0.5 text-gray-500">
-                          {b.brand} · {b.startAt ?? `${b.planStart}（计划）`}
-                        </p>
                         {row.next !== null ? (
                           <p className="mt-0.5 font-medium text-primary-600">推荐值：{fmt2(row.next)}%</p>
                         ) : (
                           <>
+                            <p className="mt-0.5 text-gray-600">牌号：{b.brand}</p>
+                            <p className="mt-0.5 text-gray-600">
+                              生产时间：{b.startAt ?? `${b.planStart}（计划）`}
+                            </p>
                             <p className="mt-0.5 text-gray-600">
                               实际值：{b.dryingActual !== null ? `${fmt2(b.dryingActual)}%` : "待回传"}
                             </p>
@@ -130,9 +131,7 @@ export function DryingAdviceChart({
                             <p className="mt-0.5 text-gray-600">
                               绝对差：{diff !== null ? `${diff.toFixed(2)} pct` : "—"}
                             </p>
-                            {b.adviceGeneratedAt && (
-                              <p className="mt-0.5 text-gray-500">推荐生成时间：{b.adviceGeneratedAt}</p>
-                            )}
+                            <p className="mt-0.5 text-gray-600">推荐生成时间：{b.adviceGeneratedAt ?? "—"}</p>
                           </>
                         )}
                       </div>
@@ -232,7 +231,7 @@ export function DryingAdviceChart({
             </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5" style={{ backgroundColor: GREEN }} />
-              建议值（锁定版本）
+              建议值
             </span>
             {includeNext && (
               <>

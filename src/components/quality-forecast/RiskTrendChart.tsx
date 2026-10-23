@@ -24,8 +24,8 @@ import {
 // 风险预测趋势：横轴按实际日期时间的小时制刻度（本窗口不跨日；跨日时需在刻度补日期），
 // 纵轴 0—100 固定 + 中/高风险阈值参考线；历史实线 + 预测虚线（首点 = 基准点衔接），
 // 曲线不带常规数据点（仅峰值红点与基准点强调），基准时刻竖向参考线（标签置于区内顶部避免裁剪），
-// 预测区浅蓝底，窗口最高风险点红点重点标记；标记点可点击滑出异常详情抽屉（峰值点恒可点，
-// 基准点已达中风险阈值才可点）；数据不足时不编造曲线，直接展示空态。
+// 预测区浅蓝底，窗口最高风险点红点重点标记（纯视觉强调，无点击交互）；
+// 数据不足时不编造曲线，直接展示空态。
 
 interface Row {
   t: string;
@@ -57,7 +57,6 @@ function TrendTooltip({ active, payload, forecast }: { active?: boolean; payload
     ["牌号", forecast.context.brand],
     ["班次", forecast.context.shift],
     ["班组", forecast.context.shiftGroup],
-    ["业务预测值", row.biz ? `${row.biz}${row.planned ? "（计划）" : ""}` : "—"],
   ];
   return (
     <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-lg">
@@ -71,14 +70,7 @@ function TrendTooltip({ active, payload, forecast }: { active?: boolean; payload
   );
 }
 
-export function RiskTrendChart({
-  forecast: f,
-  onPointClick,
-}: {
-  forecast: DefectForecast;
-  // 标记点点击：peak = 窗口最高风险点；base = 已达中风险阈值的基准点
-  onPointClick?: (point: TrendPoint, kind: "peak" | "base") => void;
-}) {
+export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
   const { data, baseLabel, endLabel, peakLabel } = useMemo(() => {
     // 历史与预测共用同一横轴：基准点（14:00）同时出现在两条曲线上保证衔接（数组去重，避免 Set 迭代受 target 限制）
     const labels: string[] = [];
@@ -110,8 +102,7 @@ export function RiskTrendChart({
     return <div className="flex h-64 items-center justify-center text-sm text-gray-400">数据不足，暂无预测曲线</div>;
   }
 
-  // 标记点判定：窗口最高风险点恒可点击（红点，预测风险）；基准点已达中风险阈值时可点击
-  // （橙点，当前异常），未达阈值仅白心蓝边强调不可点
+  // 标记点判定：窗口最高风险点（红点强调）；基准点已达中风险阈值橙点，未达阈值白心蓝边
   const markOf = (t?: string): { point: TrendPoint; kind: "peak" | "base" } | undefined => {
     if (!t) return undefined;
     const pt = f.future.find((x) => x.t === t);
@@ -123,7 +114,7 @@ export function RiskTrendChart({
     return undefined;
   };
 
-  // 数据点：可点击标记点着色强调，基准点未达阈值白心蓝边，其余不渲染（保持曲线简洁）
+  // 数据点：标记点着色强调，其余不渲染（保持曲线简洁；纯视觉，无点击交互）
   const futureDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
     const m = markOf(payload?.t);
@@ -136,8 +127,6 @@ export function RiskTrendChart({
           fill={m.kind === "peak" ? "#ef4444" : "#f97316"}
           stroke="#fff"
           strokeWidth={2}
-          style={{ cursor: "pointer" }}
-          onClick={() => onPointClick?.(m.point, m.kind)}
         />
       );
     if (payload?.t === baseLabel)
@@ -145,25 +134,12 @@ export function RiskTrendChart({
     return null;
   };
 
-  // hover 光晕：标记点携带点击（默认 activeDot 渲染在上层会拦截热区点击，参考稳定性预测趋势图）
+  // hover 光晕：峰值红 / 基准橙 / 其余蓝（纯提示，无点击交互）
   const activeDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
     const m = markOf(payload?.t);
-    if (m && Number.isFinite(cx) && Number.isFinite(cy))
-      return (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={7}
-          fill={m.kind === "peak" ? "#ef4444" : "#f97316"}
-          fillOpacity={0.3}
-          stroke={m.kind === "peak" ? "#ef4444" : "#f97316"}
-          strokeWidth={1.5}
-          style={{ cursor: "pointer" }}
-          onClick={() => onPointClick?.(m.point, m.kind)}
-        />
-      );
-    return <circle cx={cx} cy={cy} r={4.5} fill="#2563eb" fillOpacity={0.3} />;
+    const color = m ? (m.kind === "peak" ? "#ef4444" : "#f97316") : "#2563eb";
+    return <circle cx={cx} cy={cy} r={7} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={1.5} />;
   };
 
   return (

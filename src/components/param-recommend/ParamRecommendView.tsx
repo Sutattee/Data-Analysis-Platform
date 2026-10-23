@@ -1,13 +1,12 @@
 "use client";
 
 // 工艺参数推荐主视图：以加香出口水分达标为目标，结合牌号 / 产线 / 近 N 批历史自动推荐下一批次烘丝出口水分。
-// 自上而下：筛选栏（产线 Tab + 牌号 + 历史范围）→ 下一批次推荐卡 → 左右双图（实际与建议 / 达标情况）→ 推荐记录折叠区。
-// 产线 / 牌号变化 → 推荐卡短暂「更新中」（输入变化自动重算）；推荐依据与批次详情共用抽屉。
+// 自上而下：筛选栏（产线 Tab + 牌号，历史范围固定近 10 批）→ 下一批次推荐卡 → 左右双图（实际与建议 / 达标情况）→ 推荐记录折叠区。
+// 产线 / 牌号变化 → 推荐卡短暂降透明度（输入变化自动重算）；推荐依据与批次详情共用抽屉。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import {
-  DATA_AS_OF,
   LINES,
   lineOf,
   nextRecommendationOf,
@@ -19,12 +18,9 @@ import { FlavorComplianceChart } from "./FlavorComplianceChart";
 import { RecommendRecords } from "./RecommendRecords";
 import { RecommendDrawer } from "./RecommendDrawer";
 
-const RANGE_OPTIONS = [10, 20, 30];
-
 export function ParamRecommendView() {
   const [lineName, setLineName] = useState("产线A");
   const [brand, setBrand] = useState("娇子");
-  const [range, setRange] = useState(10);
   const [updating, setUpdating] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState<BatchRecord | "next" | null>(null);
 
@@ -55,10 +51,6 @@ export function ParamRecommendView() {
       {/* 标题 */}
       <div>
         <h1 className="text-xl font-bold text-gray-900">工艺参数推荐</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          以加香出口水分达标为目标，结合同产线同牌号近10个有效历史批次推算叶丝柜入口水分，自动生成下一批次烘丝出口水分推荐值 ·
-          数据截至 {DATA_AS_OF}
-        </p>
       </div>
 
       {/* 筛选栏：产线 Tab + 牌号 + 历史范围 */}
@@ -91,43 +83,26 @@ export function ParamRecommendView() {
             <p className="mb-1.5 text-xs text-gray-500">牌号</p>
             <SearchSelect options={brandOptions} value={brand} onChange={setBrand} placeholder="选择牌号" />
           </div>
+          {/* 历史范围：仅支持最近 10 个批次（固定展示，不可选择） */}
           <div>
             <p className="mb-1.5 text-xs text-gray-500">历史范围</p>
-            <select
-              value={range}
-              onChange={(e) => setRange(Number(e.target.value))}
-              aria-label="历史范围"
-              className="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-gray-700 outline-none transition-colors focus:border-transparent focus:ring-2 focus:ring-primary-500"
-            >
-              {RANGE_OPTIONS.map((n) => (
-                <option key={n} value={n}>
-                  近 {n} 批
-                </option>
-              ))}
-            </select>
+            <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">近 10 批</p>
           </div>
-          <p className="ml-auto text-xs text-gray-400">
-            工艺链路：叶丝柜 → {line.dryer} → {line.flavorer}
-          </p>
         </div>
       </Card>
 
       {/* 下一批次推荐 */}
-      <RecommendCard
-        rec={rec}
-        updating={updating}
-        brand={brand}
-        onShowBasis={() => setDrawerTarget("next")}
-      />
+      <RecommendCard rec={rec} updating={updating} onShowBasis={() => setDrawerTarget("next")} />
 
       {/* 左右双图：窄屏上下排列 */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <DryingAdviceChart line={lineName} brand={brand} range={range} rec={rec} onRecordClick={setDrawerTarget} />
-        <FlavorComplianceChart line={lineName} brand={brand} range={range} onRecordClick={setDrawerTarget} />
+        <DryingAdviceChart line={lineName} brand={brand} range={10} rec={rec} onRecordClick={setDrawerTarget} />
+        <FlavorComplianceChart line={lineName} brand={brand} range={10} onRecordClick={setDrawerTarget} />
       </div>
 
-      {/* 推荐记录（默认收起） */}
+      {/* 推荐记录：暂时隐藏不展示（组件代码保留，需要时恢复渲染）
       <RecommendRecords line={lineName} brand={brand} rec={rec} onDetail={setDrawerTarget} />
+      */}
 
       {/* 推荐依据 / 批次详情抽屉 */}
       <RecommendDrawer target={drawerTarget} rec={rec} onClose={() => setDrawerTarget(null)} />

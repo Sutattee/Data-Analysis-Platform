@@ -3,7 +3,7 @@
 // 右图 · 加香出口水分：达标情况（与左图同一组历史批次，不含未来点）
 // 蓝实线=实际值，超限点橙红并标注状态文字；橙虚线=目标线（dataKey 分段，标准换版处自然断开）；
 // 浅绿 ReferenceArea=按连续同标准版本分段的合格区间；按生产时有效标准判定达标。
-// 图上摘要：达标 X/Y 批 · 达标率 Z% · 待回传 M 批（Y=已有有效实际值且标准明确的批次，Y=0 不算率）。
+// 图上摘要：达标 X/Y 批 · 达标率 Z%（Y=已有有效实际值且标准明确的批次，Y=0 不算率）。
 import {
   CartesianGrid,
   Line,
@@ -83,7 +83,7 @@ export function FlavorComplianceChart({
   }
   if (cur) segments.push(cur);
 
-  // 摘要：Y = 已有有效实际值且标准明确（待核对不计入），X = 其中达标，M = 待回传
+  // 摘要：Y = 已有有效实际值且标准明确（待核对不计入），X = 其中达标
   const judged = rows.filter((r) => {
     const std = stdOf(r.record.brand, (r.record.startAt ?? r.record.planStart).slice(0, 10));
     return r.flavor !== null && std !== undefined && r.record.flavorLink === "已确认";
@@ -91,11 +91,6 @@ export function FlavorComplianceChart({
   const passCount = judged.filter((r) => {
     const std = stdOf(r.record.brand, (r.record.startAt ?? r.record.planStart).slice(0, 10))!;
     return r.flavor! >= std.low && r.flavor! <= std.high;
-  }).length;
-  const pendingCount = rows.filter((r) => r.flavor === null).length;
-  const missingStdCount = rows.filter((r) => {
-    const std = stdOf(r.record.brand, (r.record.startAt ?? r.record.planStart).slice(0, 10));
-    return std === undefined;
   }).length;
   const rateText = judged.length > 0 ? `达标率 ${Math.round((passCount / judged.length) * 100)}%` : "达标率 —";
 
@@ -118,13 +113,7 @@ export function FlavorComplianceChart({
       ) : (
         <>
           <p className="mb-1 text-xs text-gray-500">
-            达标 <span className="font-medium text-gray-800">{passCount}/{judged.length}</span> 批 · {rateText} · 待回传{" "}
-            <span className="font-medium text-gray-800">{pendingCount}</span> 批
-            {missingStdCount > 0 && (
-              <>
-                {" "}· 标准缺失 <span className="font-medium text-gray-800">{missingStdCount}</span> 批
-              </>
-            )}
+            达标 <span className="font-medium text-gray-800">{passCount}/{judged.length}</span> 批 · {rateText}
           </p>
           <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -155,19 +144,17 @@ export function FlavorComplianceChart({
                     return (
                       <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs shadow-md">
                         <p className="font-medium text-gray-800">批次：{b.batch}</p>
-                        <p className="mt-0.5 text-gray-500">
-                          {b.brand} · {b.startAt ?? `${b.planStart}（计划）`}
+                        <p className="mt-0.5 text-gray-600">牌号：{b.brand}</p>
+                        <p className="mt-0.5 text-gray-600">
+                          生产时间：{b.startAt ?? `${b.planStart}（计划）`}
                         </p>
                         <p className="mt-0.5 text-gray-600">
                           实际值：{b.flavorActual !== null ? `${fmt2(b.flavorActual)}%` : "待回传"}
                         </p>
-                        {std ? (
-                          <p className="mt-0.5 text-gray-600">
-                            目标：{fmt2(std.goal)}% · 范围 {fmt2(std.low)}~{fmt2(std.high)}%（{std.ver}）
-                          </p>
-                        ) : (
-                          <p className="mt-0.5 text-gray-500">目标：标准缺失（早于标准生效日）</p>
-                        )}
+                        <p className="mt-0.5 text-gray-600">目标：{std ? `${fmt2(std.goal)}%` : "—"}</p>
+                        <p className="mt-0.5 text-gray-600">
+                          合格范围：{std ? `${fmt2(std.low)}%～${fmt2(std.high)}%` : "—"}
+                        </p>
                         <p
                           className={`mt-0.5 font-medium ${
                             result === "未达标" ? "text-red-600" : result === "达标" ? "text-green-600" : "text-gray-500"
@@ -257,7 +244,7 @@ export function FlavorComplianceChart({
             </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5 border-t-2 border-dashed" style={{ borderTopColor: TARGET }} />
-              目标线（分段）
+              目标值
             </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-5 rounded-sm" style={{ backgroundColor: "rgba(22,163,74,0.15)" }} />
@@ -268,9 +255,6 @@ export function FlavorComplianceChart({
               未达标
             </span>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-400">
-            该图用于观察最终目标达标情况，达标率不等于「推荐有效率」。
-          </p>
         </>
       )}
     </Card>

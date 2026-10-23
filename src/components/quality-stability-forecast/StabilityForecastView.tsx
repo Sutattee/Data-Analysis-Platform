@@ -1,10 +1,15 @@
 "use client";
 
-// 稳定性预测主视图：对象信息（指标 + 机台，机台含「全部」综合曲线）→ 摘要（实际值/预测最高等级/等级变化预测/窗口/更新时间/置信度）
-// → 左列（预测趋势 + 来源工序参数）右列（AI 解读 + 风险来源 + 来源工序分布）；切换指标 / 机台后全量联动
-import { useState } from "react";
+// 稳定性预测主视图：对象信息（指标 + 机台，机台含「全部」综合曲线）→ 预测概况（左未来结论 / 右当前状态，
+// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数）右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
+// 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
+import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Drawer } from "@/components/ui/Drawer";
+import { StreamText } from "@/components/ui/StreamText";
+import { WarningIcon } from "@/components/ui/WarningIcon";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { SourceBreakdownChart } from "@/components/quality-forecast/RiskSourceCharts";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
@@ -34,6 +39,16 @@ import { StabilityContributionChart } from "./StabilityContributionChart";
 const selectCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
 
+// 当前等级标签配色（浅底 + 等级字色）：用于「当前等级」标签，与左侧未来预测等级大字区分
+const STATUS_TAG_CLS: Record<string, string> = {
+  提示: "bg-slate-100 text-slate-600",
+  关注: "bg-yellow-50 text-yellow-600",
+  预警: "bg-orange-50 text-orange-600",
+  告警: "bg-red-50 text-red-600",
+  危险: "bg-red-100 text-red-700",
+  正常: "bg-green-50 text-green-600",
+};
+
 // 摘要单项
 function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -42,6 +57,17 @@ function SummaryItem({ label, children }: { label: string; children: React.React
       <div className="text-sm font-medium text-gray-800">{children}</div>
     </div>
   );
+}
+
+// 延迟挂载：到时才渲染子节点（智能解读流式编排用；图表卡片延迟出现，挂载时播放自带入场生长动画）
+function Delayed({ delay, children }: { delay: number; children: ReactNode }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShow(true), delay);
+    return () => clearTimeout(t);
+  }, [delay]);
+  if (!show) return null;
+  return <>{children}</>;
 }
 
 export function StabilityForecastView() {
@@ -61,16 +87,21 @@ export function StabilityForecastView() {
   const [machine, setMachine] = useState(initial.machine);
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
+  // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 来源工序参数），点击按钮后流式生成
+  const [interpreting, setInterpreting] = useState(false);
+  // 预测详情抽屉：收纳辅助字段（指标名称 / 等级变化 / 管控值 / 置信度 / 更新时间等），默认不展开
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const metric = metricOf(code)!;
   const machineText = machine === "全部" ? "全部机台" : machine;
   const forecast = machine === "全部" ? combinedForecastOf(code) : stabilityForecastOf(code, machine);
   const machines = metricMachinesOf(code);
 
-  // 切换指标：机台重置为「全部」，全量联动
+  // 切换指标：机台重置为「全部」，全量联动；解读区收起回到按钮态
   function changeCode(v: string) {
     setCode(v);
     setMachine("全部");
+    setInterpreting(false);
   }
 
   // 升级点/告警基准点点击 → 告警记录匹配（指标 + 机台 + 等级，逐级放宽），再按点位数值覆写展示字段后
@@ -196,7 +227,7 @@ export function StabilityForecastView() {
           <Card>
             <div className="mb-2.5 flex items-center gap-1.5">
               <span>🤖</span>
-              <h3 className="text-sm font-semibold text-gray-800">AI 风险解读</h3>
+              <h3 className="text-sm font-semibold text-gray-800">智能风险解读</h3>
             </div>
             <p className="text-xs leading-relaxed text-gray-600">{failed ? "本轮预测失败，无法生成解读" : "数据不足，无法生成解读"}</p>
           </Card>
@@ -212,8 +243,35 @@ export function StabilityForecastView() {
   // 无规则时贡献与分布均进入空状态
   const breakdown = metric.rule ? sourceBreakdownOf(forecast) : [];
   const ai = aiInterpretation(forecast, code, machineText);
-  // 最新实测值配色：等级色 / 正常绿 / 无法判定灰
-  const valueCls = status === "—" ? "text-gray-400" : status === "正常" ? "text-green-600" : LEVEL_TEXT_CLS[status];
+  // 流式时序：解读各段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载来源参数 / 风险来源 / 来源分布
+  const sectionDelays: number[] = [];
+  ai.forEach((_, i) => {
+    sectionDelays.push(i === 0 ? 0 : sectionDelays[i - 1] + ai[i - 1].text.length * 8 + 200);
+  });
+  const aiDoneAt =
+    ai.length > 0 ? sectionDelays[ai.length - 1] + ai[ai.length - 1].text.length * 8 + 300 : 0;
+  // 当前等级配色：文字色（抽屉）/ 浅底标签色（主卡片）；— = 无法判定灰
+  const statusCls = status === "—" ? "text-gray-400" : status === "正常" ? "text-green-600" : LEVEL_TEXT_CLS[status];
+  const statusTagCls = status === "—" ? "bg-gray-100 text-gray-400" : STATUS_TAG_CLS[status];
+  // 等级变化文案配色：升级按目标等级 / 同级持续按当前等级 / 降级为好转（绿）/ 其余深灰
+  const changeCls =
+    change.kind === "upgrade" && change.toLevel !== undefined
+      ? LEVEL_TEXT_CLS[change.toLevel]
+      : change.kind === "hold" && status !== "—" && status !== "正常"
+        ? LEVEL_TEXT_CLS[status]
+        : change.kind === "degrade"
+          ? "text-green-600"
+          : "text-gray-800";
+  // 管控值文案（最轻级边界，与趋势图管控值线同口径）：区间 → 下限～上限；单边 → ≤/≥ 阈值（op ">=" 为超上限触发 → ≤）
+  const rule = metric.rule;
+  const lightest = rule?.levels[rule.levels.length - 1];
+  const controlText = !rule
+    ? "—"
+    : rule.op === "between" && lightest?.low !== undefined && lightest?.high !== undefined
+      ? `${lightest.low.toFixed(metric.decimals)}${metric.unit}～${lightest.high.toFixed(metric.decimals)}${metric.unit}`
+      : rule.op !== "between" && lightest?.threshold !== undefined
+        ? `${rule.op === ">=" ? "≤" : "≥"}${lightest.threshold.toFixed(metric.decimals)}${metric.unit}`
+        : "—";
 
   return (
     <div className="space-y-4">
@@ -233,7 +291,14 @@ export function StabilityForecastView() {
           </label>
           <label className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">机台</span>
-            <select className={selectCls} value={machine} onChange={(e) => setMachine(e.target.value)}>
+            <select
+              className={selectCls}
+              value={machine}
+              onChange={(e) => {
+                setMachine(e.target.value);
+                setInterpreting(false);
+              }}
+            >
               <option value="全部">全部</option>
               {machines.map((m) => (
                 <option key={m.machine} value={m.machine}>
@@ -245,46 +310,56 @@ export function StabilityForecastView() {
         </div>
       </Card>
 
-      {/* 预测摘要：最新实际值 / 预测最高等级 / 等级变化预测 / 预测窗口 / 更新时间 / 置信度 */}
-      <Card>
-        <div className="grid grid-cols-3 gap-4 md:grid-cols-6">
-          <SummaryItem label="最新实际值">
-            <span className={`text-2xl font-bold ${valueCls}`}>
-              {forecast.base.toFixed(metric.decimals)}
-              {metric.unit}
-            </span>
-            <span className={`ml-1 text-sm font-medium ${valueCls}`}>｜{status}</span>
-          </SummaryItem>
-          <SummaryItem label="预测最高等级">
-            {!metric.rule ? (
-              <span className="text-gray-400">未配置等级规则</span>
-            ) : maxLv === null ? (
-              <span className="text-green-600">正常</span>
-            ) : (
-              <span className={LEVEL_TEXT_CLS[maxLv]}>{maxLv}</span>
-            )}
-          </SummaryItem>
-          <SummaryItem label="等级变化预测">
-            {/* 升级按目标等级着色 / 同级持续按当前等级着色 / 降级为好转（绿） / 其余灰 */}
-            <span
-              className={
-                change.kind === "upgrade" && change.toLevel !== undefined
-                  ? LEVEL_TEXT_CLS[change.toLevel]
-                  : change.kind === "hold" && status !== "—" && status !== "正常"
-                    ? LEVEL_TEXT_CLS[status]
-                    : change.kind === "degrade"
-                      ? "text-green-600"
-                      : "text-gray-800"
-              }
-            >
-              {change.text}
-            </span>
-          </SummaryItem>
-          <SummaryItem label="预测窗口">{windowTextOf(metric.cycle)}</SummaryItem>
-          <SummaryItem label="预测更新时间">{forecast.updatedAt}</SummaryItem>
-          <SummaryItem label="模型置信度">
-            {forecast.confidence === null ? <span className="text-gray-400">—</span> : `${Math.round(forecast.confidence * 100)}%`}
-          </SummaryItem>
+      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（当前状态）约 6:4，突出未来风险 */}
+      <Card
+        title="预测概况"
+        divider={false}
+        padding={false}
+        headerRight={
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700"
+          >
+            预测详情
+          </button>
+        }
+      >
+        <div className="grid gap-6 px-5 pb-5 pt-2 lg:grid-cols-5">
+          {/* 左：预测结论（窗口最高等级大字 + 升级时间；合并原预测窗口 / 最高等级 / 等级变化三字段） */}
+          <div className="lg:col-span-3">
+            <p className="text-xs text-gray-400">{metric.rule ? `${windowTextOf(metric.cycle)}最高等级` : "本轮预测"}</p>
+            <div className="mt-2">
+              {maxLv ? (
+                <span className={`inline-flex items-center gap-1.5 text-2xl font-bold ${LEVEL_TEXT_CLS[maxLv]}`}>
+                  <WarningIcon className="h-5 w-5" />
+                  {maxLv}
+                </span>
+              ) : !metric.rule || change.kind === "unavailable" ? (
+                <span className="text-2xl font-bold text-gray-400">—</span>
+              ) : (
+                <span className="text-2xl font-bold text-green-600">正常</span>
+              )}
+            </div>
+            <div className="mt-2 text-sm font-medium">
+              <span className={changeCls}>{change.text}</span>
+            </div>
+          </div>
+
+          {/* 右：当前状态（最新实际值深色大数字 + 当前等级标签 + 管控值小字；与左侧未来预测等级区分） */}
+          <div className="lg:col-span-2">
+            <p className="text-xs text-gray-400">最新实际值</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-2xl font-bold tabular-nums text-gray-900">
+                {forecast.base.toFixed(metric.decimals)}
+              </span>
+              <span className="text-sm font-medium text-gray-500">{metric.unit}</span>
+              <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${statusTagCls}`}>
+                当前等级：{status}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-gray-400">管控值：{controlText}</p>
+          </div>
         </div>
       </Card>
 
@@ -297,86 +372,152 @@ export function StabilityForecastView() {
             <MetricTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 
-          {/* 来源工序参数：指标卡片（数值 + 参考范围或基准 + 偏差方向合并；悬浮提示采集方式） */}
-          <Card>
-            <h3 className="mb-3 text-sm font-semibold text-gray-800">来源工序参数</h3>
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
-              {metric.params.map((def) => {
-                const p = forecast.params.find((x) => x.key === def.key)!;
-                const { dir, deviation, rangeText } = paramDirection(p);
-                const devCls =
-                  dir === "up" ? "text-red-500" : dir === "down" ? "text-blue-500" : dir === "in" ? "text-gray-400" : "text-gray-300";
-                const devText = dir === "up" ? `${deviation} ↑` : dir === "down" ? `${deviation} ↓` : dir === "in" ? `${deviation} →` : "—";
-                return (
-                  <div key={def.key} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-3" title={`采集方式：${def.tip}`}>
-                    <div className="text-xs text-gray-500">{def.name}</div>
-                    <div className="mt-1 flex items-baseline gap-1">
-                      {p.value === null ? (
-                        <span className="text-xl font-bold text-gray-300">—</span>
-                      ) : (
-                        <>
-                          <span className="text-xl font-bold text-gray-900">{p.value}</span>
-                          <span className="text-xs text-gray-400">{def.unit}</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs">
-                      <span className="text-gray-400">{rangeText}</span>
-                      <span className={`font-medium ${devCls}`}>{devText}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+          {/* 来源工序参数：智能解读生成后延迟出现，卡片阶梯浮现、内容逐字写入 */}
+          {interpreting ? (
+            <Delayed delay={aiDoneAt}>
+              <Card>
+                <h3 className="mb-3 text-sm font-semibold text-gray-800">来源工序参数</h3>
+                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
+                  {metric.params.map((def, i) => {
+                    const p = forecast.params.find((x) => x.key === def.key)!;
+                    const { dir, deviation, rangeText } = paramDirection(p);
+                    const devCls =
+                      dir === "up" ? "text-red-500" : dir === "down" ? "text-blue-500" : dir === "in" ? "text-gray-400" : "text-gray-300";
+                    const devText = dir === "up" ? `${deviation} ↑` : dir === "down" ? `${deviation} ↓` : dir === "in" ? `${deviation} →` : "—";
+                    return (
+                      <Delayed key={def.key} delay={i * 120}>
+                        <div
+                          className="h-full rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-3"
+                          title={`采集方式：${def.tip}`}
+                        >
+                          <div className="text-xs text-gray-500">
+                            <StreamText text={def.name} />
+                          </div>
+                          <div className="mt-1 flex items-baseline gap-1">
+                            {p.value === null ? (
+                              <span className="text-xl font-bold text-gray-300">—</span>
+                            ) : (
+                              <>
+                                <span className="text-xl font-bold tabular-nums text-gray-900">
+                                  <StreamText text={String(p.value)} />
+                                </span>
+                                <span className="text-xs text-gray-400">{def.unit}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="mt-1.5 flex items-center justify-between text-xs">
+                            <span className="text-gray-400">
+                              <StreamText text={rangeText} />
+                            </span>
+                            <span className={`font-medium ${devCls}`}>
+                              <StreamText text={devText} />
+                            </span>
+                          </div>
+                        </div>
+                      </Delayed>
+                    );
+                  })}
+                </div>
+              </Card>
+            </Delayed>
+          ) : null}
         </div>
 
         <div className="space-y-4">
-          {/* AI 风险解读：三段带主题（风险概况 / 参数关注 / 核查重点），与预测结果同步更新 */}
+          {/* 智能风险解读：三段带主题（风险概况 / 参数关注 / 核查重点）；默认收起，点击「智能解读」后逐字流式生成 */}
           <Card>
             <div className="mb-2.5 flex items-center gap-1.5">
               <span>🤖</span>
-              <h3 className="text-sm font-semibold text-gray-800">AI 风险解读</h3>
+              <h3 className="text-sm font-semibold text-gray-800">智能风险解读</h3>
             </div>
-            <div className="space-y-1.5 text-xs leading-relaxed text-gray-600">
-              {ai.map((s, i) => (
-                <p key={i}>
-                  <span className="font-medium text-gray-700">{s.topic}：</span>
-                  {s.text}
+            {!interpreting ? (
+              <div className="flex flex-col items-center gap-3 py-10">
+                <Button onClick={() => setInterpreting(true)}>智能解读</Button>
+                <p className="max-w-[220px] text-center text-xs leading-5 text-gray-400">
+                  点击后，AI 将实时生成风险解读、风险来源、来源分布与来源工序参数分析。
                 </p>
-              ))}
-            </div>
-          </Card>
-
-          {/* 风险来源：仅增险因素按占比降序；解释目标 = 沿等级规则方向最不利预测点 */}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">风险来源</h3>
-              <span className="text-xs text-gray-400">按贡献从高到低</span>
-            </div>
-            {!metric.rule ? (
-              <p className="text-xs text-gray-400">未配置等级规则，暂无贡献解释</p>
-            ) : contributions.length === 0 ? (
-              <p className="text-xs text-gray-400">暂无增加风险的贡献因素</p>
+              </div>
             ) : (
-              <StabilityContributionChart contributions={contributions} unit={metric.unit} decimals={metric.decimals} />
+              <div className="space-y-1.5 text-xs leading-relaxed text-gray-600">
+                {ai.map((s, i) => (
+                  <p key={s.topic}>
+                    <span className="font-medium text-gray-700">{s.topic}：</span>
+                    <StreamText text={s.text} delay={sectionDelays[i] ?? 0} caret />
+                  </p>
+                ))}
+              </div>
             )}
           </Card>
 
-          {/* 来源工序分布：按来源占比降序 */}
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">来源工序分布</h3>
-              <span className="text-xs text-gray-400">按贡献从高到低</span>
-            </div>
-            {breakdown.length === 0 ? (
-              <p className="text-xs text-gray-400">暂无可用解释</p>
-            ) : (
-              <SourceBreakdownChart breakdown={breakdown} />
-            )}
-          </Card>
+          {/* 风险来源：仅增险因素按占比降序；解释目标 = 沿等级规则方向最不利预测点；解读生成后延迟挂载 */}
+          {interpreting ? (
+            <Delayed delay={aiDoneAt + 400}>
+              <Card>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-800">风险来源</h3>
+                  <span className="text-xs text-gray-400">按贡献从高到低</span>
+                </div>
+                {!metric.rule ? (
+                  <p className="text-xs text-gray-400">未配置等级规则，暂无贡献解释</p>
+                ) : contributions.length === 0 ? (
+                  <p className="text-xs text-gray-400">暂无增加风险的贡献因素</p>
+                ) : (
+                  <StabilityContributionChart contributions={contributions} unit={metric.unit} decimals={metric.decimals} />
+                )}
+              </Card>
+            </Delayed>
+          ) : null}
+
+          {/* 来源工序分布：按来源占比降序；解读生成后延迟挂载 */}
+          {interpreting ? (
+            <Delayed delay={aiDoneAt + 1100}>
+              <Card>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-800">来源工序分布</h3>
+                  <span className="text-xs text-gray-400">按贡献从高到低</span>
+                </div>
+                {breakdown.length === 0 ? (
+                  <p className="text-xs text-gray-400">暂无可用解释</p>
+                ) : (
+                  <SourceBreakdownChart breakdown={breakdown} />
+                )}
+              </Card>
+            </Delayed>
+          ) : null}
         </div>
       </div>
+
+      {/* 预测详情抽屉：辅助字段收纳（默认不展开）；指标名称置首 */}
+      <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="预测详情" width={440}>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+          <SummaryItem label="指标名称">{metric.name}</SummaryItem>
+          <SummaryItem label="预测最高等级">
+            {!metric.rule || change.kind === "unavailable" ? (
+              <span className="text-gray-400">—</span>
+            ) : maxLv === null ? (
+              <span className="text-green-600">正常</span>
+            ) : (
+              <span className={LEVEL_TEXT_CLS[maxLv]}>{maxLv}</span>
+            )}
+          </SummaryItem>
+          <SummaryItem label="等级变化预测">
+            <span className={changeCls}>{change.text}</span>
+          </SummaryItem>
+          <SummaryItem label="最新实际值">
+            {forecast.base.toFixed(metric.decimals)}
+            {metric.unit}
+          </SummaryItem>
+          <SummaryItem label="当前等级">
+            <span className={statusCls}>{status}</span>
+          </SummaryItem>
+          <SummaryItem label="管控值">{controlText}</SummaryItem>
+          <SummaryItem label="预测窗口">{windowTextOf(metric.cycle)}</SummaryItem>
+          <SummaryItem label="模型置信度">
+            {forecast.confidence === null ? <span className="text-gray-400">—</span> : `${Math.round(forecast.confidence * 100)}%`}
+          </SummaryItem>
+          <SummaryItem label="预测更新时间">{forecast.updatedAt}</SummaryItem>
+        </div>
+      </Drawer>
 
       {/* 异常详情抽屉（点击趋势图等级标记点：升级点 / 触发等级的基准点） */}
       <StabilityAnomalyDrawer record={anomalyAlert} onClose={() => setAnomalyAlert(null)} />

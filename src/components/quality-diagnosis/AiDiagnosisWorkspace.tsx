@@ -7,6 +7,7 @@ import {
   type DiagTask,
 } from "@/lib/mock-data/defect-diagnosis-flow";
 import { AgentStatusPanel } from "./AgentStatusPanel";
+import { GrowBar, StreamText } from "@/components/ui/StreamText";
 
 // 比较结果配色：超上限/超限红，达标绿，数据缺失琥珀，其余灰
 function compareCls(compare: string): string {
@@ -59,6 +60,7 @@ export function AiDiagnosisWorkspace({
   }
 
   const v = latest;
+  const adv = v.advice; // 结论区引用（const 收窄在 map 回调内保持有效）
   const th = "text-left px-3 py-2 text-xs font-medium text-gray-500 whitespace-nowrap";
 
   return (
@@ -70,24 +72,11 @@ export function AiDiagnosisWorkspace({
         canRetry={canOperate}
       />
 
-      {/* 诊断进行中：展示已获取依据 */}
-      {!latest.finishedAt ? (
-        latest.evidences.length > 0 && (
-          <div className="rounded-xl border border-gray-100 bg-white p-5 text-sm">
-            <h3 className="mb-3 font-semibold text-gray-800">诊断依据（已获取）</h3>
-            <ul className="space-y-1.5">
-              {latest.evidences.map((e) => (
-                <li key={e.no} className="text-xs text-gray-600">
-                  <span className="mr-1.5 font-mono text-gray-400">{e.no}</span>
-                  {e.name}：{e.value}{e.unit ?? ""}（{e.sourceSystem}）
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
-      ) : (
+      {/* 诊断进行中：仅展示 Agent 执行过程（诊断依据在诊断完成后随结果区一起展示） */}
+      {!latest.finishedAt ? null : (
         <>
-          <div className="grid gap-4 lg:grid-cols-5">
+          {/* key 随诊断版本切换：重新诊断后整段流式重放 */}
+          <div key={`${v.version}-${v.startedAt}`} className="grid gap-4 lg:grid-cols-5">
             {/* 左列：诊断依据 + 贡献度/规则说明 + 相似历史案例 */}
             <div className="space-y-4 lg:col-span-3">
               <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -111,22 +100,29 @@ export function AiDiagnosisWorkspace({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {v.evidences.map((e) => (
-                        <tr key={e.no} className="transition-colors hover:bg-gray-50/60">
-                          <td className="px-3 py-2 font-mono text-gray-500">{e.no}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-700">{e.name}</td>
-                          <td className={`px-3 py-2 whitespace-nowrap font-medium tabular-nums ${e.missing ? "text-gray-300" : "text-gray-800"}`}>
-                            {e.value}
-                            {e.unit ? <span className="ml-0.5 text-[10px] font-normal text-gray-400">{e.unit}</span> : null}
-                          </td>
-                          <td className="max-w-[180px] truncate px-3 py-2 text-gray-500" title={e.scope}>{e.scope}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-500">{e.ref}</td>
-                          <td className={`px-3 py-2 whitespace-nowrap ${compareCls(e.compare)}`}>{e.compare}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-500">{e.sourceSystem}</td>
-                          <td className="max-w-[180px] truncate px-3 py-2 text-gray-500" title={e.object}>{e.object}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-gray-400">{e.asOf}</td>
-                        </tr>
-                      ))}
+                      {v.evidences.map((e, i) => {
+                        const d = i * 80; // 同行单元格同拍输出 → 整行像被逐字写入
+                        return (
+                          <tr key={e.no} className="transition-colors hover:bg-gray-50/60">
+                            <td className="px-3 py-2 font-mono text-gray-500"><StreamText text={e.no} delay={d} /></td>
+                            <td className="px-3 py-2 whitespace-nowrap text-gray-700"><StreamText text={e.name} delay={d} /></td>
+                            <td className="px-3 py-2 whitespace-nowrap font-medium tabular-nums">
+                              <StreamText
+                                text={e.value}
+                                delay={d}
+                                className={e.missing ? "text-gray-300" : "text-gray-800"}
+                                suffix={e.unit ? <span className="ml-0.5 text-[10px] font-normal text-gray-400">{e.unit}</span> : null}
+                              />
+                            </td>
+                            <td className="max-w-[180px] truncate px-3 py-2 text-gray-500" title={e.scope}><StreamText text={e.scope} delay={d} /></td>
+                            <td className="px-3 py-2 whitespace-nowrap text-gray-500"><StreamText text={e.ref} delay={d} /></td>
+                            <td className={`px-3 py-2 whitespace-nowrap ${compareCls(e.compare)}`}><StreamText text={e.compare} delay={d} /></td>
+                            <td className="px-3 py-2 whitespace-nowrap text-gray-500"><StreamText text={e.sourceSystem} delay={d} /></td>
+                            <td className="max-w-[180px] truncate px-3 py-2 text-gray-500" title={e.object}><StreamText text={e.object} delay={d} /></td>
+                            <td className="px-3 py-2 whitespace-nowrap text-gray-400"><StreamText text={e.asOf} delay={d} /></td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -140,22 +136,29 @@ export function AiDiagnosisWorkspace({
                     <span className="text-xs text-gray-400">数值归因（正向贡献占比）</span>
                   </div>
                   <div className="space-y-2.5">
-                    {v.contributions.map((c) => (
-                      <div key={c.name} className="flex items-center gap-3" title={c.note}>
-                        <div className="w-44 shrink-0 truncate text-xs text-gray-600">{c.name}</div>
-                        <div className="h-4 flex-1 overflow-hidden rounded bg-gray-100">
-                          <div className="h-full rounded bg-primary-600" style={{ width: `${Math.min(parseInt(c.pct, 10) * 2, 100)}%` }} />
+                    {v.contributions.map((c, i) => {
+                      const d = i * 150;
+                      return (
+                        <div key={c.name} className="flex items-center gap-3" title={c.note}>
+                          <div className="w-44 shrink-0 truncate text-xs text-gray-600">
+                            <StreamText text={c.name} delay={d} />
+                          </div>
+                          <div className="h-4 flex-1 overflow-hidden rounded bg-gray-100">
+                            <GrowBar width={Math.min(parseInt(c.pct, 10) * 2, 100)} delay={d + 120} />
+                          </div>
+                          <div className="w-10 shrink-0 text-right text-xs tabular-nums text-gray-700">
+                            <StreamText text={c.pct} delay={d + 120} />
+                          </div>
                         </div>
-                        <div className="w-10 shrink-0 text-right text-xs tabular-nums text-gray-700">{c.pct}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
               {v.ruleNote && (
                 <div className="rounded-xl border border-gray-100 bg-white p-5 text-xs leading-5 text-gray-500 shadow-sm">
                   <span className="mr-1.5 font-semibold text-gray-700">归因说明：</span>
-                  {v.ruleNote}
+                  <StreamText text={v.ruleNote} delay={200} caret />
                 </div>
               )}
 
@@ -169,40 +172,45 @@ export function AiDiagnosisWorkspace({
                   {v.cases.length === 0 ? (
                     <p className="py-6 text-center text-sm text-gray-400">暂无相似历史案例</p>
                   ) : (
-                    v.cases.map((c) => (
-                      <div key={c.id} className="rounded-lg border border-gray-100 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-gray-800">{c.title}</span>
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{c.grade}</span>
-                          <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] text-cyan-700">{c.source}</span>
-                        </div>
-                        <div className="mt-1.5 text-xs text-gray-400">
-                          形成时间 {c.formedAt} ｜ 适用范围：{c.scope}
-                        </div>
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          <div>
-                            <div className="text-[11px] font-medium text-green-700">匹配点</div>
-                            <ul className="mt-1 space-y-0.5">
-                              {c.matchPoints.map((m) => (
-                                <li key={m} className="text-xs leading-5 text-gray-600">✓ {m}</li>
-                              ))}
-                            </ul>
+                    v.cases.map((c, i) => {
+                      const d = i * 450; // 案例卡片逐张生成
+                      return (
+                        <div key={c.id} className="rounded-lg border border-gray-100 p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium text-gray-800">
+                              <StreamText text={c.title} delay={d} caret />
+                            </span>
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{c.grade}</span>
+                            <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] text-cyan-700">{c.source}</span>
                           </div>
-                          <div>
-                            <div className="text-[11px] font-medium text-gray-500">差异点</div>
-                            <ul className="mt-1 space-y-0.5">
-                              {c.diffs.map((d) => (
-                                <li key={d} className="text-xs leading-5 text-gray-500">△ {d}</li>
-                              ))}
-                            </ul>
+                          <div className="mt-1.5 text-xs text-gray-400">
+                            <StreamText text={`形成时间 ${c.formedAt} ｜ 适用范围：${c.scope}`} delay={d + 100} />
+                          </div>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            <div>
+                              <div className="text-[11px] font-medium text-green-700">匹配点</div>
+                              <ul className="mt-1 space-y-0.5">
+                                {c.matchPoints.map((m, j) => (
+                                  <li key={m} className="text-xs leading-5 text-gray-600">✓ <StreamText text={m} delay={d + 220 + j * 110} /></li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div>
+                              <div className="text-[11px] font-medium text-gray-500">差异点</div>
+                              <ul className="mt-1 space-y-0.5">
+                                {c.diffs.map((x, j) => (
+                                  <li key={x} className="text-xs leading-5 text-gray-500">△ <StreamText text={x} delay={d + 220 + j * 110} /></li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">已确定原因：</span><span className="text-gray-600"><StreamText text={c.cause} delay={d + 380} /></span></p>
+                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">核查说明：</span><span className="text-gray-600"><StreamText text={c.checkNote} delay={d + 460} /></span></p>
                           </div>
                         </div>
-                        <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
-                          <p className="text-xs leading-5"><span className="font-medium text-gray-700">已确定原因：</span><span className="text-gray-600">{c.cause}</span></p>
-                          <p className="text-xs leading-5"><span className="font-medium text-gray-700">核查说明：</span><span className="text-gray-600">{c.checkNote}</span></p>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -217,7 +225,9 @@ export function AiDiagnosisWorkspace({
                 <div className="space-y-4 p-5">
                   <div>
                     <div className="text-[11px] font-medium text-gray-400">异常概况</div>
-                    <p className="mt-1 text-xs leading-5 text-gray-600">{v.advice?.overview}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-600">
+                      <StreamText text={v.advice?.overview ?? ""} caret />
+                    </p>
                   </div>
 
                   <div>
@@ -226,25 +236,33 @@ export function AiDiagnosisWorkspace({
                       <ul className="mt-1.5 space-y-1.5">
                         {v.advice.candidates.map((c, i) => (
                           <li key={c.name} className="text-xs leading-5 text-gray-700">
-                            {i + 1}. {c.name}（{c.support}，依据 {c.basisNos.join("/")}）
-                            {c.caseTitle ? `（案例：${c.caseTitle}）` : ""}
+                            <StreamText
+                              text={`${i + 1}. ${c.name}（${c.support}，依据 ${c.basisNos.join("/")}）${c.caseTitle ? `（案例：${c.caseTitle}）` : ""}`}
+                              delay={250 + i * 180}
+                              caret
+                            />
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <p className="mt-1.5 text-xs leading-5 text-amber-700">
-                        当前依据不足，无可推荐的候选原因，需人工核查后判定。
+                        <StreamText text="当前依据不足，无可推荐的候选原因，需人工核查后判定。" delay={250} caret />
                       </p>
                     )}
                   </div>
 
-                  {v.advice && v.advice.checks.length > 0 && (
+                  {adv && adv.checks.length > 0 && (
                     <div>
                       <div className="text-[11px] font-medium text-gray-400">建议核查</div>
                       <ul className="mt-1.5 space-y-1">
-                        {v.advice.checks.map((c) => (
-                          <li key={c} className="text-xs leading-5 text-gray-600">· {c}</li>
-                        ))}
+                        {adv.checks.map((c, i) => {
+                          const d = 400 + adv.candidates.length * 180 + i * 150;
+                          return (
+                            <li key={c} className="text-xs leading-5 text-gray-600">
+                              · <StreamText text={c} delay={d} caret />
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}

@@ -79,7 +79,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   ),
   "🛠️": (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
-      <rect x="2" y="2" width="16" height="16" rx="3" fill="#6B7280" />
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#6366F1" />
       <path d="M7 13L13 7" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
       <path d="M12 6L14 8L13 9L11 7Z" fill="white" />
       <path d="M6 12L8 14L7 15L5 13Z" fill="white" />

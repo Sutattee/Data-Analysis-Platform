@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { AgentNode, AgentNodeStatus, AiVersion } from "@/lib/mock-data/defect-diagnosis-flow";
+import { StreamText } from "@/components/ui/StreamText";
 
 // 状态词（展示口径）：完成 → 已完成，跳过 → 已跳过，其余原样
 function statusWord(s: AgentNodeStatus): string {
@@ -69,20 +70,31 @@ export function AgentStatusPanel({
           {version.nodes.map((n: AgentNode) => (
             <div key={n.key}>
               <p className="text-sm text-gray-700">
-                {n.name}：{statusWord(n.status)}
-                {n.ms ? `（耗时 ${secsOf(n.ms)}）` : ""}
+                <StreamText
+                  text={`${n.name}：${statusWord(n.status)}${n.ms ? `（耗时 ${secsOf(n.ms)}）` : ""}`}
+                  caret={n.status === "执行中"}
+                  instant={!running}
+                />
               </p>
-              {n.summary && <p className="mt-0.5 pl-4 text-xs leading-5 text-gray-500">{n.summary}</p>}
+              {n.summary && (
+                <p className="mt-0.5 pl-4 text-xs leading-5 text-gray-500">
+                  <StreamText text={n.summary} delay={100} caret instant={!running} />
+                </p>
+              )}
               {n.details && n.details.length > 0 && (
                 <ul className="mt-0.5 space-y-0.5 pl-4">
-                  {n.details.map((d) => (
-                    <li key={d} className="truncate text-[11px] text-gray-400" title={d}>· {d}</li>
+                  {n.details.map((d, j) => (
+                    <li key={d} className="truncate text-[11px] text-gray-400" title={d}>
+                      · <StreamText text={d} delay={180 + j * 90} instant={!running} />
+                    </li>
                   ))}
                 </ul>
               )}
               {n.error && (
                 <div className="mt-1 ml-4 flex flex-wrap items-center gap-2 rounded bg-red-50 px-2.5 py-1.5 text-xs text-red-600">
-                  <span>{n.error}</span>
+                  <span>
+                    <StreamText text={n.error} delay={80} caret instant={!running} />
+                  </span>
                   {onRetry && canRetry && n.status === "失败" && (
                     <Button size="sm" variant="secondary" onClick={onRetry}>
                       重试

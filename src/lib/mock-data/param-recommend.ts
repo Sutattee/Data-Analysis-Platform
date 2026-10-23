@@ -3,7 +3,7 @@
 // 推算叶丝柜入口水分（模型推算），再生成下一批次烘丝出口水分推荐值；
 // 推荐须落在烘丝工艺允许范围内（12.5%~13.5%），超出不截断、不生成。
 // 确定性手锚种子：产线A 演示完整推荐链（13.20% 示例、标准换版分段、待回传/待核对/未达标/上线前空缺），
-// 产线B 演示数据不足（7/10）与超范围拒绝，产线C 演示暂无待生产批次与标准缺失。
+// 产线B 演示不足 10 批仍基于现有历史计算与超范围拒绝，产线C 演示暂无待生产批次与标准缺失。
 // 推算关系（模型口径）：烘丝出口推荐 = 加香目标 + 预计柜内损耗 − 预计加香增量（12.5 + 0.75 − 0.05 = 13.20）。
 
 // ============ 产线 ============
@@ -112,7 +112,7 @@ export const BATCHES: BatchRecord[] = [
   mk({ batch: "P20261021-01", workOrder: "WO-2610-082", line: "产线A", brand: "娇子", planStart: "2026-10-21 08:00", started: true, startAt: "2026-10-21 08:02", dryingActual: null, dryingAdvice: 13.2, flavorActual: null, flavorLink: "已确认" }), // 实际数据待回传
   mk({ batch: "P20261023-01", workOrder: "WO-2610-090", line: "产线A", brand: "娇子", planStart: "2026-10-23 08:00", started: false, dryingActual: null, dryingAdvice: null, flavorActual: null, flavorLink: "已确认" }), // 下一批次（待生产）
 
-  // —— 产线B（3#烘丝机 → 2#加香机）—— 宽窄有效 7 批 → 数据不足 7/10
+  // —— 产线B（3#烘丝机 → 2#加香机）—— 宽窄有效 7 批 → 不足 10 批仍基于现有批次计算（13.10%）
   mk({ batch: "P20261008-02", workOrder: "WO-2610-027", line: "产线B", brand: "宽窄", planStart: "2026-10-08 08:00", started: true, startAt: "2026-10-08 08:07", dryingActual: 13.12, dryingAdvice: 13.08, flavorActual: 12.32, flavorLink: "已确认" }),
   mk({ batch: "P20261009-01", workOrder: "WO-2610-030", line: "产线B", brand: "长城", planStart: "2026-10-09 20:00", started: true, startAt: "2026-10-09 20:02", dryingActual: 13.3, dryingAdvice: 13.27, flavorActual: 12.62, flavorLink: "已确认" }),
   mk({ batch: "P20261011-02", workOrder: "WO-2610-038", line: "产线B", brand: "宽窄", planStart: "2026-10-11 14:00", started: true, startAt: "2026-10-11 14:05", dryingActual: 13.18, dryingAdvice: 13.12, flavorActual: 12.45, flavorLink: "已确认" }),
@@ -198,7 +198,7 @@ export interface NextRecommendation {
   batch?: BatchRecord; // 下一批次（排产顺序首条未开工未取消工单）
   value?: number; // 烘丝出口水分推荐值 %
   inletMoisture?: number; // 叶丝柜入口水分（模型推算）%
-  validCount: number; // 同产线同牌号有效历史批次数（X/10）
+  validCount: number; // 同产线同牌号有效历史批次数
   dataAsOf: string;
   generatedAt?: string;
   version?: string; // 推荐版本（重算保留版本）
@@ -224,8 +224,8 @@ export function nextRecommendationOf(line: string): NextRecommendation {
     generatedAt: "2026-10-22 09:31",
     version: "REC-2610-090-v2",
   };
-  if (!std || valid.length < 10) {
-    // 有效历史不足 10 批 → 不输出数值（产线B 演示 7/10）
+  if (!std || valid.length === 0) {
+    // 无有效历史批次（或标准缺失）→ 不输出数值；不足 10 批时基于现有有效批次计算
     return { ...rec, status: "数据不足" };
   }
   const value = std.goal + REC_CHAIN.cabinetLoss - REC_CHAIN.flavorGain;

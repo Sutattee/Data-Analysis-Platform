@@ -1,8 +1,7 @@
 "use client";
 
-// 推荐详情抽屉：推荐卡「查看依据」（target="next"）与图表点击 / 记录「详情」（target=批次记录）共用。
-// 下一批次 → 展示目标与范围、推算链（叶丝柜入口水分·模型推算 → 烘丝出口推荐值）、历史依据与版本信息；
-// 历史批次 → 展示当时锁定的推荐版本、目标标准与实际回填结果（保留当时快照口径）。
+// 推荐依据抽屉：推荐卡「查看依据」（target="next"）→ 工单信息 / 目标与推算结果 / 历史依据与生成信息 三区；
+// 图表点击 / 记录「详情」（target=批次记录）→ 当时锁定的推荐版本、目标标准与实际回填结果（保留当时快照口径）。
 import { Drawer } from "@/components/ui/Drawer";
 import { StatusTag } from "./StatusTag";
 import {
@@ -34,55 +33,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** 推荐结果区：推算链 + 置信度；未生成有效推荐时展示原因文案 */
-function RecResult({ rec }: { rec: NextRecommendation }) {
-  if (rec.status !== "已生成" || rec.value === undefined) {
-    const hint =
-      rec.status === "数据不足"
-        ? `历史数据不足，当前 ${rec.validCount}/10 批，补齐后自动计算`
-        : rec.status === "超出工艺范围"
-          ? "未生成有效推荐：超出工艺范围"
-          : rec.status === "生成失败"
-            ? "推荐生成失败，后台自动重试"
-            : "暂无待生产批次";
-    return (
-      <div>
-        <h4 className="mb-2 text-xs font-bold text-gray-900">推算结果</h4>
-        <p className="text-sm text-gray-500">{hint}</p>
-      </div>
-    );
-  }
-  return (
-    <div>
-      <h4 className="mb-2 text-xs font-bold text-gray-900">推算结果</h4>
-      <div className="grid grid-cols-2 gap-3">
-        <Field
-          label="叶丝柜入口水分（模型推算）"
-          value={
-            rec.inletMoisture === undefined ? (
-              "-"
-            ) : (
-              <span>
-                {fmt2(rec.inletMoisture)}% <span className="ml-1 text-xs text-gray-400">模型推算</span>
-              </span>
-            )
-          }
-        />
-        <Field
-          label="烘丝出口水分推荐值"
-          value={
-            <span className="font-semibold text-primary-600">{fmt2(rec.value)}%</span>
-          }
-        />
-        {rec.confidence !== undefined && (
-          <Field label="模型置信度" value={`${(rec.confidence * 100).toFixed(1)}%`} />
-        )}
-      </div>
-      <p className="mt-2 text-xs leading-relaxed text-gray-400">
-        推算链：加香出口水分目标 + 预计柜内损耗（温湿度 / 停留时间 / 柜内状态，按模型能力接入） − 预计加香增量；温湿度等未接入因素不参与数值计算。
-      </p>
-    </div>
-  );
+/** 未生成有效推荐时的原因文案（展示在「目标与推算结果」区） */
+function recHintOf(rec: NextRecommendation): string {
+  return rec.status === "数据不足"
+    ? `历史数据不足，当前 ${rec.validCount} 批，补齐后自动计算`
+    : rec.status === "超出工艺范围"
+      ? "未生成有效推荐：超出工艺范围"
+      : rec.status === "生成失败"
+        ? "推荐生成失败，后台自动重试"
+        : "暂无待生产批次";
 }
 
 export function RecommendDrawer({
@@ -108,54 +67,61 @@ export function RecommendDrawer({
         <div className="space-y-5">
           {isNext && rec ? (
             <>
-              {/* 下一批次：推荐依据 */}
+              {/* 工单信息 */}
               <Section title="工单信息">
                 <Field label="工单号" value={batch.workOrder} />
                 <Field label="批次" value={batch.batch} />
                 <Field label="牌号" value={batch.brand} />
                 <Field label="产线" value={batch.line} />
-                <Field label="计划开工" value={batch.planStart} />
               </Section>
 
-              <Section title="目标与范围（自动带入 · 只读）">
+              {/* 目标与推算结果：目标标准 + 工艺范围 + 推算链（叶丝柜入口水分 → 烘丝出口推荐值）+ 置信度 */}
+              <Section title="目标与推算结果">
                 {rec.std ? (
                   <>
                     <Field label="加香出口水分目标" value={`${fmt2(rec.std.goal)}%`} />
-                    <Field label="加香合格范围" value={`${fmt2(rec.std.low)}% ~ ${fmt2(rec.std.high)}%`} />
-                    <Field label="标准版本" value={`${rec.std.brand} ${rec.std.ver}`} />
+                    <Field label="加香合格范围" value={`${fmt2(rec.std.low)}%～${fmt2(rec.std.high)}%`} />
                   </>
                 ) : (
                   <Field label="加香出口水分标准" value={<span className="text-gray-400">标准缺失</span>} />
                 )}
-                <Field label="烘丝出口水分允许范围" value={`${fmt2(DRYING_RANGE.low)}% ~ ${fmt2(DRYING_RANGE.high)}%`} />
+                <Field label="烘丝出口水分允许范围" value={`${fmt2(DRYING_RANGE.low)}%～${fmt2(DRYING_RANGE.high)}%`} />
+                {rec.status === "已生成" && rec.value !== undefined ? (
+                  <>
+                    <Field
+                      label="叶丝柜入口水分（模型推算）"
+                      value={rec.inletMoisture === undefined ? "-" : `${fmt2(rec.inletMoisture)}%`}
+                    />
+                    <Field
+                      label="烘丝出口水分建议值"
+                      value={
+                        <span className="font-semibold text-primary-600">{fmt2(rec.value)}%</span>
+                      }
+                    />
+                    {rec.confidence !== undefined && (
+                      <Field label="模型置信度" value={`${(rec.confidence * 100).toFixed(1)}%`} />
+                    )}
+                  </>
+                ) : (
+                  <Field label="推算结果" value={<span className="text-gray-400">{recHintOf(rec)}</span>} />
+                )}
               </Section>
 
-              <RecResult rec={rec} />
-
+              {/* 历史依据与生成信息 */}
               {(() => {
                 const valid = validHistoryOf(batch.line, batch.brand);
                 return (
-                  <Section title="历史依据">
-                    <Field label="参与计算的历史批次" value={`同产线同牌号近10个有效批次`} />
-                    <Field label="有效批次" value={`${valid.length}/10 批`} />
+                  <Section title="历史依据与生成信息">
+                    <Field label="参与计算的历史批次" value="同产线同牌号近10个有效批次（不足10批时基于现有批次计算）" />
+                    <Field label="有效批次" value={`${valid.length} 批`} />
                     {valid.length > 0 && (
-                      <Field label="批次范围" value={`${valid[0].batch} ~ ${valid[valid.length - 1].batch}`} />
+                      <Field label="批次范围" value={`${valid[0].batch}～${valid[valid.length - 1].batch}`} />
                     )}
-                    <Field label="数据截至" value={rec.dataAsOf} />
+                    <Field label="推荐生成时间" value={rec.generatedAt ?? "-"} />
+                    <Field label="模型版本" value={rec.modelVer} />
                   </Section>
                 );
               })()}
-
-              <Section title="版本信息">
-                <Field label="推荐生成时间" value={rec.generatedAt ?? "-"} />
-                <Field label="模型版本" value={rec.modelVer} />
-                <Field label="标准版本" value={rec.std ? `${rec.std.ver}` : "-"} />
-                <Field label="推荐版本" value={rec.version ?? "-"} />
-              </Section>
-
-              <p className="text-xs leading-relaxed text-gray-400">
-                说明：批次开工时将锁定当前有效推荐版本，后续实际值与该版本对照；开工前输入变化会自动重算并保留版本记录。
-              </p>
             </>
           ) : (
             <>
@@ -198,7 +164,7 @@ export function RecommendDrawer({
                     )
                   }
                 />
-                <Field label="推荐版本（锁定）" value={batch.adviceVersion ?? "-"} />
+                <Field label="推荐版本" value={batch.adviceVersion ?? "-"} />
                 <Field label="推荐生成时间" value={batch.adviceGeneratedAt ?? "-"} />
               </Section>
 

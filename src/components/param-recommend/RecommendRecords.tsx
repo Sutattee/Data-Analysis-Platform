@@ -37,7 +37,7 @@ function adviceCellOf(b: BatchRecord, rec: NextRecommendation): React.ReactNode 
         </span>
       );
     }
-    if (rec.status === "数据不足") return <span className="text-gray-400">历史数据不足 {rec.validCount}/10</span>;
+    if (rec.status === "数据不足") return <span className="text-gray-400">历史数据不足 {rec.validCount} 批</span>;
     if (rec.status === "超出工艺范围") return <span className="text-gray-400">未生成有效推荐：超出工艺范围</span>;
     return <span className="text-gray-400">推荐生成失败</span>;
   }

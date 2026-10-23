@@ -1,10 +1,12 @@
 "use client";
 
-// 下一批次推荐卡：核心建议（大号蓝色推荐值）+ 批次信息 + 最终控制目标 + 置信度（算法提供才展示）。
-// 已生成时不展示状态标签；数据不足 / 超出工艺范围 / 生成失败 / 暂无待生产保留状态标签与原因文案；
-// 牌号筛选与下一批次牌号不一致时仍完整展示推荐（附一行提示），历史图表与记录按所选牌号展示。
+// 下一批次推荐卡：左侧 💧 标签 + 大号建议值（数字从 0 增长动效）+ 允差区间位置横条；
+// 右侧批次信息 + 叶丝柜入口水分（模型推算）+ 置信度（算法提供才展示）。
+// 已生成不展示状态标签；数据不足 / 暂无待生产仅文字说明；超出工艺范围 / 生成失败保留状态标签与原因文案；
+// 重算期间（updating）仅降透明度提示，不展示文字标签。
 import { Card } from "@/components/ui/Card";
 import { StatusTag } from "./StatusTag";
+import { CountUp } from "./CountUp";
 import { DRYING_RANGE, fmt2, type NextRecommendation } from "@/lib/mock-data/param-recommend";
 
 function InfoField({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -16,29 +18,15 @@ function InfoField({ label, value }: { label: string; value?: React.ReactNode })
   );
 }
 
-/** 批次信息区：下一批次 / 牌号产线 / 最终控制目标 / 烘丝允许范围 */
+/** 批次信息区：下一批次 / 牌号产线（未生成等分支复用） */
 function BatchInfo({ rec }: { rec: NextRecommendation }) {
   return (
     <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
       <InfoField
         label="下一批次"
-        value={rec.batch ? `${rec.batch.batch}（${rec.batch.workOrder}）` : "-"}
+        value={rec.batch ? rec.batch.batch : "-"}
       />
       <InfoField label="牌号 / 产线" value={rec.batch ? `${rec.batch.brand} / ${rec.batch.line}` : "-"} />
-      <InfoField
-        label="最终控制目标 · 加香出口水分"
-        value={
-          rec.std ? (
-            <span>
-              <span className="font-medium">{fmt2(rec.std.goal)}%</span>（{fmt2(rec.std.low)}~{fmt2(rec.std.high)}）
-              <span className="ml-1 text-xs text-gray-400">{rec.std.ver}</span>
-            </span>
-          ) : (
-            <span className="text-gray-400">标准缺失</span>
-          )
-        }
-      />
-      <InfoField label="烘丝出口水分允许范围" value={`${fmt2(DRYING_RANGE.low)}% ~ ${fmt2(DRYING_RANGE.high)}%`} />
     </div>
   );
 }
@@ -46,24 +34,19 @@ function BatchInfo({ rec }: { rec: NextRecommendation }) {
 export function RecommendCard({
   rec,
   updating,
-  brand,
   onShowBasis,
 }: {
   rec: NextRecommendation;
-  updating: boolean; // 输入变化自动重算中：状态显示"更新中"，旧版本降透明度
-  brand: string;
+  updating: boolean; // 输入变化自动重算中：卡片降透明度提示
   onShowBasis: () => void;
 }) {
   const generated = rec.status === "已生成" && rec.value !== undefined;
-  // 下一批次与筛选牌号不一致：推荐仍完整展示，仅附一行提示（历史区按所选牌号）
-  const brandNote =
-    !generated || brand === rec.batch?.brand
-      ? null
-      : `当前筛选「${brand}」：下一批次为「${rec.batch!.brand}」牌号，历史图表与推荐记录仍按「${brand}」展示。`;
 
   return (
     <Card
       title="下一批次推荐"
+      divider={false}
+      padding={false}
       headerRight={
         <button
           type="button"
@@ -74,48 +57,80 @@ export function RecommendCard({
         </button>
       }
     >
-      <div className={updating ? "opacity-60 transition-opacity" : "transition-opacity"}>
-        {/* 状态：已生成不展示标签；其余状态 / 更新中保留颜色标签 */}
-        <div className="flex flex-wrap items-center gap-2">
-          {updating ? <StatusTag text="更新中" /> : !generated && <StatusTag text={rec.status} />}
-          {updating && (
-            <span className="text-xs text-gray-400">输入变化，正在按最新数据重算，旧版本仅保留在推荐记录中</span>
-          )}
-        </div>
-        {brandNote && <p className="mt-2 text-xs text-gray-400">{brandNote}</p>}
+      <div className={`px-5 pb-5 -mt-3 pt-0.5 ${updating ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
+        {/* 状态标签：超出工艺范围 / 生成失败展示；数据不足、暂无待生产不展示标签 */}
+        {(rec.status === "超出工艺范围" || rec.status === "生成失败") && <StatusTag text={rec.status} />}
 
         {generated ? (
           <div className="mt-4 flex flex-col gap-5 lg:flex-row">
-            {/* 核心建议：大号蓝色推荐值 */}
+            {/* 核心建议：💧 标签在上 + 大号推荐值（数字从 0 增长动效）+ 允差区间横条 */}
             <div className="lg:w-[36%] lg:border-r lg:border-gray-100 lg:pr-6">
-              <div className="flex items-baseline gap-1">
-                <span className="text-4xl font-bold tracking-tight text-primary-600">{fmt2(rec.value)}</span>
+              <p className="text-sm font-medium text-gray-600">💧 烘丝出口水分建议值</p>
+              <div className="mt-1.5 flex items-baseline gap-1">
+                <span className="text-4xl font-bold tracking-tight tabular-nums text-primary-600">
+                  <CountUp to={rec.value!} />
+                </span>
                 <span className="text-lg font-semibold text-primary-600">%</span>
               </div>
-              <p className="mt-1 text-sm text-gray-500">烘丝出口水分推荐值</p>
-              <p className="mt-3 text-sm text-gray-600">
-                叶丝柜入口水分（模型推算）：
-                <span className="font-medium text-primary-700">{fmt2(rec.inletMoisture)}%</span>
-              </p>
-              {rec.confidence !== undefined && (
-                <p className="mt-1 text-sm text-gray-600">
-                  模型置信度：<span className="font-medium text-gray-800">{(rec.confidence * 100).toFixed(1)}%</span>
-                </p>
-              )}
-              {rec.generatedAt && (
-                <p className="mt-1 text-xs text-gray-400">推荐生成时间 {rec.generatedAt}</p>
-              )}
+
+              {/* 烘丝出口水分允差横条：左上角标题 + 右上角「建议值位置」，竖指针标记建议值在区间中的位置 */}
+              {(() => {
+                const pos = ((rec.value! - DRYING_RANGE.low) / (DRYING_RANGE.high - DRYING_RANGE.low)) * 100;
+                return (
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-500">烘丝出口水分允差</span>
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary-600">
+                        <span className="inline-block h-2 w-2 rounded-sm bg-primary-600" />
+                        建议值位置
+                      </span>
+                    </div>
+                    <div className="relative mt-2">
+                      <div className="h-2 rounded-full bg-primary-100" />
+                      <div
+                        className="absolute -top-1 h-4 w-1 rounded-full bg-primary-600"
+                        style={{ left: `calc(${pos}% - 2px)` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[11px] text-gray-400">下限 {fmt2(DRYING_RANGE.low)}%</span>
+                      <span className="text-[11px] text-gray-400">上限 {fmt2(DRYING_RANGE.high)}%</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-            <div className="flex-1">
-              <BatchInfo rec={rec} />
+            <div className="flex flex-1 flex-col justify-center">
+              <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                <InfoField
+                  label="下一批次"
+                  value={rec.batch ? rec.batch.batch : "-"}
+                />
+                <InfoField label="牌号 / 产线" value={rec.batch ? `${rec.batch.brand} / ${rec.batch.line}` : "-"} />
+                <InfoField
+                  label="叶丝柜入口水分（模型推算）"
+                  value={
+                    rec.inletMoisture !== undefined ? (
+                      <span className="font-medium text-primary-700">{fmt2(rec.inletMoisture)}%</span>
+                    ) : (
+                      "-"
+                    )
+                  }
+                />
+                {rec.confidence !== undefined && (
+                  <InfoField
+                    label="模型置信度"
+                    value={<span className="font-medium text-gray-800">{(rec.confidence * 100).toFixed(1)}%</span>}
+                  />
+                )}
+              </div>
             </div>
           </div>
         ) : (
           <div className="mt-4 space-y-4">
             {rec.status === "数据不足" ? (
               <p className="text-sm leading-relaxed text-gray-700">
-                历史数据不足，当前 {rec.validCount}/10 批
-                {rec.batch ? `（${rec.batch.brand} · ${rec.batch.batch}）` : ""}；补齐后自动计算。
+                历史数据不足，当前 {rec.validCount} 批；补齐后自动计算。
               </p>
             ) : rec.status === "超出工艺范围" ? (
               <p className="text-sm leading-relaxed text-gray-700">

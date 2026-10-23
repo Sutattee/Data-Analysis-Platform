@@ -133,16 +133,21 @@ export interface MoistureBasis {
   tolerance: string;
   dev: string;
   atTime: string; // 引用点时间（存在多个未来点时注明）
+  range: string; // 允差范围（标准水分 ± 允差，如 "12.2%～12.8%"）
+  std: string; // 标准水分（如 "12.5%"）
+  overText: string; // 与允差范围的对比结论（新口径：预测值 − 允差上限，如 "超上限 0.4 pct"）
+  overKind: "over" | "in" | "under"; // 超上限 / 范围内（含恰达上限）/ 低于下限
 }
 
-// 箱储业务依据：时长公式组（规格 §3；数据不足时不编造预计出库时间）
+// 箱储业务依据：时长公式组（规格 §3；数值口径，remainingHours 0 = 恰达上限 / 负值 = 已超时；
+// 数据不足或不编造的预计字段缺省）
 export interface StorageBasis {
-  stored: string; // 已储存时长 = 基准时间 − 入库时间
-  limit: string; // 储存时长上限
-  remaining: string; // 剩余允许储存时间（负值显示已超时）
-  total: string; // 预计总储存时长 = 预计出库时间 − 入库时间
-  outbound: string; // 预计出库 / 耗用时间
-  deadline: string; // 允许储存截止时间 = 入库时间 + 上限
+  storedHours: number; // 已储存时长 = 基准时间 − 入库时间（小时）
+  limitHours: number; // 储存时长上限（小时）
+  remainingHours: number; // 剩余可储存（小时）
+  deadline: string; // 允许储存截止时间 = 入库时间 + 上限（MM-DD HH:mm）
+  totalHours?: number; // 预计总储存时长 = 预计出库时间 − 入库时间（小时）
+  outbound?: string; // 预计出库 / 耗用时间（含"（计划）"标注）
 }
 
 export interface DefectForecast {
@@ -152,6 +157,7 @@ export interface DefectForecast {
   batch: string;
   status: "ok" | "insufficient"; // 数据不足：评分 / 曲线 / 解读均不编造
   confidence?: number; // 模型置信度（0—1）；缺省 = 摘要隐藏该字段（不由 AI 生成）
+  modelVer: string; // 模型版本（预测详情抽屉展示）
   hist: TrendPoint[]; // 历史评分曲线（末点 = 基准点）
   future: TrendPoint[]; // 预测曲线（首点 = 基准点；单点对象仅含基准点；数据不足为空）
   params: ParamCell[];
@@ -248,6 +254,7 @@ interface RawSeed {
   objectKey: string;
   batch: string;
   confidence?: number;
+  modelVer?: string; // 不传时按缺陷取 MODEL_VER 默认版本
   hist: TrendPoint[];
   future: TrendPoint[]; // 数据不足为空；单点对象仅含基准点
   params: ParamCell[];
@@ -265,6 +272,13 @@ const withMoistureBiz = (future: TrendPoint[], values: number[]): TrendPoint[] =
 const withOutboundBiz = (future: TrendPoint[], outboundHour: number, label: string): TrendPoint[] =>
   future.map((p, i) => (14 + i <= outboundHour ? { ...p, biz: label, planned: true } : p));
 
+// 各缺陷预测模型版本（预测详情抽屉展示；种子可用 modelVer 覆盖）
+const MODEL_VER: Record<DefectCode, string> = {
+  CPSFBH: "MoistNet v2.3",
+  YZCB: "PunctNet v1.8",
+  XCCG: "StoreSim v3.0",
+};
+
 const SEEDS: RawSeed[] = [
   // ---- 成品水分不合格（烘丝机台）----
   {
@@ -281,7 +295,7 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 4.1, source: "制丝", origin: "MES" },
     ],
     context: { brand: "娇子", shift: "白班", shiftGroup: "甲班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "13.2%", tolerance: "±0.3%", dev: "+0.7pct", atTime: "10-19 19:00" },
+    moisture: { predicted: "13.2%", tolerance: "±0.3%", dev: "+0.7pct", atTime: "10-19 19:00", range: "12.2%～12.8%", std: "12.5%", overText: "超上限 0.4 pct", overKind: "over" },
   },
   {
     // 中风险演示：窗口内未达高风险阈值
@@ -296,7 +310,7 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 4.2, source: "制丝", origin: "MES" },
     ],
     context: { brand: "长城", shift: "白班", shiftGroup: "乙班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "12.8%", tolerance: "±0.3%", dev: "+0.3pct", atTime: "10-19 19:00" },
+    moisture: { predicted: "12.8%", tolerance: "±0.3%", dev: "+0.3pct", atTime: "10-19 19:00", range: "12.2%～12.8%", std: "12.5%", overText: "恰达允差上限", overKind: "in" },
   },
   {
     // 低风险演示
@@ -310,7 +324,7 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 7.2, source: "制丝", origin: "MES" },
     ],
     context: { brand: "宽窄", shift: "白班", shiftGroup: "丙班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "12.5%", tolerance: "±0.3%", dev: "0pct", atTime: "10-19 16:00" },
+    moisture: { predicted: "12.5%", tolerance: "±0.3%", dev: "0pct", atTime: "10-19 16:00", range: "12.2%～12.8%", std: "12.5%", overText: "允差范围内", overKind: "in" },
   },
   // ---- 烟支刺破（卷接机台）----
   {
@@ -375,7 +389,7 @@ const SEEDS: RawSeed[] = [
       { name: "制丝投料进度", score: 11.5, source: "制丝", origin: "MES" },
     ],
     context: { brand: "长城", shift: "白班", shiftGroup: "甲班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { stored: "102 小时", limit: "72 小时", remaining: "已超时 30 小时", total: "—", outbound: "—", deadline: "10-18 08:00" },
+    storage: { storedHours: 102, limitHours: 72, remainingHours: -30, deadline: "10-18 08:00" },
   },
   {
     // 1#储丝柜 · 批次B：预计出库来自计划（Tooltip 标注"计划"）
@@ -390,7 +404,7 @@ const SEEDS: RawSeed[] = [
       { name: "制丝投料进度", score: 6.3, source: "制丝", origin: "MES" },
     ],
     context: { brand: "宽窄", shift: "白班", shiftGroup: "丙班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { stored: "56 小时", limit: "72 小时", remaining: "剩余 16 小时", total: "预计 63 小时", outbound: "10-19 21:00（计划）", deadline: "10-20 06:00" },
+    storage: { storedHours: 56, limitHours: 72, remainingHours: 16, deadline: "10-20 06:00", totalHours: 63, outbound: "10-19 21:00（计划）" },
   },
   {
     // 2#储丝柜：中风险，预计 16:00 出库（计划）
@@ -405,7 +419,7 @@ const SEEDS: RawSeed[] = [
       { name: "库存结构", score: 5.1, source: "仓储", origin: "MES" },
     ],
     context: { brand: "娇子", shift: "白班", shiftGroup: "乙班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { stored: "38 小时", limit: "72 小时", remaining: "剩余 34 小时", total: "预计 64 小时", outbound: "10-19 16:00（计划）", deadline: "10-20 00:00" },
+    storage: { storedHours: 38, limitHours: 72, remainingHours: 34, deadline: "10-20 00:00", totalHours: 64, outbound: "10-19 16:00（计划）" },
   },
   {
     // 3#储丝柜：数据不足演示（缺领用/出库计划与部分产量 → 不编造评分 / 曲线 / 解读）
@@ -414,7 +428,7 @@ const SEEDS: RawSeed[] = [
     future: [],
     params: storageParams({ inbound: "10-18 14:00", limit: 60, stock: 41800, dryingActual: 8930, packingActual: null, outboundInfo: null }),
     context: { brand: "长城", shift: "白班", shiftGroup: "甲班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { stored: "24 小时", limit: "60 小时", remaining: "剩余 36 小时", total: "—", outbound: "—", deadline: "10-20 14:00" },
+    storage: { storedHours: 24, limitHours: 60, remainingHours: 36, deadline: "10-20 14:00" },
   },
 ];
 
@@ -467,14 +481,14 @@ export type EtaKind = "reached" | "within" | "notReached" | "noSeries" | "unavai
 export function highRiskEta(f: DefectForecast): { kind: EtaKind; text: string } {
   if (f.status === "insufficient") return { kind: "unavailable", text: "暂无法预测" };
   const base = f.future[0];
-  if (base && base.score >= HIGH_THRESHOLD) return { kind: "reached", text: "已达风险阈值" };
+  if (base && base.score >= HIGH_THRESHOLD) return { kind: "reached", text: "已进入高风险" };
   if (f.future.length <= 1) return { kind: "noSeries", text: "暂无达阈值时间预测" };
   const hit = f.future.slice(1).find((p) => p.score >= HIGH_THRESHOLD);
   if (hit) {
     const hours = Number(hit.full.slice(11, 13)) - Number(base.full.slice(11, 13));
-    return { kind: "within", text: `预计${hours}小时内达风险阈值` };
+    return { kind: "within", text: `预计${hours}小时内进入高风险` };
   }
-  return { kind: "notReached", text: `未来${WINDOW_HOURS}小时未达风险阈值` };
+  return { kind: "notReached", text: `未来${WINDOW_HOURS}小时未进入高风险` };
 }
 
 // 预测窗口：按业务配置时长展示（默认未来 8 小时）；数据不足不展示窗口
@@ -524,6 +538,7 @@ function finalize(seed: RawSeed): DefectForecast {
     batch: seed.batch,
     status: seed.future.length === 0 ? "insufficient" : "ok",
     confidence: seed.confidence,
+    modelVer: seed.modelVer ?? MODEL_VER[seed.code],
     hist: seed.hist,
     future: seed.future,
     params: seed.params,
