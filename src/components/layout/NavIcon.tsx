@@ -161,6 +161,15 @@ const ICON_MAP: Record<string, React.ReactNode> = {
       <rect x="9.75" y="11" width="6.5" height="2.2" rx="1.1" fill="white" />
     </svg>
   ),
+  // 智能工作台：仪表盘（半圆表盘 + 指针，聚合 AI 工具的工作台意象；与告警管理的扳手 🛠️ 区分）
+  "🎛️": (
+    <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">
+      <rect x="2" y="2" width="16" height="16" rx="3" fill="#F97316" />
+      <path d="M5 13.5C5 10.19 7.46 7.5 10.5 7.5C13.54 7.5 16 10.19 16 13.5H5Z" fill="white" />
+      <path d="M10.5 13L12.8 9.8" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="10.5" cy="13.5" r="1.1" fill="#F97316" />
+    </svg>
+  ),
   // 诊断：听诊器（U 形耳管 + 膜片）
   "🩺": (
     <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none">

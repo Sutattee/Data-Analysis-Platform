@@ -51,7 +51,7 @@ export const PRIMARY_NAV: NavItem[] = [
     { label: "智能问数", href: "/production/qa", icon: "💬" },
   ], matchPrefixes: ["/production"] },
   { label: "工艺质量",   href: "/quality",      icon: "✅", children: [
-    { label: "智能工作台", href: "/quality/workbench", icon: "🛠️" },
+    { label: "智能工作台", href: "/quality/workbench", icon: "🎛️" },
     { label: "质量总览", href: "/quality/overview", icon: "📊" },
     { label: "质量风险预测", href: "/quality/forecast", icon: "📈", children: [
       { label: "稳定性预测", href: "/quality/forecast/stability", icon: "📉" },
