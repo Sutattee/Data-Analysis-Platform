@@ -92,10 +92,10 @@ export function MaterialTrendChart({
             formatter={(v: any, n: any) => [v, NAME_MAP[n as string] ?? n]}
           />
           {hasTarget && (
-            <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
+            <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
           )}
-          <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
-          <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
           {/* 异常偏差点：全部指标日/月档均展示 */}
           {data
             .filter((d) => d.anomaly)

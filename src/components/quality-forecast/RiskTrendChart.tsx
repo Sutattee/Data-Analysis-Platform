@@ -203,7 +203,7 @@ export function RiskTrendChart({
           label={{ value: "基准时刻", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
         />
 
-        <Line
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
           type="monotone"
           dataKey="hist"
           name="历史评分"
@@ -213,7 +213,7 @@ export function RiskTrendChart({
           activeDot={false}
           connectNulls={false}
         />
-        <Line
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
           type="monotone"
           dataKey="future"
           name="预测评分"

@@ -32,7 +32,7 @@ export function DeptPowerCompareChart() {
             formatter={(v: any, n: any) => [Number(v).toLocaleString(), n]}
           />
           <Legend wrapperStyle={{ fontSize: 11, textAlign: "center" }} />
-          <Bar dataKey="actual" name="当期实际" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="actual" name="当期实际" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
             {/* 柱末标签：实际值 + 占总电量百分比 */}
             <LabelList dataKey="labelText" position="right" fontSize={10} fill="#374151" />
           </Bar>

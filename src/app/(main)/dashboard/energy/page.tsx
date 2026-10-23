@@ -39,9 +39,9 @@ function TrendChart({ data, domain }: { data: { date: string; actual: number; ta
         <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" domain={domain} />
         <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Area type="monotone" dataKey="predict" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.08} name="预测值" strokeDasharray="4 4" />
-        <Line type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
-        <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际值" dot={false} />
+        <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="predict" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.08} name="预测值" strokeDasharray="4 4" />
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际值" dot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -90,7 +90,7 @@ export default function EnergyPage() {
         <Card title="🍩 能源消耗结构">
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie data={D.energyStructure} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name} ${value}%`}>
+              <Pie isAnimationActive animationDuration={900} animationEasing="ease-out" data={D.energyStructure} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name} ${value}%`}>
                 {D.energyStructure.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
@@ -111,7 +111,7 @@ export default function EnergyPage() {
               <XAxis type="number" tick={{ fontSize: 10 }} stroke="#9ca3af" unit="%" />
               <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={70} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v}%`, "能耗占比"]} />
-              <Bar dataKey="energy" radius={[0, 4, 4, 0]}>
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="energy" radius={[0, 4, 4, 0]}>
                 {[0, 1, 2, 3, 4].map((i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Bar>
             </BarChart>

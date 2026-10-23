@@ -34,7 +34,7 @@ export function CompletionRateChart() {
           <XAxis type="number" tick={{ fontSize: 10 }} stroke="#9ca3af" domain={[0, 120]} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="#9ca3af" width={104} />
           <Tooltip content={<CompletionTooltip />} cursor={{ fill: "rgba(59, 130, 246, 0.06)" }} />
-          <Bar dataKey="rate" name="完成率" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="rate" name="完成率" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
             {/* 条形右侧直接标注完成率（如 96%） */}
             <LabelList dataKey="rate" position="right" formatter={(v: any) => `${v}%`} style={{ fontSize: 11, fill: "#6b7280" }} />
           </Bar>

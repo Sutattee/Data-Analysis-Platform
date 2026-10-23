@@ -158,12 +158,12 @@ export function MetricForecastCard({ card }: { card: OverviewCardData }) {
                 <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: 11, paddingBottom: 4 }} />
                 {/* 预测值：蒸汽 = 蓝色柱（峰值柱橙色，点击峰值柱查看详情），其余 = 蓝色实线 */}
                 {isSteam ? (
-                  <Bar
+                  <Bar isAnimationActive animationDuration={900} animationEasing="ease-out"
                     dataKey="predict"
                     name="预测值"
                     fill="#3b82f6"
                     radius={[3, 3, 0, 0]}
-                    isAnimationActive={false}
+                   
                     onClick={(data: unknown) => {
                       const pt = (data as { payload?: TrendPoint })?.payload;
                       if (pt?.peak !== undefined && series.peakInfo) {
@@ -176,40 +176,40 @@ export function MetricForecastCard({ card }: { card: OverviewCardData }) {
                     ))}
                   </Bar>
                 ) : (
-                  <Line type="monotone" dataKey="predict" stroke="#3b82f6" strokeWidth={2} dot={false} name="预测值" isAnimationActive={false} />
+                  <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="predict" stroke="#3b82f6" strokeWidth={2} dot={false} name="预测值" />
                 )}
                 {/* 目标值（仅综合能耗）：同一条橙色实线，生效日起阶梯切换为新目标 */}
                 {isComp && (
-                  <Line
+                  <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                     type="stepAfter"
                     dataKey="target"
                     stroke="#f97316"
                     strokeWidth={1.5}
                     dot={false}
                     name="目标值"
-                    isAnimationActive={false}
+                   
                   />
                 )}
                 {/* 蒸汽峰值以橙色柱表达（不加圆点）；此处空图形仅用于生成橙色「预测峰值」图例项 */}
                 {isSteam && (
-                  <Scatter
+                  <Scatter isAnimationActive animationDuration={900} animationEasing="ease-out"
                     dataKey="peak"
                     name="预测峰值"
                     fill="#f97316"
                     legendType="circle"
                     shape={() => <g />}
-                    isAnimationActive={false}
+                   
                   />
                 )}
                 {/* 峰值标记：橙色点（仅折线图；蒸汽用橙色峰值柱表达，不加圆点） */}
                 {!isSteam && (
-                  <Scatter
+                  <Scatter isAnimationActive animationDuration={900} animationEasing="ease-out"
                     dataKey="peak"
                     shape="circle"
                     fill="#f97316"
                     legendType="circle"
                     name="预测峰值"
-                    isAnimationActive={false}
+                   
                   />
                 )}
               </ComposedChart>

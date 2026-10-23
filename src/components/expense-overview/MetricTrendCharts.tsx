@@ -101,7 +101,7 @@ export function HealthTrendChart({ subjectId }: { subjectId: string }) {
               label={{ value: b.label, position: "insideLeft", fontSize: 9, fill: "#9ca3af" }}
             />
           ))}
-          <Line
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
             type="monotone"
             dataKey="value"
             name="健康度评分"
@@ -146,10 +146,10 @@ export function RateTrendChart({ subjectId }: { subjectId: string }) {
           <Tooltip content={<TrendTooltip unit="%" />} cursor={{ stroke: "#e5e7eb" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={100} stroke="#f97316" strokeDasharray="6 4" label={{ value: "100% 预算线", position: "insideTopRight", fontSize: 10, fill: "#f97316" }} />
-          <Line type="monotone" dataKey="value" name="预算执行率" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="value" name="预算执行率" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
             <LabelList dataKey="value" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}%`)} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Line>
-          <Line type="monotone" dataKey="forecastValue" name="预测执行率" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 4" connectNulls dot={{ r: 2, fill: "#3b82f6" }}>
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="forecastValue" name="预测执行率" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 4" connectNulls dot={{ r: 2, fill: "#3b82f6" }}>
             <LabelList dataKey="forecastValue" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}%`)} style={{ fontSize: 9, fill: "#3b82f6" }} />
           </Line>
         </LineChart>
@@ -180,7 +180,7 @@ export function DeviationTrendChart({ subjectId }: { subjectId: string }) {
           <Tooltip content={<TrendTooltip unit="pct" />} cursor={{ stroke: "#e5e7eb" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1} label={{ value: "计划进度基准", position: "insideTopRight", fontSize: 10, fill: "#9ca3af" }} />
-          <Line type="monotone" dataKey="value" name="执行进度偏差" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="value" name="执行进度偏差" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
             <LabelList dataKey="value" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}`)} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Line>
         </LineChart>
@@ -201,7 +201,7 @@ export function OperatingCostTrendChart() {
           <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={56} />
           <Tooltip content={<TrendTooltip unit=" 万元" />} cursor={{ stroke: "#e5e7eb" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Line type="monotone" dataKey="value" name="运营成本" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="value" name="运营成本" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
             <LabelList dataKey="value" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}`)} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Line>
         </LineChart>
@@ -229,7 +229,7 @@ export function PerBoxTrendChart() {
             strokeDasharray="6 4"
             label={{ value: `目标值：${PER_BOX_COST.target}`, position: "insideBottomRight", fontSize: 10, fill: "#f97316" }}
           />
-          <Line type="monotone" dataKey="value" name="单箱可控费用" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="value" name="单箱可控费用" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
             <LabelList dataKey="value" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}`)} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Line>
         </LineChart>

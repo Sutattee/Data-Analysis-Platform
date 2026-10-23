@@ -63,7 +63,7 @@ export function DefectTrendChart({
             />
             <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" allowDecimals={false} />
             <Tooltip content={<TrendTooltip total={total} />} />
-            <Line
+            <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
               type="monotone"
               dataKey="count"
               name="缺陷条数"

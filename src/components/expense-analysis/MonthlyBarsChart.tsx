@@ -34,11 +34,11 @@ export function MonthlyBarsChart({ monthly }: MonthlyBarsChartProps) {
           <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={56} />
           <Tooltip content={<BarsTooltip />} cursor={{ fill: "rgba(59, 130, 246, 0.06)" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Bar dataKey="plan" name="预算计划" fill="#7dd3fc" radius={[3, 3, 0, 0]} barSize={16}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="plan" name="预算计划" fill="#7dd3fc" radius={[3, 3, 0, 0]} barSize={16}>
             {/* 柱顶展示数值 */}
             <LabelList dataKey="plan" position="top" formatter={(v: any) => Number(v).toLocaleString()} style={{ fontSize: 9, fill: "#0284c7" }} />
           </Bar>
-          <Bar dataKey="actual" name="实际执行" fill="#1d4ed8" radius={[3, 3, 0, 0]} barSize={16}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="actual" name="实际执行" fill="#1d4ed8" radius={[3, 3, 0, 0]} barSize={16}>
             <LabelList dataKey="actual" position="top" formatter={(v: any) => (v === null ? "" : Number(v).toLocaleString())} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Bar>
         </ComposedChart>

@@ -223,7 +223,7 @@ export function MetricTrendChart({
           ))}
           {/* 历史实测：实线；基准点放大（蓝圈）；值为 null 的点不渲染 dot（避免半圆残影） */}
           {/* 基准点实测触发等级时不渲染蓝圈（由等级标记 ReferenceDot + 预测线热区承接展示与点击） */}
-          <Line
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
             dataKey="histValue"
             stroke="#2563eb"
             strokeWidth={2}
@@ -268,12 +268,12 @@ export function MetricTrendChart({
               }
               return <circle cx={props.cx} cy={props.cy} r={4} fill="#2563eb" fillOpacity={0.3} />;
             }}
-            isAnimationActive={false}
+           
           />
           {/* 预测输出：虚线（首点 = 基准，与历史衔接）；值为 null 的点不渲染 dot； */}
           {/* 等级标记点叠加透明点击热区（视觉标记由 ReferenceDot 呈现），hover 高亮点 */}
           {/* 同样携带点击（默认 activeDot 会覆盖热区拦截点击，参考过程管控趋势图修复） */}
-          <Line
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
             dataKey="futureValue"
             stroke="#2563eb"
             strokeWidth={2}
@@ -328,7 +328,7 @@ export function MetricTrendChart({
               }
               return <circle cx={props.cx} cy={props.cy} r={4.5} fill="#2563eb" fillOpacity={0.3} />;
             }}
-            isAnimationActive={false}
+           
           />
           <Tooltip
             content={({ active, payload }: any) => {

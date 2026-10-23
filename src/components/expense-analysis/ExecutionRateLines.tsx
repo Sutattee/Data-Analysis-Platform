@@ -66,13 +66,13 @@ export function ExecutionRateLines({ series }: ExecutionRateLinesProps) {
           <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={44} domain={[0, 100]} unit="%" />
           <Tooltip content={<RateTooltip />} cursor={{ stroke: "#e5e7eb" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Line
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
             type="monotone" dataKey="execRate" name="预算执行率" stroke="#3b82f6" strokeWidth={2}
             dot={{ r: 3, fill: "#3b82f6" }} connectNulls
           >
             <LabelList dataKey="execRate" content={makeSideLabel(series, "execRate", "#3b82f6")} />
           </Line>
-          <Line
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
             type="monotone" dataKey="planRate" name="资金计划应执行" stroke="#f97316" strokeWidth={2}
             strokeDasharray="6 4" dot={{ r: 3, fill: "#f97316" }}
           >

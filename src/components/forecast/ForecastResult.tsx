@@ -58,13 +58,13 @@ export function ForecastResultView({ result, showMeta = true }: { result: Foreca
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               {/* 预测区间：上界浅蓝填充 + 下界白色覆盖 */}
-              <Area type="monotone" dataKey="upper" stroke="none" fill="#bfdbfe" fillOpacity={0.5} name="预测区间上界" />
-              <Area type="monotone" dataKey="lower" stroke="none" fill="#ffffff" fillOpacity={1} legendType="none" />
+              <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="upper" stroke="none" fill="#bfdbfe" fillOpacity={0.5} name="预测区间上界" />
+              <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="lower" stroke="none" fill="#ffffff" fillOpacity={1} legendType="none" />
               {chart.kind === "target" && (
-                <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
               )}
-              <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls name="实际值" />
-              <Line
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls name="实际值" />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                 type="monotone"
                 dataKey="predict"
                 stroke="#3b82f6"
@@ -86,7 +86,7 @@ export function ForecastResultView({ result, showMeta = true }: { result: Foreca
               <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={56} domain={["auto", "auto"]} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="scenario" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} name="测算工况" />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="scenario" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2 }} name="测算工况" />
             </ComposedChart>
           </ResponsiveContainer>
         )}
@@ -99,7 +99,7 @@ export function ForecastResultView({ result, showMeta = true }: { result: Foreca
               <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" width={64} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" name={`预测值(${chart.unit})`} radius={[4, 4, 0, 0]} barSize={64}>
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="value" name={`预测值(${chart.unit})`} radius={[4, 4, 0, 0]} barSize={64}>
                 {chart.bars.map((b, i) => (
                   <Cell key={i} fill={b.tone === "actual" ? "#3b82f6" : "#93c5fd"} />
                 ))}
@@ -116,7 +116,7 @@ export function ForecastResultView({ result, showMeta = true }: { result: Foreca
               <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="#9ca3af" width={180} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" name={chart.unit} radius={[0, 4, 4, 0]} barSize={20}>
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="value" name={chart.unit} radius={[0, 4, 4, 0]} barSize={20}>
                 {chart.bars.map((b, i) => (
                   <Cell key={i} fill={b.tone === "target" ? "#f97316" : "#3b82f6"} />
                 ))}

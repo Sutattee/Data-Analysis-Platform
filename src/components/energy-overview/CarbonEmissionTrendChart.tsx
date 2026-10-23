@@ -66,8 +66,8 @@ export function CarbonEmissionTrendChart({ onAnomaly }: { onAnomaly: (d: Anomaly
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
             formatter={(v: any, n: any) => [`${Number(v).toFixed(3)} ${unitLabel}`, NAME_MAP[n as string] ?? n]}
           />
-          <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
-          <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
           {data
             .filter((d) => d.anomaly)
             .map((d) => (

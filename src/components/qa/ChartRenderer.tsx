@@ -83,7 +83,7 @@ export function ChartRenderer({ content, chartType }: ChartRendererProps) {
             <Tooltip />
             <Legend />
             {valueKeys.map((key, i) => (
-              <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" key={key} dataKey={key} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />
             ))}
           </BarChart>
         );
@@ -96,7 +96,7 @@ export function ChartRenderer({ content, chartType }: ChartRendererProps) {
             <Tooltip />
             <Legend />
             {valueKeys.map((key, i) => (
-              <Line key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={{ r: 4 }} />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" key={key} type="monotone" dataKey={key} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={{ r: 4 }} />
             ))}
           </LineChart>
         );
@@ -105,7 +105,7 @@ export function ChartRenderer({ content, chartType }: ChartRendererProps) {
           <PieChart>
             <Tooltip />
             <Legend />
-            <Pie
+            <Pie isAnimationActive animationDuration={900} animationEasing="ease-out"
               data={data.map((d) => ({
                 name: d.name as string,
                 value: d[valueKeys[0]] as number,
@@ -131,7 +131,7 @@ export function ChartRenderer({ content, chartType }: ChartRendererProps) {
             <Tooltip />
             <Legend />
             {valueKeys.map((key, i) => (
-              <Area key={key} type="monotone" dataKey={key} fill={COLORS[i % COLORS.length]} stroke={COLORS[i % COLORS.length]} fillOpacity={0.2} />
+              <Area isAnimationActive animationDuration={900} animationEasing="ease-out" key={key} type="monotone" dataKey={key} fill={COLORS[i % COLORS.length]} stroke={COLORS[i % COLORS.length]} fillOpacity={0.2} />
             ))}
           </AreaChart>
         );
@@ -145,7 +145,7 @@ export function ChartRenderer({ content, chartType }: ChartRendererProps) {
             <Tooltip />
             <Legend />
             {valueKeys.slice(0, 2).map((key, i) => (
-              <Bar key={key} dataKey={key} fill={COLORS[i * 3]} radius={[4, 4, 0, 0]} />
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" key={key} dataKey={key} fill={COLORS[i * 3]} radius={[4, 4, 0, 0]} />
             ))}
           </BarChart>
         );

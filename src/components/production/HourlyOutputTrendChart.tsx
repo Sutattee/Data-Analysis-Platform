@@ -117,9 +117,9 @@ export function HourlyOutputTrendChart({ onAnomaly }: { onAnomaly: (d: AnomalyDe
             formatter={(v: any, n: any) => [v, NAME_MAP[n as string] ?? n]}
           />
           {/* 目标值恒定 1100 → 橙色水平线 */}
-          <Line type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
-          <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
-          <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#f97316" strokeDasharray="4 4" dot={false} name="目标值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
           {/* 异常偏差点：日/周/月粒度均展示（实际值低于目标值时标记） */}
           {data
             .filter((d) => d.anomaly)

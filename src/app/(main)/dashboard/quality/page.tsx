@@ -39,9 +39,9 @@ function TrendChart({ data, domain }: { data: { date: string; actual: number; ta
         <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" domain={domain} />
         <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
         <Legend wrapperStyle={{ fontSize: 11 }} />
-        <Area type="monotone" dataKey="predict" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.08} name="预测值" strokeDasharray="4 4" />
-        <Line type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
-        <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际值" dot={false} />
+        <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="predict" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.08} name="预测值" strokeDasharray="4 4" />
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
+        <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际值" dot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -71,10 +71,10 @@ export default function QualityPage() {
               <YAxis tick={{ fontSize: 10 }} stroke="#9ca3af" domain={[-0.8, 0.8]} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Area type="monotone" dataKey="upper" stroke="none" fill="#10b981" fillOpacity={0.06} name="控制上限" />
-              <Area type="monotone" dataKey="lower" stroke="none" fill="#10b981" fillOpacity={0.06} name="控制下限" />
-              <Line type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
-              <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际偏差" dot={{ r: 3 }} />
+              <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="upper" stroke="none" fill="#10b981" fillOpacity={0.06} name="控制上限" />
+              <Area isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="lower" stroke="none" fill="#10b981" fillOpacity={0.06} name="控制下限" />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="3 3" name="目标值" dot={false} />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} name="实际偏差" dot={{ r: 3 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
@@ -88,8 +88,8 @@ export default function QualityPage() {
               <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar yAxisId="left" dataKey="count" fill="#ef4444" name="缺陷数" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="right" type="monotone" dataKey="pct" stroke="#3b82f6" strokeWidth={2} name="累计占比(%)" dot={{ r: 4 }} />
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="left" dataKey="count" fill="#ef4444" name="缺陷数" radius={[4, 4, 0, 0]} />
+              <Line isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="right" type="monotone" dataKey="pct" stroke="#3b82f6" strokeWidth={2} name="累计占比(%)" dot={{ r: 4 }} />
             </ComposedChart>
           </ResponsiveContainer>
         </Card>
@@ -101,7 +101,7 @@ export default function QualityPage() {
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis domain={[85, 100]} tick={{ fontSize: 10 }} unit="分" />
               <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} formatter={(v) => [`${v} 分`, "质量得分"]} />
-              <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+              <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="score" radius={[4, 4, 0, 0]}>
                 {D.processQualityScore.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Bar>
             </BarChart>

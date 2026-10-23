@@ -81,13 +81,13 @@ export function MonthlyTrendChart({ subjectId }: { subjectId: string }) {
           <Legend wrapperStyle={{ fontSize: 11 }} />
           {/* 100% 预算线（右轴，橙色虚线） */}
           <ReferenceLine yAxisId="rate" y={100} stroke="#f97316" strokeDasharray="6 4" label={{ value: "100% 预算线", position: "insideTopRight", fontSize: 10, fill: "#f97316" }} />
-          <Bar yAxisId="amount" dataKey="plan" name="预算计划" fill="#7dd3fc" radius={[3, 3, 0, 0]} barSize={16}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="amount" dataKey="plan" name="预算计划" fill="#7dd3fc" radius={[3, 3, 0, 0]} barSize={16}>
             <LabelList dataKey="plan" position="top" formatter={(v: any) => Number(v).toLocaleString()} style={{ fontSize: 9, fill: "#0284c7" }} />
           </Bar>
           {/* 实际执行（1-8 月深蓝实心）/ 预测执行（9-12 月浅蓝虚线柱，值同预算计划）合并为同一柱系列
               共享槽位：9-12 月预测柱紧贴预算计划柱右侧、1-8 月实际柱同位，均不错位；
               预测柱不进图例（由下方蓝色虚线「预测执行」代表） */}
-          <Bar yAxisId="amount" dataKey="executed" name="实际执行" fill="#1d4ed8" radius={[3, 3, 0, 0]} barSize={16}>
+          <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="amount" dataKey="executed" name="实际执行" fill="#1d4ed8" radius={[3, 3, 0, 0]} barSize={16}>
             {data.map((d) => (
               <Cell
                 key={d.month}
@@ -99,9 +99,9 @@ export function MonthlyTrendChart({ subjectId }: { subjectId: string }) {
             ))}
             <LabelList dataKey="executed" position="top" formatter={(v: any) => Number(v).toLocaleString()} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Bar>
-          <Line yAxisId="rate" type="monotone" dataKey="cumRate" name="累计消耗度" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2, fill: "#3b82f6" }} connectNulls />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="rate" type="monotone" dataKey="cumRate" name="累计消耗度" stroke="#3b82f6" strokeWidth={2} dot={{ r: 2, fill: "#3b82f6" }} connectNulls />
           {/* 累计消耗度预测延伸（蓝色虚线，9-12 月） */}
-          <Line yAxisId="rate" type="monotone" dataKey="cumRateForecast" name="预测执行" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2, fill: "#3b82f6" }} connectNulls />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" yAxisId="rate" type="monotone" dataKey="cumRateForecast" name="预测执行" stroke="#3b82f6" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2, fill: "#3b82f6" }} connectNulls />
           {/* 预测累计超预算：橙色标记点（首点标注文字） */}
           {overPoints.map((p) => (
             <ReferenceDot

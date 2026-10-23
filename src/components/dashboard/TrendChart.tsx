@@ -57,7 +57,7 @@ export function TrendChart({ series, title, height = 280 }: TrendChartProps) {
             wrapperStyle={{ fontSize: 12 }}
           />
           {series.map((s) => (
-            <Line
+            <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
               key={s.name}
               type="monotone"
               dataKey={s.name}

@@ -49,7 +49,7 @@ function SliceTooltip({ active, payload }: any) {
 function HoverPie({ data, innerRadius }: { data: DefectSlice[]; innerRadius?: number }) {
   return (
     <PieChart>
-      <Pie
+      <Pie isAnimationActive animationDuration={900} animationEasing="ease-out"
         data={data}
         dataKey="value"
         nameKey="name"
@@ -57,7 +57,7 @@ function HoverPie({ data, innerRadius }: { data: DefectSlice[]; innerRadius?: nu
         cy="50%"
         innerRadius={innerRadius}
         outerRadius={54}
-        isAnimationActive={false}
+       
         shape={renderSector}
       >
         {data.map((s) => (
@@ -159,7 +159,7 @@ export function DefectModule() {
                   cursor={{ fill: "rgba(59, 130, 246, 0.06)" }}
                   formatter={(v: any) => [`${v} 条 · ${((v / DEFECT_TOTAL) * 100).toFixed(1)}%`, "缺陷数"]}
                 />
-                <Bar dataKey="count" name="缺陷数" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={10}>
+                <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey="count" name="缺陷数" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={10}>
                   {/* 条形右侧标注：条数 · 占比（自定义渲染强制单行，避免 Recharts 自动折行） */}
                   <LabelList
                     dataKey="count"

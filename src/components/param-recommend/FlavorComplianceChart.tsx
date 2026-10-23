@@ -194,22 +194,22 @@ export function FlavorComplianceChart({
                   />
                 ))}
                 {/* 目标线：橙虚线（dataKey 分段，标准缺失处断开） */}
-                <Line
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="goal"
                   stroke={TARGET}
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   connectNulls={false}
                   dot={false}
-                  isAnimationActive={false}
+                 
                 />
                 {/* 实际值：蓝实线；超限点橙红 + 状态文字；待核对空心琥珀；标准缺失灰点；待回传无点不连线 */}
-                <Line
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="flavor"
                   stroke={BLUE}
                   strokeWidth={2}
                   connectNulls={false}
-                  isAnimationActive={false}
+                 
                   dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
                     const v = props.payload?.flavor;
                     if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {

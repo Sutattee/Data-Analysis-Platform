@@ -152,14 +152,14 @@ export function MeasuredTrendChart({
                 label={{ value: `上限 ${upper.toFixed(metric.decimals)}${metric.unit}`, position: "insideTopLeft", fontSize: 10, fill: "#ef4444" }}
               />
             )}
-            <Line
+            <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
               name="实测值"
               dataKey="value"
               stroke={LINE_COLOR}
               strokeWidth={2}
               dot={dotOf}
               activeDot={activeDotOf}
-              isAnimationActive={false}
+             
             />
             <Tooltip
               content={({ active, payload }: any) => {

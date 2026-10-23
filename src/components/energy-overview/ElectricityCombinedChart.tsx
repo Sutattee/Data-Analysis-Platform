@@ -156,8 +156,8 @@ export function ElectricityCombinedChart({ onAnomaly }: { onAnomaly: (d: Anomaly
             contentStyle={{ borderRadius: 8, fontSize: 12 }}
             formatter={(v: any, n: any) => [v, NAME_MAP[n as string] ?? n]}
           />
-          <Line type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
-          <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="avg" stroke="#3b82f6" strokeDasharray="5 4" strokeWidth={1.5} dot={false} name="历史均值" />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} name="实际值" />
           {/* 异常偏差点仅日粒度展示（周 / 月 / 年聚合粒度不展示） */}
           {range === "日" &&
             data

@@ -160,12 +160,12 @@ export function DryingAdviceChart({
                   />
                 )}
                 {/* 实际值：蓝实线 + 圆点；待回传批次无点不连线；点热区点击打开记录详情 */}
-                <Line
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="actual"
                   stroke={BLUE}
                   strokeWidth={2}
                   connectNulls={false}
-                  isAnimationActive={false}
+                 
                   dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
                     const v = props.payload?.actual;
                     if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
@@ -187,12 +187,12 @@ export function DryingAdviceChart({
                   }}
                 />
                 {/* 建议值：绿实线 + 方点（锁定版本，逐批波动）；无历史推荐的批次空缺不连线 */}
-                <Line
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="advice"
                   stroke={GREEN}
                   strokeWidth={2}
                   connectNulls={false}
-                  isAnimationActive={false}
+                 
                   dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
                     const v = props.payload?.advice;
                     if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
