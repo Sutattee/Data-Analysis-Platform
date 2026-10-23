@@ -15,7 +15,7 @@ export default function QualityOverviewPage() {
       welcomeText="您好，我是工艺质量智能分析助手。可以问我本页的缺陷分布、过程管控指标情况，我来帮你快速定位问题。"
     >
       <div className="space-y-4">
-        <h1 className="text-xl font-bold text-gray-900">总览</h1>
+        <h1 className="text-xl font-bold text-gray-900">质量总览</h1>
 
         <QualityOverviewCards />
 

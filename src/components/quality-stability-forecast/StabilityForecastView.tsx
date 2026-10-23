@@ -3,6 +3,7 @@
 // 稳定性预测主视图：对象信息（指标 + 机台，机台含「全部」综合曲线）→ 摘要（实际值/预测最高等级/等级变化预测/窗口/更新时间/置信度）
 // → 左列（预测趋势 + 来源工序参数）右列（AI 解读 + 风险来源 + 来源工序分布）；切换指标 / 机台后全量联动
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { SourceBreakdownChart } from "@/components/quality-forecast/RiskSourceCharts";
@@ -44,9 +45,20 @@ function SummaryItem({ label, children }: { label: string; children: React.React
 }
 
 export function StabilityForecastView() {
-  // 默认选中首个启用预测模型的指标；机台默认「全部」（综合曲线），可切换单机台
-  const [code, setCode] = useState(STABILITY_METRICS[0].code);
-  const [machine, setMachine] = useState("全部");
+  const searchParams = useSearchParams();
+  // 深链初始选中（?metric=&machine=，来自工作台「预测详情」）：metric 须为已配置指标、
+  // machine 须属于该指标机台（含「全部」），任一无效则回退默认；无参数时行为不变
+  const [initial] = useState(() => {
+    const m = searchParams.get("metric");
+    const metric =
+      m && STABILITY_METRICS.some((x) => x.code === m) ? m : STABILITY_METRICS[0].code;
+    const p = searchParams.get("machine");
+    const machine =
+      p && metricMachinesOf(metric).some((x) => x.machine === p) ? p : "全部";
+    return { metric, machine };
+  });
+  const [code, setCode] = useState(initial.metric);
+  const [machine, setMachine] = useState(initial.machine);
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
 

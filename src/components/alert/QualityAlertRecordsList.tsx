@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
@@ -44,13 +44,18 @@ type SortMode = "default" | "time_desc" | "time_asc";
 // 等级/状态表头筛选；默认按等级优先级 + 同级最新优先排序）
 export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }: { basePath?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // 全量质量告警记录（实测异常 + 预测风险均展示；应用会话级处理覆盖）
   const [records, setRecords] = useState<AlertRecord[]>(() =>
     ALERT_RECORDS.filter((r) => r.id.startsWith("ZL")).map((r) => applyHandledOverride({ ...r }))
   );
-  const [filter, setFilter] = useState<QualityAlertFilter>(EMPTY_FILTER); // 输入态
-  const [applied, setApplied] = useState<QualityAlertFilter>(EMPTY_FILTER);
+  // 深链初始类型筛选（?type=实测异常|预测风险，来自工作台「全部告警记录」）：无效参数忽略
+  const [filter, setFilter] = useState<QualityAlertFilter>(() => {
+    const t = searchParams.get("type");
+    return t === "实测异常" || t === "预测风险" ? { ...EMPTY_FILTER, type: t } : EMPTY_FILTER;
+  }); // 输入态
+  const [applied, setApplied] = useState<QualityAlertFilter>(filter);
   const [phase, setPhase] = useState<Phase>("loading");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

@@ -1,240 +1,251 @@
-// 工艺参数推荐 —— 模拟数据层（加香出口水分达标场景）
-// 以「加香出口水分达标」为目标，按 牌号 × 加香机台 × 历史参考期 输出一套工艺参数建议（联合方案）；
-// 建议值由确定性规则产生：建议 = 计算基准 + 量化到步长的（来料水分 − 名义水分）× 参数敏感度，
-// 名义水分 / 敏感度 / 最低样本要求（30 条）均为明确配置，可整体替换为真实算法；
-// 候选参数 4 项按机台控制方式启用：排潮风门开度与排潮负压设定值二选一（1#/2# 风门、3# 负压）。
-import { addDaysISO } from "@/lib/mock-data/quality-defect";
+// 工艺参数推荐 —— 模拟数据层（烘丝出口水分推荐）
+// 业务链路：以加香出口水分达标为目标，结合同产线同牌号近 10 个有效历史批次与已接入工况，
+// 推算叶丝柜入口水分（模型推算），再生成下一批次烘丝出口水分推荐值；
+// 推荐须落在烘丝工艺允许范围内（12.5%~13.5%），超出不截断、不生成。
+// 确定性手锚种子：产线A 演示完整推荐链（13.20% 示例、标准换版分段、待回传/待核对/未达标/上线前空缺），
+// 产线B 演示数据不足（7/10）与超范围拒绝，产线C 演示暂无待生产批次与标准缺失。
+// 推算关系（模型口径）：烘丝出口推荐 = 加香目标 + 预计柜内损耗 − 预计加香增量（12.5 + 0.75 − 0.05 = 13.20）。
 
-// ============ 候选参数 ============
+// ============ 产线 ============
 
-export type ParamKey = "drumSpeed" | "atomizePress" | "exhaustDamper" | "exhaustVacuum";
-
-export interface ParamDef {
-  key: ParamKey;
-  name: string;
-  unit: string;
-  step: number; // 设备调整步长（建议值量化与展示精度）
-  decimals: number; // 数值展示小数位
-  pctDelta?: boolean; // 调整量用 pct（百分点）
+export interface LineDef {
+  key: "A" | "B" | "C";
+  name: string; // 产线A
+  dryer: string; // 烘丝机台
+  flavorer: string; // 加香机台
+  brands: string[]; // 该产线生产的牌号
 }
 
-export const PARAM_CANDIDATES: ParamDef[] = [
-  { key: "drumSpeed", name: "筒体转速", unit: "r/min", step: 0.5, decimals: 1 },
-  { key: "atomizePress", name: "雾化空气压力", unit: "MPa", step: 0.01, decimals: 2 },
-  { key: "exhaustDamper", name: "排潮风门开度", unit: "%", step: 1, decimals: 0, pctDelta: true },
-  { key: "exhaustVacuum", name: "排潮负压设定值", unit: "Pa", step: 50, decimals: 0 },
+export const LINES: LineDef[] = [
+  { key: "A", name: "产线A", dryer: "1#烘丝机", flavorer: "1#加香机", brands: ["娇子", "长城"] },
+  { key: "B", name: "产线B", dryer: "3#烘丝机", flavorer: "2#加香机", brands: ["长城", "宽窄"] },
+  { key: "C", name: "产线C", dryer: "5#烘丝机", flavorer: "3#加香机", brands: ["娇子", "宽窄"] },
 ];
 
-const PARAM_MAP = new Map(PARAM_CANDIDATES.map((p) => [p.key, p]));
-
-// 参数敏感度：来料水分每偏离名义值 1% 对应的建议调整量（雾化压力不参与，恒为基准值）
-const SENSITIVITY: Record<ParamKey, number> = {
-  drumSpeed: 1, // r/min / 1%
-  atomizePress: 0,
-  exhaustDamper: 4, // pct / 1%
-  exhaustVacuum: 100, // Pa / 1%
-};
-
-// 机台 → 启用参数（按实际控制方式：排潮风门开度 / 排潮负压设定值二选一）
-const MACHINE_PARAMS: Record<string, ParamKey[]> = {
-  "1#加香机": ["drumSpeed", "atomizePress", "exhaustDamper"],
-  "2#加香机": ["drumSpeed", "atomizePress", "exhaustDamper"],
-  "3#加香机": ["drumSpeed", "atomizePress", "exhaustVacuum"],
-};
-
-export function enabledParamsOf(machine: string): ParamDef[] {
-  return (MACHINE_PARAMS[machine] ?? []).map((k) => PARAM_MAP.get(k)!);
+export function lineOf(name: string): LineDef {
+  return LINES.find((l) => l.name === name) ?? LINES[0];
 }
 
-// ============ 牌号 × 机台 ============
+// ============ 加香出口水分标准（按牌号 + 生效版本） ============
 
-// 牌号按数据权限可见（模拟全量）
-export const RECOMMEND_BRANDS = ["娇子", "长城", "宽窄"];
-
-// 牌号 → 适用加香机台（机台名与工艺质量告警口径一致）
-export const BRAND_MACHINES: Record<string, string[]> = {
-  娇子: ["1#加香机", "2#加香机"],
-  长城: ["2#加香机", "3#加香机"],
-  宽窄: ["1#加香机", "3#加香机"],
-};
-
-export function machinesOfBrand(brand: string): string[] {
-  return BRAND_MACHINES[brand] ?? [];
-}
-
-// ============ 时间基准 ============
-
-// 本地当日 yyyy-mm-dd（默认参考期与「不得晚于当前日期」校验用；页面正文仅客户端渲染）
-export function todayISO(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-// 默认历史参考期：近 90 天、截至昨日（仅限定历史分析范围，不影响当前工况采集）
-export function defaultRange(): { from: string; to: string } {
-  const to = addDaysISO(todayISO(), -1);
-  return { from: addDaysISO(to, -89), to };
-}
-
-// ============ 当前工况快照 ============
-
-export interface ConditionSnapshot {
+export interface StdDef {
   brand: string;
-  machine: string;
-  inflowMoisture: number; // 来料水分 %
-  flowRate: number; // 物料流量 kg/h
-  recipeVer: string; // 配方版本（原系统版本标识）
-  batch: string; // 当前批次
-  collectedAt: string; // 工况采集时间 yyyy-MM-dd HH:mm
-  standardText: string; // 出口水分达标标准：目标（下限 ~ 上限），按牌号自动读取，不可修改
+  ver: string; // 标准版本
+  effectiveFrom: string; // 生效日 yyyy-MM-dd
+  goal: number; // 目标 %
+  low: number; // 合格下限 %
+  high: number; // 合格上限 %
 }
 
-// 出口水分达标标准（按牌号）
-const STANDARD_TEXT: Record<string, string> = {
-  娇子: "12.5%（12.0% ~ 13.0%）",
-  长城: "12.6%（12.1% ~ 13.1%）",
-  宽窄: "12.4%（11.9% ~ 12.9%）",
-};
+const STDS: StdDef[] = [
+  // 娇子：10-18 允差换版（目标不变 → 推荐值不受影响，右图分段绘制合格区间）
+  { brand: "娇子", ver: "V2026.1", effectiveFrom: "2026-09-01", goal: 12.5, low: 12.0, high: 13.0 },
+  { brand: "娇子", ver: "V2026.2", effectiveFrom: "2026-10-18", goal: 12.5, low: 12.1, high: 13.1 },
+  { brand: "长城", ver: "V2026.1", effectiveFrom: "2026-09-01", goal: 12.6, low: 12.1, high: 13.1 },
+  // 宽窄标准 10-08 才生效：更早批次 → 标准缺失（产线C 首批演示）
+  { brand: "宽窄", ver: "V2026.1", effectiveFrom: "2026-10-08", goal: 12.4, low: 11.9, high: 12.9 },
+];
 
-// 工况静态值 + 采集时刻（日期取当日拼接）
-interface CondSeed {
-  inflowMoisture: number;
-  flowRate: number;
-  recipeVer: string;
-  batch: string;
-  collectedHM: string; // 采集时刻 HH:mm
+/** 按牌号与生产日期取当时有效的标准；早于首个生效日 → undefined（标准缺失） */
+export function stdOf(brand: string, date: string): StdDef | undefined {
+  return STDS.filter((s) => s.brand === brand && s.effectiveFrom <= date).sort((a, b) =>
+    a.effectiveFrom.localeCompare(b.effectiveFrom)
+  ).pop();
 }
 
-const COND_SEEDS: Record<string, CondSeed> = {
-  "娇子|1#加香机": { inflowMoisture: 22.1, flowRate: 4850, recipeVer: "JX-PE-2026-17", batch: "2418", collectedHM: "08:42" },
-  "娇子|2#加香机": { inflowMoisture: 20.6, flowRate: 5120, recipeVer: "JX-PE-2026-08", batch: "2419", collectedHM: "09:05" },
-  "长城|2#加香机": { inflowMoisture: 21.9, flowRate: 4630, recipeVer: "CC-PE-2026-21", batch: "3105", collectedHM: "08:15" },
-  "长城|3#加香机": { inflowMoisture: 21.2, flowRate: 4780, recipeVer: "CC-PE-2026-19", batch: "3106", collectedHM: "07:58" },
-  "宽窄|1#加香机": { inflowMoisture: 22.4, flowRate: 4210, recipeVer: "KZ-PE-2026-11", batch: "1876", collectedHM: "08:30" },
-  "宽窄|3#加香机": { inflowMoisture: 21.8, flowRate: 4350, recipeVer: "KZ-PE-2026-06", batch: "1877", collectedHM: "09:12" },
-};
+// ============ 批次记录 ============
 
-// 当前工况：与所选牌号、机台及当前批次严格匹配（不套用其他牌号/批次/过期数据）
-export function conditionOf(brand: string, machine: string): ConditionSnapshot {
-  const seed = COND_SEEDS[`${brand}|${machine}`];
-  const today = todayISO();
+export interface BatchRecord {
+  batch: string; // P20261023-01
+  workOrder: string; // 工单号
+  line: string; // 产线A
+  brand: string;
+  planStart: string; // 计划开工 yyyy-MM-dd HH:mm
+  started: boolean; // 是否已开工（未开工 = 待生产）
+  startAt?: string; // 实际开工时间
+  cancelled?: boolean; // 取消工单：不计入历史 / 记录 / 有效样本
+  dryingActual: number | null; // 烘丝出口水分实际 %（null = 待回传）
+  dryingAdvice: number | null; // 开工时锁定的推荐版本建议值（null = 无有效推荐）
+  adviceReason?: string; // 无建议值原因（功能上线前 / 超出工艺范围）
+  adviceVersion?: string; // 锁定的推荐版本号
+  adviceGeneratedAt?: string; // 推荐生成时间（开工前一日自动生成并锁定）
+  flavorActual: number | null; // 加香出口水分实际 %
+  flavorLink: "已确认" | "待核对"; // 物料追溯关联状态
+}
+
+// 推荐版本号 / 生成时间（开工前一日 20:15 自动生成并锁定）
+function adviceVersionOf(batch: string): string {
+  return `REC-${batch.slice(1)}`;
+}
+function adviceGenOf(startAt: string): string {
+  const prev = new Date(Date.parse(`${startAt.slice(0, 10)}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+  return `${prev} 20:15`;
+}
+
+function mk(s: BatchRecord): BatchRecord {
+  const adviceGeneratedAt = s.started && s.dryingAdvice !== null ? adviceGenOf(s.startAt!) : undefined;
   return {
-    brand,
-    machine,
-    inflowMoisture: seed.inflowMoisture,
-    flowRate: seed.flowRate,
-    recipeVer: seed.recipeVer,
-    batch: seed.batch,
-    collectedAt: `${today} ${seed.collectedHM}`,
-    standardText: STANDARD_TEXT[brand] ?? "—",
+    ...s,
+    adviceVersion: s.dryingAdvice !== null ? adviceVersionOf(s.batch) : undefined,
+    adviceGeneratedAt,
   };
 }
 
-// ============ 参数推荐 ============
+// 种子：按产线分组、时间正序；水分值手锚（推荐 = 目标 + 0.75 − 0.05：娇子 13.20 / 长城 13.30 / 宽窄 13.10）
+export const BATCHES: BatchRecord[] = [
+  // —— 产线A（1#烘丝机 → 1#加香机）——
+  // 娇子完整有效 10 批（09-29 ~ 10-19）→ 下一批推荐 10/10
+  mk({ batch: "P20260929-01", workOrder: "WO-2609-201", line: "产线A", brand: "娇子", planStart: "2026-09-29 08:00", started: true, startAt: "2026-09-29 08:05", dryingActual: 13.2, dryingAdvice: null, adviceReason: "功能上线前批次", flavorActual: 12.5, flavorLink: "已确认" }),
+  mk({ batch: "P20261001-01", workOrder: "WO-2610-001", line: "产线A", brand: "娇子", planStart: "2026-10-01 20:00", started: true, startAt: "2026-10-01 20:03", dryingActual: 13.28, dryingAdvice: null, adviceReason: "功能上线前批次", flavorActual: 12.53, flavorLink: "已确认" }),
+  mk({ batch: "P20261002-01", workOrder: "WO-2610-004", line: "产线A", brand: "娇子", planStart: "2026-10-02 08:00", started: true, startAt: "2026-10-02 08:02", dryingActual: 13.26, dryingAdvice: null, adviceReason: "功能上线前批次", flavorActual: 12.51, flavorLink: "已确认" }),
+  mk({ batch: "P20261004-01", workOrder: "WO-2610-011", line: "产线A", brand: "娇子", planStart: "2026-10-04 08:00", started: true, startAt: "2026-10-04 08:06", dryingActual: 13.32, dryingAdvice: 13.18, flavorActual: 12.56, flavorLink: "已确认" }),
+  mk({ batch: "P20261006-01", workOrder: "WO-2610-018", line: "产线A", brand: "长城", planStart: "2026-10-06 14:00", started: true, startAt: "2026-10-06 14:04", dryingActual: 13.31, dryingAdvice: null, adviceReason: "功能上线前批次", flavorActual: 12.58, flavorLink: "已确认" }),
+  mk({ batch: "P20261008-01", workOrder: "WO-2610-025", line: "产线A", brand: "娇子", planStart: "2026-10-08 08:00", started: true, startAt: "2026-10-08 08:01", dryingActual: 13.18, dryingAdvice: 13.22, flavorActual: 12.47, flavorLink: "已确认" }),
+  mk({ batch: "P20261010-01", workOrder: "WO-2610-033", line: "产线A", brand: "长城", planStart: "2026-10-10 08:00", started: true, startAt: "2026-10-10 08:05", dryingActual: 13.42, dryingAdvice: 13.28, flavorActual: 13.14, flavorLink: "已确认" }), // 加香超上限 → 未达标
+  mk({ batch: "P20261011-01", workOrder: "WO-2610-037", line: "产线A", brand: "娇子", planStart: "2026-10-11 08:00", started: true, startAt: "2026-10-11 07:58", dryingActual: 13.35, dryingAdvice: 13.2, flavorActual: 12.52, flavorLink: "已确认" }), // 绝对差 0.15 pct（需求示例）
+  mk({ batch: "P20261013-01", workOrder: "WO-2610-045", line: "产线A", brand: "娇子", planStart: "2026-10-13 20:00", started: true, startAt: "2026-10-13 20:10", dryingActual: 13.1, dryingAdvice: 13.24, flavorActual: 12.41, flavorLink: "已确认" }),
+  mk({ batch: "P20261015-01", workOrder: "WO-2610-052", line: "产线A", brand: "娇子", planStart: "2026-10-15 08:00", started: true, startAt: "2026-10-15 08:03", dryingActual: 13.22, dryingAdvice: 13.16, flavorActual: 12.55, flavorLink: "已确认" }),
+  mk({ batch: "P20261016-01", workOrder: "WO-2610-058", line: "产线A", brand: "长城", planStart: "2026-10-16 08:00", started: true, startAt: "2026-10-16 08:02", dryingActual: 13.26, dryingAdvice: 13.33, flavorActual: 12.72, flavorLink: "已确认" }),
+  mk({ batch: "P20261017-01", workOrder: "WO-2610-063", line: "产线A", brand: "娇子", planStart: "2026-10-17 08:00", started: true, startAt: "2026-10-17 08:00", dryingActual: 13.05, dryingAdvice: 13.21, flavorActual: 12.38, flavorLink: "已确认" }), // 换版前最后一批（V2026.1）
+  mk({ batch: "P20261019-01", workOrder: "WO-2610-071", line: "产线A", brand: "娇子", planStart: "2026-10-19 08:00", started: true, startAt: "2026-10-19 08:04", dryingActual: 13.31, dryingAdvice: 13.19, flavorActual: 12.48, flavorLink: "已确认" }), // V2026.2 允差下达标
+  mk({ batch: "P20261020-01", workOrder: "WO-2610-077", line: "产线A", brand: "娇子", planStart: "2026-10-20 20:00", started: true, startAt: "2026-10-20 20:07", dryingActual: 13.24, dryingAdvice: 13.2, flavorActual: 12.5, flavorLink: "待核对" }), // 物料关联待核对
+  mk({ batch: "P20261021-01", workOrder: "WO-2610-082", line: "产线A", brand: "娇子", planStart: "2026-10-21 08:00", started: true, startAt: "2026-10-21 08:02", dryingActual: null, dryingAdvice: 13.2, flavorActual: null, flavorLink: "已确认" }), // 实际数据待回传
+  mk({ batch: "P20261023-01", workOrder: "WO-2610-090", line: "产线A", brand: "娇子", planStart: "2026-10-23 08:00", started: false, dryingActual: null, dryingAdvice: null, flavorActual: null, flavorLink: "已确认" }), // 下一批次（待生产）
 
-export interface AdviceRow {
-  key: ParamKey;
-  name: string; // 工艺参数名
-  unit: string;
-  current: string; // 当前设定值（"—" = 未接入，不用实测值冒充）
-  suggest: string; // 建议设定值（"—" = 样本不足，未生成数值）
-  delta: string; // 调整量：+1.5 / -50 / +4pct / 无需调整 / —
+  // —— 产线B（3#烘丝机 → 2#加香机）—— 宽窄有效 7 批 → 数据不足 7/10
+  mk({ batch: "P20261008-02", workOrder: "WO-2610-027", line: "产线B", brand: "宽窄", planStart: "2026-10-08 08:00", started: true, startAt: "2026-10-08 08:07", dryingActual: 13.12, dryingAdvice: 13.08, flavorActual: 12.32, flavorLink: "已确认" }),
+  mk({ batch: "P20261009-01", workOrder: "WO-2610-030", line: "产线B", brand: "长城", planStart: "2026-10-09 20:00", started: true, startAt: "2026-10-09 20:02", dryingActual: 13.3, dryingAdvice: 13.27, flavorActual: 12.62, flavorLink: "已确认" }),
+  mk({ batch: "P20261011-02", workOrder: "WO-2610-038", line: "产线B", brand: "宽窄", planStart: "2026-10-11 14:00", started: true, startAt: "2026-10-11 14:05", dryingActual: 13.18, dryingAdvice: 13.12, flavorActual: 12.45, flavorLink: "已确认" }),
+  mk({ batch: "P20261013-02", workOrder: "WO-2610-046", line: "产线B", brand: "宽窄", planStart: "2026-10-13 08:00", started: true, startAt: "2026-10-13 08:03", dryingActual: 13.05, dryingAdvice: 13.06, flavorActual: 12.24, flavorLink: "已确认" }),
+  mk({ batch: "P20261014-01", workOrder: "WO-2610-050", line: "产线B", brand: "长城", planStart: "2026-10-14 08:00", started: true, startAt: "2026-10-14 08:01", dryingActual: 13.44, dryingAdvice: 13.31, flavorActual: 12.75, flavorLink: "已确认" }),
+  mk({ batch: "P20261015-02", workOrder: "WO-2610-054", line: "产线B", brand: "宽窄", planStart: "2026-10-15 20:00", started: true, startAt: "2026-10-15 20:06", dryingActual: 13.52, dryingAdvice: 13.14, flavorActual: 12.28, flavorLink: "已确认" }),
+  mk({ batch: "P20261016-02", workOrder: "WO-2610-060", line: "产线B", brand: "宽窄", planStart: "2026-10-16 08:00", started: true, startAt: "2026-10-16 08:04", dryingActual: 13.09, dryingAdvice: 13.09, flavorActual: 12.4, flavorLink: "已确认" }),
+  mk({ batch: "P20261017-02", workOrder: "WO-2610-064", line: "产线B", brand: "长城", planStart: "2026-10-17 08:00", started: true, startAt: "2026-10-17 08:02", dryingActual: 13.22, dryingAdvice: null, adviceReason: "未生成有效推荐：超出工艺范围", flavorActual: 12.55, flavorLink: "已确认" }), // 推算 13.8 超出 12.5~13.5 → 拒绝生成
+  mk({ batch: "P20261018-02", workOrder: "WO-2610-067", line: "产线B", brand: "宽窄", planStart: "2026-10-18 08:00", started: false, cancelled: true, dryingActual: null, dryingAdvice: null, flavorActual: null, flavorLink: "已确认" }), // 取消工单：不计入任何统计
+  mk({ batch: "P20261019-02", workOrder: "WO-2610-072", line: "产线B", brand: "宽窄", planStart: "2026-10-19 08:00", started: true, startAt: "2026-10-19 08:05", dryingActual: 13.08, dryingAdvice: 13.11, flavorActual: 12.44, flavorLink: "已确认" }),
+  mk({ batch: "P20261020-02", workOrder: "WO-2610-078", line: "产线B", brand: "宽窄", planStart: "2026-10-20 08:00", started: true, startAt: "2026-10-20 08:00", dryingActual: 13.21, dryingAdvice: 13.05, flavorActual: 12.36, flavorLink: "已确认" }),
+  mk({ batch: "P20261021-02", workOrder: "WO-2610-083", line: "产线B", brand: "长城", planStart: "2026-10-21 14:00", started: true, startAt: "2026-10-21 14:03", dryingActual: null, dryingAdvice: 13.32, flavorActual: null, flavorLink: "已确认" }), // 待回传
+  mk({ batch: "P20261022-16", workOrder: "WO-2610-088", line: "产线B", brand: "宽窄", planStart: "2026-10-22 20:00", started: false, dryingActual: null, dryingAdvice: null, flavorActual: null, flavorLink: "已确认" }), // 下一批次（待生产）
+
+  // —— 产线C（5#烘丝机 → 3#加香机）—— 无待生产工单
+  mk({ batch: "P20261005-01", workOrder: "WO-2610-015", line: "产线C", brand: "宽窄", planStart: "2026-10-05 08:00", started: true, startAt: "2026-10-05 08:04", dryingActual: 13.16, dryingAdvice: null, adviceReason: "功能上线前批次", flavorActual: 12.3, flavorLink: "已确认" }), // 早于宽窄标准生效日 → 标准缺失
+  mk({ batch: "P20261008-03", workOrder: "WO-2610-028", line: "产线C", brand: "娇子", planStart: "2026-10-08 08:00", started: true, startAt: "2026-10-08 08:06", dryingActual: 13.2, dryingAdvice: 13.22, flavorActual: 12.5, flavorLink: "已确认" }),
+  mk({ batch: "P20261010-02", workOrder: "WO-2610-034", line: "产线C", brand: "宽窄", planStart: "2026-10-10 14:00", started: true, startAt: "2026-10-10 14:02", dryingActual: 13.14, dryingAdvice: 13.08, flavorActual: 12.42, flavorLink: "已确认" }),
+  mk({ batch: "P20261012-01", workOrder: "WO-2610-042", line: "产线C", brand: "娇子", planStart: "2026-10-12 08:00", started: true, startAt: "2026-10-12 08:03", dryingActual: 13.29, dryingAdvice: 13.18, flavorActual: 12.57, flavorLink: "已确认" }),
+  mk({ batch: "P20261014-02", workOrder: "WO-2610-051", line: "产线C", brand: "宽窄", planStart: "2026-10-14 20:00", started: true, startAt: "2026-10-14 20:05", dryingActual: 13.36, dryingAdvice: 13.12, flavorActual: 11.86, flavorLink: "已确认" }), // 低于下限 → 未达标
+  mk({ batch: "P20261016-03", workOrder: "WO-2610-059", line: "产线C", brand: "娇子", planStart: "2026-10-16 08:00", started: true, startAt: "2026-10-16 08:01", dryingActual: 13.15, dryingAdvice: 13.21, flavorActual: 12.44, flavorLink: "已确认" }),
+  mk({ batch: "P20261018-01", workOrder: "WO-2610-068", line: "产线C", brand: "宽窄", planStart: "2026-10-18 08:00", started: true, startAt: "2026-10-18 08:07", dryingActual: 13.1, dryingAdvice: 13.07, flavorActual: 12.33, flavorLink: "已确认" }),
+  mk({ batch: "P20261019-03", workOrder: "WO-2610-074", line: "产线C", brand: "娇子", planStart: "2026-10-19 20:00", started: true, startAt: "2026-10-19 20:04", dryingActual: 13.27, dryingAdvice: 13.19, flavorActual: 12.61, flavorLink: "已确认" }),
+  mk({ batch: "P20261021-03", workOrder: "WO-2610-084", line: "产线C", brand: "宽窄", planStart: "2026-10-21 08:00", started: true, startAt: "2026-10-21 08:02", dryingActual: 13.19, dryingAdvice: 13.1, flavorActual: 12.47, flavorLink: "已确认" }),
+  mk({ batch: "P20261021-04", workOrder: "WO-2610-086", line: "产线C", brand: "娇子", planStart: "2026-10-21 20:00", started: true, startAt: "2026-10-21 20:08", dryingActual: null, dryingAdvice: 13.2, flavorActual: null, flavorLink: "已确认" }), // 待回传
+];
+
+// ============ 查询 ============
+
+/** 最近 n 个已开工未取消批次（时间正序；brand="全部" 不过滤；含实际数据未回传批次） */
+export function historyOf(line: string, brand: string, n: number): BatchRecord[] {
+  return BATCHES.filter((b) => b.line === line && b.started && !b.cancelled && (brand === "全部" || b.brand === brand)).slice(-n);
 }
 
-export interface RecommendResult {
-  rows: AdviceRow[];
-  sampleCount: number; // 参考期内匹配有效历史样本数
-  insufficient: boolean; // 样本不足 → 不输出数值建议
+/** 全部可展示记录（含待生产，不含取消），时间正序 */
+export function recordsOf(line: string, brand: string): BatchRecord[] {
+  return BATCHES.filter((b) => b.line === line && !b.cancelled && (brand === "全部" || b.brand === brand));
 }
 
-export const MIN_SAMPLES = 30; // 最低样本要求（条，明确配置）
-
-// 组合种子：名义水分（敏感度基准）/ 样本密度 / 当前设定值（null = 未接入）/ 达标组合基准
-interface ComboSeed {
-  nominalMoisture: number;
-  density: number; // 有效历史样本密度（条/天）
-  setpoints: Record<ParamKey, number | null>;
-  refs: Record<ParamKey, number>; // 历史达标组合基准（当前设定值未接入时的建议计算基准）
+/** 模型有效历史口径：已开工未取消、烘丝与加香实际值完整、物料关联已确认（待核对不计入） */
+export function validHistoryOf(line: string, brand: string): BatchRecord[] {
+  return BATCHES.filter(
+    (b) =>
+      b.line === line &&
+      !b.cancelled &&
+      b.started &&
+      b.brand === brand &&
+      b.dryingActual !== null &&
+      b.flavorActual !== null &&
+      b.flavorLink === "已确认"
+  );
 }
 
-const COMBO_SEEDS: Record<string, ComboSeed> = {
-  "娇子|1#加香机": {
-    nominalMoisture: 21.0, density: 1.8,
-    setpoints: { drumSpeed: 11.5, atomizePress: 0.32, exhaustDamper: 62, exhaustVacuum: null },
-    refs: { drumSpeed: 11.5, atomizePress: 0.32, exhaustDamper: 62, exhaustVacuum: 750 },
-  },
-  "娇子|2#加香机": {
-    nominalMoisture: 21.0, density: 1.6,
-    setpoints: { drumSpeed: 12.0, atomizePress: 0.30, exhaustDamper: 58, exhaustVacuum: null },
-    refs: { drumSpeed: 12.0, atomizePress: 0.30, exhaustDamper: 58, exhaustVacuum: 750 },
-  },
-  "长城|2#加香机": {
-    nominalMoisture: 20.5, density: 2.0,
-    setpoints: { drumSpeed: 11.0, atomizePress: 0.28, exhaustDamper: 65, exhaustVacuum: null },
-    refs: { drumSpeed: 11.0, atomizePress: 0.28, exhaustDamper: 65, exhaustVacuum: 750 },
-  },
-  "长城|3#加香机": {
-    nominalMoisture: 20.5, density: 1.7,
-    setpoints: { drumSpeed: 10.5, atomizePress: 0.26, exhaustDamper: null, exhaustVacuum: 750 },
-    refs: { drumSpeed: 10.5, atomizePress: 0.26, exhaustDamper: 60, exhaustVacuum: 750 },
-  },
-  // 雾化空气压力设定值未接入 → 当前设定值/调整量显 "—"（建议值仍输出）
-  "宽窄|1#加香机": {
-    nominalMoisture: 22.0, density: 1.9,
-    setpoints: { drumSpeed: 12.5, atomizePress: null, exhaustDamper: 55, exhaustVacuum: null },
-    refs: { drumSpeed: 12.5, atomizePress: 0.30, exhaustDamper: 55, exhaustVacuum: 750 },
-  },
-  // 样本密度低 → 90 天样本约 18 条 < 最低样本要求 30 条 → 不输出数值建议
-  "宽窄|3#加香机": {
-    nominalMoisture: 21.5, density: 0.2,
-    setpoints: { drumSpeed: 11.0, atomizePress: 0.27, exhaustDamper: null, exhaustVacuum: 700 },
-    refs: { drumSpeed: 11.0, atomizePress: 0.27, exhaustDamper: 60, exhaustVacuum: 700 },
-  },
-};
+export type BatchResult = "待生产" | "待回传" | "待核对" | "达标" | "未达标" | "标准缺失";
 
-const roundTo = (v: number, step: number) => Math.round(v / step) * step;
-const fmt = (v: number, decimals: number) => v.toFixed(decimals);
-
-// 参考期内匹配有效历史样本数 = 参考期天数 × 组合样本密度（确定性取整）
-export function sampleCountOf(brand: string, machine: string, from: string, to: string): number {
-  const seed = COMBO_SEEDS[`${brand}|${machine}`];
-  const days = Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
-  return Math.max(0, Math.round(Math.max(0, days) * seed.density));
+/** 结果状态判定（优先级：待生产 → 标准缺失 → 待核对 → 待回传 → 按当时有效标准判达标） */
+export function resultOf(b: BatchRecord): BatchResult {
+  if (!b.started) return "待生产";
+  const std = stdOf(b.brand, (b.startAt ?? b.planStart).slice(0, 10));
+  if (!std) return "标准缺失";
+  if (b.flavorLink === "待核对" && b.flavorActual !== null) return "待核对";
+  if (b.flavorActual === null || b.dryingActual === null) return "待回传";
+  return b.flavorActual >= std.low && b.flavorActual <= std.high ? "达标" : "未达标";
 }
 
-// 生成参数建议：历史参考期内匹配同牌号、同机台、相近工况的有效历史数据，
-// 从达标表现较好的参数组合生成一套联合建议（多参数整体方案，不分别取优拼接）
-export function recommendOf(
-  brand: string,
-  machine: string,
-  from: string,
-  to: string,
-  inflowMoisture: number
-): RecommendResult {
-  const seed = COMBO_SEEDS[`${brand}|${machine}`];
-  const sampleCount = sampleCountOf(brand, machine, from, to);
-  const insufficient = sampleCount < MIN_SAMPLES;
-  const dev = inflowMoisture - seed.nominalMoisture; // 来料水分相对名义值的偏差
+/** 绝对差 pct：实际与建议均有效才算，未舍入原值计算 */
+export function absDiffOf(b: BatchRecord): number | null {
+  if (b.dryingActual === null || b.dryingAdvice === null) return null;
+  return Math.abs(b.dryingActual - b.dryingAdvice);
+}
 
-  const rows: AdviceRow[] = enabledParamsOf(machine).map((def) => {
-    const cur = seed.setpoints[def.key]; // null = 该机台此参数设定值未接入
-    const current = cur === null ? "—" : fmt(cur, def.decimals);
-    if (insufficient) {
-      // 无法形成有样本支持的合规方案 → 不输出数值
-      return { key: def.key, name: def.name, unit: def.unit, current, suggest: "—", delta: "—" };
-    }
-    // 建议值 = 计算基准（当前设定，未接入时取达标组合基准）+ 水分偏差敏感度，量化到设备调整步长
-    const base = cur ?? seed.refs[def.key];
-    const suggest = roundTo(base + dev * SENSITIVITY[def.key], def.step);
-    // 当前设定值未接入 → 调整量无法计算；与当前一致 → 无需调整
-    const delta =
-      cur === null
-        ? "—"
-        : Math.abs(suggest - cur) < 1e-9
-          ? "无需调整"
-          : `${suggest > cur ? "+" : "-"}${fmt(Math.abs(suggest - cur), def.decimals)}${def.pctDelta ? "pct" : ""}`;
-    return { key: def.key, name: def.name, unit: def.unit, current, suggest: fmt(suggest, def.decimals), delta };
-  });
-  return { rows, sampleCount, insufficient };
+// ============ 下一批次推荐 ============
+
+export const DRYING_RANGE = { low: 12.5, high: 13.5 }; // 烘丝出口水分工艺允许范围 %
+export const MODEL_VER = "烘丝出口水分推荐模型 v2.3";
+export const DATA_AS_OF = "2026-10-22 09:30"; // 数据截至
+export const REC_CHAIN = { cabinetLoss: 0.75, flavorGain: 0.05 }; // 推算链：目标 + 柜内损耗 − 加香增量
+
+export type RecStatus = "已生成" | "数据不足" | "超出工艺范围" | "生成失败" | "暂无待生产";
+
+export interface NextRecommendation {
+  status: RecStatus;
+  batch?: BatchRecord; // 下一批次（排产顺序首条未开工未取消工单）
+  value?: number; // 烘丝出口水分推荐值 %
+  inletMoisture?: number; // 叶丝柜入口水分（模型推算）%
+  validCount: number; // 同产线同牌号有效历史批次数（X/10）
+  dataAsOf: string;
+  generatedAt?: string;
+  version?: string; // 推荐版本（重算保留版本）
+  modelVer: string;
+  confidence?: number; // 仅算法提供有效数值时展示
+  std?: StdDef; // 下一批次适用的加香标准
+}
+
+/** 下一批次推荐（按产线实际排产；brand 仅用于页面匹配提示，不改变推荐对象） */
+export function nextRecommendationOf(line: string): NextRecommendation {
+  const base: NextRecommendation = { status: "暂无待生产", validCount: 0, dataAsOf: DATA_AS_OF, modelVer: MODEL_VER };
+  const next = BATCHES.find((b) => b.line === line && !b.started && !b.cancelled);
+  if (!next) return base;
+
+  const valid = validHistoryOf(line, next.brand);
+  const std = stdOf(next.brand, DATA_AS_OF.slice(0, 10));
+  const rec: NextRecommendation = {
+    ...base,
+    status: "已生成",
+    batch: next,
+    validCount: valid.length,
+    std,
+    generatedAt: "2026-10-22 09:31",
+    version: "REC-2610-090-v2",
+  };
+  if (!std || valid.length < 10) {
+    // 有效历史不足 10 批 → 不输出数值（产线B 演示 7/10）
+    return { ...rec, status: "数据不足" };
+  }
+  const value = std.goal + REC_CHAIN.cabinetLoss - REC_CHAIN.flavorGain;
+  if (value < DRYING_RANGE.low || value > DRYING_RANGE.high) {
+    return { ...rec, status: "超出工艺范围" };
+  }
+  // 产线A 演示：算法提供有效置信度与验证依据；其余产线不提供 → 隐藏
+  if (line === "产线A") rec.confidence = 0.992;
+  return { ...rec, value, inletMoisture: value };
+}
+
+// ============ 展示工具 ============
+
+/** 水分 / 差值两位小数展示 */
+export function fmt2(v: number | null | undefined): string {
+  return v === null || v === undefined ? "—" : v.toFixed(2);
+}
+
+/** 图表横轴短标签：批次号 → "MM-DD·序号"（同日多批不冲突） */
+export function batchLabelOf(batch: string): string {
+  const [mmdd, seq] = batch.slice(5).split("-");
+  return `${mmdd.slice(0, 2)}-${mmdd.slice(2)}·${seq}`;
 }

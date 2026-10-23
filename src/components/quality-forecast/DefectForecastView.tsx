@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { RiskTrendChart } from "./RiskTrendChart";
@@ -82,13 +83,27 @@ function DevCell({ dev }: { dev: ParamCell["dev"] }) {
   return <span className={`font-medium ${cls}`}>{dev.text}</span>;
 }
 
+// 深链初始选中（?code=&object=&batch=，来自工作台「预测详情」）：code 取默认兜底，
+// object 按名称或机台编码匹配，batch 须属于该对象，任一无效则回退该缺陷的默认目标
+function deepTargetOf(params: URLSearchParams) {
+  const base = defaultTargetOf(params.get("code") ?? undefined);
+  const o = params.get("object");
+  const obj = o ? forecastObjectsOf(base.code).find((x) => x.key === o || x.code === o) : undefined;
+  const objectKey = obj?.key ?? base.objectKey;
+  const b = params.get("batch");
+  const batch = b && (obj ? obj.batches.includes(b) : b === base.batch) ? b : defaultBatchOf(base.code, objectKey);
+  return { code: base.code, objectKey, batch };
+}
+
 // 缺陷预测主视图：顶部项目及对象选择（缺陷单选 → 预测对象联动 → 多批次分别预测，字段与控件同行），
 // 只读上下文紧随其后；风险摘要字段值同行、无卡片标题（压缩高度让参数表进第一屏）；左侧主区域（预测趋势 / 关联参数表），
 // 右侧辅助区域（AI 解读 / 贡献度 / 来源分布）。本期仅展示最新一轮预测：切换对象即整轮切换，不混合轮次。
 export function DefectForecastView() {
-  const [code, setCode] = useState(() => defaultTargetOf().code);
-  const [objectKey, setObjectKey] = useState(() => defaultTargetOf().objectKey);
-  const [batch, setBatch] = useState(() => defaultTargetOf().batch);
+  const searchParams = useSearchParams();
+  const [initial] = useState(() => deepTargetOf(searchParams));
+  const [code, setCode] = useState(initial.code);
+  const [objectKey, setObjectKey] = useState(initial.objectKey);
+  const [batch, setBatch] = useState(initial.batch);
   // 点击趋势图标记点（窗口最高风险点 / 已达阈值的基准点）→ 构造告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
 
