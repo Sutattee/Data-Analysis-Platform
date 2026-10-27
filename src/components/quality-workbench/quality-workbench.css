@@ -72,12 +72,11 @@
 #quality-workbench-final .qw-badge.source{color:var(--qw-muted);background:var(--qw-bg)}
 #quality-workbench-final .qw-badge.prediction{color:var(--qw-lilac);background:var(--qw-lilac-bg)}
 #quality-workbench-final .qw-badge.defect{color:var(--qw-teal);background:var(--qw-teal-bg)}
-#quality-workbench-final .qw-state{margin-left:auto;color:var(--qw-muted);font-size:11px}
 #quality-workbench-final .qw-alert-title{font-size:13px;font-weight:500;overflow-wrap:anywhere}
-#quality-workbench-final .qw-alert-insight{margin-top:7px;padding:7px 9px;border-radius:5px;background:var(--qw-blue-bg);font-size:11px;color:var(--qw-blue-ink)}
-#quality-workbench-final .qw-alert-insight strong{margin-right:5px}
 #quality-workbench-final .qw-row-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:7px}
 #quality-workbench-final .qw-meta{font-size:11px;color:var(--qw-muted);overflow-wrap:anywhere}
+#quality-workbench-final .qw-alert-insight{margin-top:7px;padding:7px 9px;border-radius:5px;background:var(--qw-blue-bg);font-size:11px;color:var(--qw-blue-ink)}
+#quality-workbench-final .qw-alert-insight strong{margin-right:5px}
 #quality-workbench-final .qw-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 #quality-workbench-final .qw-text-button{font-size:11px;color:var(--qw-blue);padding:5px 0;white-space:nowrap}
 #quality-workbench-final .qw-footer-link{border-top:1px solid var(--qw-line);padding:9px 15px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
@@ -88,8 +87,7 @@
 #quality-workbench-final .qw-defect-row h3{margin:6px 0 5px}
 #quality-workbench-final .qw-defect-context{font-size:11px;color:var(--qw-muted);margin-top:3px}
 #quality-workbench-final .qw-sample-values{font-size:11px;margin-top:8px}
-#quality-workbench-final .qw-ai-summary{font-size:11px;color:var(--qw-muted);margin-top:7px;padding:7px 8px;background:var(--qw-bg);border-radius:5px}
-#quality-workbench-final .qw-defect-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
+#quality-workbench-final .qw-defect-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:10px}
 #quality-workbench-final .qw-recommend-list{padding:4px 14px 6px}
 #quality-workbench-final .qw-recommend{display:flex;align-items:center;gap:9px;width:100%;padding:11px 0;border-bottom:1px solid var(--qw-line)}
 #quality-workbench-final .qw-recommend:last-child{border:0}

@@ -3,17 +3,18 @@
 import { Button } from "@/components/ui/Button";
 import {
   defectRateOf,
+  isDiagnosed,
   primaryActionOf,
   summaryOf,
   type DiagTask,
 } from "@/lib/mock-data/defect-diagnosis-flow";
 
-// 处理状态徽章（两档）：待判定（含未诊断/诊断中/待判定）琥珀，已判定绿
+// 处理状态徽章（两档，按是否完成智能诊断划分）：待诊断（未诊断/诊断中）琥珀，已诊断（待判定/已判定）绿
 export function judgeBadgeOf(t: DiagTask) {
-  return t.status === "已判定" ? (
-    <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">已判定</span>
+  return isDiagnosed(t) ? (
+    <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">已诊断</span>
   ) : (
-    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">待判定</span>
+    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">待诊断</span>
   );
 }
 

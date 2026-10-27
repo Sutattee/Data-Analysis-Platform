@@ -310,7 +310,7 @@ export function StabilityForecastView() {
         </div>
       </Card>
 
-      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（当前状态）约 6:4，突出未来风险 */}
+      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（当前状态）约 5:5，突出未来风险 */}
       <Card
         title="预测概况"
         divider={false}
@@ -325,9 +325,9 @@ export function StabilityForecastView() {
           </button>
         }
       >
-        <div className="grid gap-6 px-5 pb-5 pt-2 lg:grid-cols-5">
+        <div className="grid gap-6 px-5 pb-5 pt-2 lg:grid-cols-2">
           {/* 左：预测结论（窗口最高等级大字 + 升级时间；合并原预测窗口 / 最高等级 / 等级变化三字段） */}
-          <div className="lg:col-span-3">
+          <div>
             <p className="text-xs text-gray-400">{metric.rule ? `${windowTextOf(metric.cycle)}最高等级` : "本轮预测"}</p>
             <div className="mt-2">
               {maxLv ? (
@@ -347,7 +347,7 @@ export function StabilityForecastView() {
           </div>
 
           {/* 右：当前状态（最新实际值深色大数字 + 当前等级标签 + 管控值小字；与左侧未来预测等级区分） */}
-          <div className="lg:col-span-2">
+          <div>
             <p className="text-xs text-gray-400">最新实际值</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="text-2xl font-bold tabular-nums text-gray-900">

@@ -117,7 +117,7 @@ export function AlarmPanel({
                 )}
                 <div className="qw-row-bottom">
                   <span className="qw-meta">
-                    {a.objectName} · {a.triggerTime.slice(5)}
+                    {a.triggerTime.slice(5)}
                   </span>
                   <div className="qw-actions">
                     {a.forecastHref && (

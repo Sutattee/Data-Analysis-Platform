@@ -14,6 +14,12 @@ const momCls = (v: number) => {
   return v > 0 ? "text-orange-500" : "text-green-600";
 };
 
+// 优质品率同/环比着色：率上升为改善（↑ 绿 / ↓ 橙），与缺陷率口径相反
+const upCls = (v: number) => {
+  if (v === 0) return "text-gray-400";
+  return v > 0 ? "text-green-600" : "text-orange-500";
+};
+
 // 顶部 4 张指标卡：缺陷率（支持 A/B/C/D 等级切换）、成品/制丝优质品率、包装与卷制加权平均分
 export function QualityOverviewCards() {
   const [grade, setGrade] = useState("all");
@@ -60,8 +66,17 @@ export function QualityOverviewCards() {
           <span className="text-2xl font-bold text-gray-900">{FINISHED_PREMIUM.value.toFixed(1)}</span>
           <span className="text-sm text-gray-400">%</span>
         </div>
-        <div className="text-xs text-gray-400">
-          近10批 {FINISHED_PREMIUM.rangeLow.toFixed(1)} – {FINISHED_PREMIUM.rangeHigh.toFixed(1)} %
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-400">同比</span>
+          <span className={upCls(FINISHED_PREMIUM.yoy)}>
+            {FINISHED_PREMIUM.yoy > 0 ? "↑" : FINISHED_PREMIUM.yoy < 0 ? "↓" : ""}
+            {Math.abs(FINISHED_PREMIUM.yoy).toFixed(1)}
+          </span>
+          <span className="ml-1 text-gray-400">环比</span>
+          <span className={upCls(FINISHED_PREMIUM.mom)}>
+            {FINISHED_PREMIUM.mom > 0 ? "↑" : FINISHED_PREMIUM.mom < 0 ? "↓" : ""}
+            {Math.abs(FINISHED_PREMIUM.mom).toFixed(1)}
+          </span>
         </div>
       </div>
 
@@ -75,8 +90,17 @@ export function QualityOverviewCards() {
           <span className="text-2xl font-bold text-gray-900">{SILK_PREMIUM.value.toFixed(1)}</span>
           <span className="text-sm text-gray-400">%</span>
         </div>
-        <div className="text-xs text-gray-400">
-          近10批 {SILK_PREMIUM.rangeLow.toFixed(1)} – {SILK_PREMIUM.rangeHigh.toFixed(1)} %
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-400">同比</span>
+          <span className={upCls(SILK_PREMIUM.yoy)}>
+            {SILK_PREMIUM.yoy > 0 ? "↑" : SILK_PREMIUM.yoy < 0 ? "↓" : ""}
+            {Math.abs(SILK_PREMIUM.yoy).toFixed(1)}
+          </span>
+          <span className="ml-1 text-gray-400">环比</span>
+          <span className={upCls(SILK_PREMIUM.mom)}>
+            {SILK_PREMIUM.mom > 0 ? "↑" : SILK_PREMIUM.mom < 0 ? "↓" : ""}
+            {Math.abs(SILK_PREMIUM.mom).toFixed(1)}
+          </span>
         </div>
       </div>
 

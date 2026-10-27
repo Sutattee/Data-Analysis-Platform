@@ -9,6 +9,7 @@ import { DIAG_CATALOG } from "@/lib/mock-data/quality-defect";
 import {
   ensureProgress,
   getDiagVersion,
+  isDiagnosed,
   listTasks,
   primaryActionOf,
   statusCounts,
@@ -18,7 +19,7 @@ import {
 import { DiagnosisTaskCard } from "./DiagnosisTaskCard";
 import { DiagnosisTaskTable } from "./DiagnosisTaskTable";
 
-type TabKey = "pending" | "judged" | "all";
+type TabKey = "pending" | "diagnosed" | "all";
 type ViewKey = "card" | "table";
 
 interface Filters {
@@ -58,7 +59,7 @@ function loadSaved(): SavedState | null {
   }
 }
 
-// 缺陷诊断任务列表：状态 tab（待处理/已判定/全部）+ 卡片/表格视图 + 基础/展开筛选；
+// 缺陷诊断任务列表：状态 tab（待诊断/已诊断/全部，按是否完成智能诊断划分）+ 卡片/表格视图 + 基础/展开筛选；
 //智能诊断状态实时刷新（useSyncExternalStore 订阅会话级 store）
 export function DefectDiagnosisView() {
   const router = useRouter();
@@ -90,7 +91,7 @@ export function DefectDiagnosisView() {
   useEffect(() => {
     const s = loadSaved();
     if (s && !validCode) {
-      setTab(s.tab);
+      setTab(s.tab === "diagnosed" || s.tab === "all" ? s.tab : "pending"); // 旧存档 tab 值（如 judged）回落待诊断
       setView(s.view);
       setDraft(s.draft);
       setApplied(s.applied);
@@ -137,7 +138,7 @@ export function DefectDiagnosisView() {
           (!kw || batch.includes(kw)) &&
           (applied.brand === "all" || t.occurrence.brand === applied.brand) &&
           (applied.shift === "all" || t.occurrence.shift === applied.shift) &&
-          (tab === "all" || (tab === "judged" ? t.status === "已判定" : t.status !== "已判定"))
+          (tab === "all" || (tab === "diagnosed" ? isDiagnosed(t) : !isDiagnosed(t)))
         );
       })
       .sort((a, b) => {
@@ -175,8 +176,8 @@ export function DefectDiagnosisView() {
   const label = "flex items-center gap-1.5";
 
   const tabs: { key: TabKey; text: string; count: number }[] = [
-    { key: "pending", text: "待处理", count: counts.pending },
-    { key: "judged", text: "已判定", count: counts.judged },
+    { key: "pending", text: "待诊断", count: counts.pending },
+    { key: "diagnosed", text: "已诊断", count: counts.diagnosed },
     { key: "all", text: "全部", count: counts.all },
   ];
 

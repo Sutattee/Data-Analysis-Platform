@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import {
@@ -18,7 +17,7 @@ const gradeCls = (g: string) =>
 
 // 缺陷明细表：随顶部筛选联动，默认按检验日期倒序；
 // 自身支持按缺陷名称/代码关键词筛选；滚动区域 + 表头固定；
-// 缺陷代码/名称链接跳缺陷诊断页，整行与「查看」打开诊断抽屉
+// 整行与「查看」打开缺陷详情抽屉（名称/代码为纯文本，不跳转缺陷诊断页）
 export function DefectDetailTable({
   filters,
   onOpen,
@@ -80,24 +79,8 @@ export function DefectDetailTable({
                   className="cursor-pointer transition-colors hover:bg-gray-50"
                 >
                   <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{r.part}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <Link
-                      href={`/quality/diagnosis/defect?code=${r.code}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
-                    >
-                      {r.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
-                    <Link
-                      href={`/quality/diagnosis/defect?code=${r.code}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="font-mono text-xs text-primary-600 hover:text-primary-700 hover:underline"
-                    >
-                      {r.code}
-                    </Link>
-                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap font-medium text-gray-700">{r.name}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap font-mono text-xs text-gray-600">{r.code}</td>
                   <td className={`px-3 py-2.5 whitespace-nowrap ${gradeCls(r.grade)}`}>{r.grade}类</td>
                   <td className="px-3 py-2.5 whitespace-nowrap font-medium text-gray-800">{r.count}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-gray-600">{r.sampled}</td>

@@ -1,7 +1,10 @@
 "use client";
 
-// 指标值维护：固定维护「工业总产值」的月度值（无法通过业务系统自动获取、需人工填报）
-// 筛选（数据月份）+ 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
+// 指标值管理：顶部三页签（目标值 | 指标值 | 管控值）切换
+// - 目标值：选择支持配置的指标 → 当前生效目标 + 历史版本列表 + 新增目标值（原「目标值管理」页迁入）
+// - 指标值：固定维护「工业总产值」的月度值（无法通过业务系统自动获取、需人工填报），
+//   月份筛选 + 记录列表 + 新增/编辑抽屉 + 查看/删除弹窗
+// - 管控值：三类管控值统一维护（过程管控指标 / 缺陷部位缺陷率 / 缺陷指标）
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -9,13 +12,17 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { MetricValueFormDrawer } from "@/components/settings/MetricValueFormDrawer";
+import { TargetManagement } from "@/components/settings/TargetManagement";
+import { ControlManagement } from "@/components/settings/ControlManagement";
+import { metricList } from "@/lib/mock-data/metric-management";
+import { SUPPORTED_TARGET_METRICS } from "@/lib/mock-data/metric-targets";
 import {
   FIXED_METRIC,
   listMetricValues,
   monthLabel,
   removeMetricValue,
 } from "@/lib/mock-data/metric-values";
-import type { MetricValueRecord } from "@/types";
+import type { MetricManage, MetricValueRecord } from "@/types";
 
 // 只读字段（查看弹窗用）
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -35,13 +42,34 @@ function fmtValue(v: number, decimals: number): string {
   return v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+// 顶部页签：目标值 | 指标值 | 管控值
+const TABS = [
+  { key: "target", label: "目标值" },
+  { key: "value", label: "指标值" },
+  { key: "control", label: "管控值" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
 export default function MetricValuePage() {
   const toast = useToast();
   const { state } = useApp();
 
+  const [tab, setTab] = useState<TabKey>("target");
+
+  // 目标值页签：仅支持配置目标值的指标可选
+  const targetMetrics = useMemo(
+    () =>
+      SUPPORTED_TARGET_METRICS
+        .map((id) => metricList.find((m) => m.id === id))
+        .filter((m): m is MetricManage => !!m),
+    []
+  );
+  const [targetMetricId, setTargetMetricId] = useState(targetMetrics[0]?.id ?? "");
+  const targetMetric = targetMetrics.find((m) => m.id === targetMetricId) ?? targetMetrics[0];
+
   const [rows, setRows] = useState<MetricValueRecord[]>(() => listMetricValues());
 
-  // 筛选条件（数据月份，精确匹配）
+  // 筛选条件（数据月份，精确匹配；仅指标值页签使用）
   const [fMonth, setFMonth] = useState("");
 
   // 交互态
@@ -50,12 +78,12 @@ export default function MetricValuePage() {
   const [viewTarget, setViewTarget] = useState<MetricValueRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MetricValueRecord | null>(null);
 
-  // 筛选条件变更时模拟加载
+  // 切换页签 / 筛选条件变更时模拟加载
   useEffect(() => {
     setLoading(true);
     const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
-  }, [fMonth]);
+  }, [tab, fMonth]);
 
   // 过滤：数据月份（记录月份精确匹配所选月份）
   const filtered = useMemo(
@@ -84,113 +112,165 @@ export default function MetricValuePage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">指标值维护</h1>
+        <h1 className="text-xl font-bold text-gray-900">指标值管理</h1>
       </div>
 
-      {/* 筛选区 + 新增按钮 */}
-      <Card padding>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* 数据月份筛选：精确匹配该月记录 */}
-          <input
-            type="month"
-            className={selectCls}
-            value={fMonth}
-            onChange={(e) => setFMonth(e.target.value)}
-            title="筛选数据月份为该月份的记录"
-          />
-          {fMonth && <span className="text-xs text-gray-400">数据月份：{monthLabel(fMonth)}</span>}
-          <Button variant="secondary" onClick={handleReset}>
-            重置
-          </Button>
-          <Button className="ml-auto" onClick={() => setFormBase({ base: null })}>
-            + 新增
-          </Button>
-        </div>
-      </Card>
+      {/* 页签：目标值 | 指标值 | 管控值 */}
+      <div className="flex gap-1.5" role="tablist" aria-label="维护类型">
+        {TABS.map((t) => {
+          const active = t.key === tab;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.key)}
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-primary-600 text-white"
+                  : "border border-gray-300 text-gray-600 hover:border-primary-400 hover:text-primary-700"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* 指标值列表 */}
-      <Card padding={false}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className={th}>指标名称</th>
-                <th className={th}>数据月份</th>
-                <th className={th}>指标值</th>
-                <th className={th}>单位</th>
-                <th className={th}>数据来源</th>
-                <th className={th}>更新时间</th>
-                <th className={th}>更新人</th>
-                <th className={`${th} text-right`}>操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
-                    加载中…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
-                    暂无符合条件的指标值记录
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{r.metricName}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{monthLabel(r.month)}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
-                      {fmtValue(r.value, FIXED_METRIC.decimals)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{r.unit}</td>
-                    <td className="px-4 py-3 max-w-[160px] truncate text-gray-600" title={r.source}>
-                      {r.source ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                      {r.updatedAt ?? r.createdAt}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">
-                      {r.updatedBy ?? r.createdBy}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <div className="inline-flex gap-1">
-                        <button
-                          onClick={() => setViewTarget(r)}
-                          className="rounded px-1.5 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
-                        >
-                          查看
-                        </button>
-                        <button
-                          onClick={() => setFormBase({ base: r })}
-                          className="rounded px-1.5 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(r)}
-                          className="rounded px-1.5 py-0.5 text-xs text-red-500 transition-colors hover:bg-red-50"
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {!loading && (
-          <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
-            共 {filtered.length} 条；相同数据月份仅保留一条有效记录；删除后的记录不再参与指标计算和数据分析
+      {/* 目标值：指标选择 + 当前生效目标 + 历史版本列表 + 新增目标值 */}
+      {tab === "target" && targetMetric && (
+        <Card padding>
+          <label className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">指标</span>
+            <select
+              value={targetMetricId}
+              onChange={(e) => setTargetMetricId(e.target.value)}
+              className={selectCls}
+            >
+              {targetMetrics.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nameCn}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="mt-4">
+            <TargetManagement metric={targetMetric} />
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {/* 新增/编辑表单抽屉 */}
+      {/* 指标值：月份筛选 + 记录列表 + 新增按钮 */}
+      {tab === "value" && (
+        <>
+          <Card padding>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 数据月份筛选：精确匹配该月记录 */}
+              <input
+                type="month"
+                className={selectCls}
+                value={fMonth}
+                onChange={(e) => setFMonth(e.target.value)}
+                title="筛选数据月份为该月份的记录"
+              />
+              {fMonth && <span className="text-xs text-gray-400">数据月份：{monthLabel(fMonth)}</span>}
+              <Button variant="secondary" onClick={handleReset}>
+                重置
+              </Button>
+              <Button className="ml-auto" onClick={() => setFormBase({ base: null })}>
+                + 新增
+              </Button>
+            </div>
+          </Card>
+
+          <Card padding={false}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className={th}>指标名称</th>
+                    <th className={th}>数据月份</th>
+                    <th className={th}>指标值</th>
+                    <th className={th}>单位</th>
+                    <th className={th}>数据来源</th>
+                    <th className={th}>更新时间</th>
+                    <th className={th}>更新人</th>
+                    <th className={`${th} text-right`}>操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
+                        加载中…
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
+                        暂无符合条件的指标值记录
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-800">{r.metricName}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-600">{monthLabel(r.month)}</td>
+                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                          {fmtValue(r.value, FIXED_METRIC.decimals)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{r.unit}</td>
+                        <td className="px-4 py-3 max-w-[160px] truncate text-gray-600" title={r.source}>
+                          {r.source ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
+                          {r.updatedAt ?? r.createdAt}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                          {r.updatedBy ?? r.createdBy}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="inline-flex gap-1">
+                            <button
+                              onClick={() => setViewTarget(r)}
+                              className="rounded px-1.5 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
+                            >
+                              查看
+                            </button>
+                            <button
+                              onClick={() => setFormBase({ base: r })}
+                              className="rounded px-1.5 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
+                            >
+                              编辑
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(r)}
+                              className="rounded px-1.5 py-0.5 text-xs text-red-500 transition-colors hover:bg-red-50"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {!loading && (
+              <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
+                共 {filtered.length} 条；相同数据月份仅保留一条有效记录；删除后的记录不再参与指标计算和数据分析
+              </div>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* 管控值：三类管控值统一维护（筛选 + 新增 + 列表启停/编辑/变更记录） */}
+      {tab === "control" && <ControlManagement user={state.user?.nickname || state.user?.username || "当前用户"} />}
+
+      {/* 新增/编辑表单抽屉（指标值页签） */}
       <MetricValueFormDrawer
         open={formBase !== null}
         onClose={() => setFormBase(null)}
@@ -199,7 +279,7 @@ export default function MetricValuePage() {
         onSaved={reload}
       />
 
-      {/* 记录详情查看弹窗 */}
+      {/* 记录详情查看弹窗（指标值页签） */}
       <Modal
         open={viewTarget !== null}
         onClose={() => setViewTarget(null)}
@@ -227,7 +307,7 @@ export default function MetricValuePage() {
         )}
       </Modal>
 
-      {/* 删除二次确认弹窗 */}
+      {/* 删除二次确认弹窗（指标值页签） */}
       <Modal
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}

@@ -277,7 +277,7 @@ export function AiDiagnosisWorkspace({
                       </Button>
                     )}
                     <Button className="flex-1" onClick={onEnterJudgment}>
-                      进入人工判定 →
+                      查看人工判定 →
                     </Button>
                   </div>
                 </div>

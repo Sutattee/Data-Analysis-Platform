@@ -2,7 +2,7 @@ import type { MetricValueRecord } from "@/types";
 import { metricList } from "./metric-management";
 
 /**
- * 指标值维护 —— 模拟数据 + 会话级 store（刷新还原）。
+ * 指标值管理 —— 模拟数据 + 会话级 store（刷新还原）。
  * 固定维护「工业总产值」的月度值（无法通过业务系统自动获取、需人工填报）。
  * 业务规则：
  * 1. 每条记录对应一个自然月，系统按月保存工业总产值；

@@ -92,7 +92,7 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "业务术语",   href: "/settings/biz-term" },
       { label: "业务逻辑",   href: "/settings/biz-logic" },
       { label: "折标系数",   href: "/settings/energy-coefficient" },
-      { label: "指标值维护", href: "/settings/metric-value" },
+      { label: "指标值管理", href: "/settings/metric-value" },
       { label: "标准问答",   href: "/settings/standard-qa" },
       { label: "对话管理",   href: "/settings/conversation" },
     ],

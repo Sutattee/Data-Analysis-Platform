@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { diagCatalogOf } from "@/lib/mock-data/quality-defect";
 import {
   defectRateOf,
+  isDiagnosed,
   primaryActionOf,
   type DiagTask,
 } from "@/lib/mock-data/defect-diagnosis-flow";
@@ -80,10 +81,10 @@ export function DiagnosisTaskTable({
                   {storageCols && <td className={`${td} text-gray-600`}>{t.storage ? t.storage.limit : dash}</td>}
                   {storageCols && <td className={`${td} text-red-600`}>{t.storage ? t.storage.over : dash}</td>}
                   <td className={td}>
-                    {t.status === "已判定" ? (
-                      <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">已判定</span>
+                    {isDiagnosed(t) ? (
+                      <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">已诊断</span>
                     ) : (
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">待处理</span>
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">待诊断</span>
                     )}
                   </td>
                   <td className="sticky right-0 bg-white px-3 py-2.5 text-right whitespace-nowrap group-hover:bg-gray-50">

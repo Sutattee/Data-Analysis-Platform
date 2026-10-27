@@ -81,9 +81,9 @@ function Tip({ text }: { text: string }) {
 }
 
 // 新建/编辑数据告警（工艺质量板块，按需求文档精简字段：
-// 告警名称 / 策略说明 / 告警类型 / 触发条件 / 告警对象（自动带入）/ 告警等级 / 检测周期（按指标联动）/
+// 告警名称 / 策略说明 / 告警类型 / 触发条件 / 告警等级 / 检测周期（按指标联动）/
 // 连续同向偏离（选填正整数，单位随指标周期：批次/班次/月）；
-// 不含通知功能字段，保存时自动补默认值；操作 = 取消、保存）
+// 告警对象不在表单展示，保存时按首条条件的指标自动带入；不含通知功能字段，保存时自动补默认值；操作 = 取消、保存）
 export function QualityAlertStrategyForm({
   mode,
   initial,
@@ -124,7 +124,7 @@ export function QualityAlertStrategyForm({
     }));
   }
 
-  // 告警对象：按首条条件的指标自动带入机台（结果类指标为「全厂」），仅展示、不支持编辑
+  // 告警对象：不在表单展示，保存时按首条条件的指标自动带入机台（结果类指标为「全厂」）
   const firstMetric = data.conditions[0]?.metric ?? "";
   const alertObjectOptions = objectsForMetric(firstMetric);
 
@@ -135,7 +135,6 @@ export function QualityAlertStrategyForm({
     const e: Record<string, string> = {};
     const ce: string[] = [];
     if (!data.name.trim()) e.name = "请输入告警名称";
-    if (!firstMetric.trim()) e.objects = "请先在触发条件中选择数据指标";
     // 连续同向偏离：选填；填写时仅支持正整数
     const shiftTrim = data.consecutiveShift.trim();
     if (shiftTrim && (!/^\d+$/.test(shiftTrim) || Number(shiftTrim) < 1)) {
@@ -291,26 +290,6 @@ export function QualityAlertStrategyForm({
             <div className="mt-3">
               <QualityThresholdNote />
             </div>
-          </div>
-
-          {/* 告警对象（触发条件之后）：按指标自动带入机台，仅展示、不支持编辑 */}
-          <div className="md:col-span-2">
-            <label className={labelCls}>告警对象 <span className="text-red-500">*</span></label>
-            <div className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2">
-              {alertObjectOptions.length > 0 ? (
-                alertObjectOptions.map((o) => (
-                  <span
-                    key={o}
-                    className="inline-flex items-center rounded-md border border-gray-200 bg-white px-2 py-0.5 text-sm text-gray-600"
-                  >
-                    {o}
-                  </span>
-                ))
-              ) : (
-                <span className="text-sm text-gray-400">请先在触发条件中选择数据指标</span>
-              )}
-            </div>
-            {errors.objects && <p className="mt-1 text-xs text-red-500">{errors.objects}</p>}
           </div>
 
           {/* 检测周期：随首条条件指标的统计周期联动（单值） */}

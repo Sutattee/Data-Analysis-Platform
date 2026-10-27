@@ -3,7 +3,7 @@
 import { ButtonHTMLAttributes, ReactNode } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
   size?: "sm" | "md" | "lg";
   children: ReactNode;
 }
@@ -46,6 +46,14 @@ export function Button({
       "active:scale-[0.97] active:bg-red-800",
       "focus:ring-red-500",
       "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600 disabled:hover:shadow-none disabled:active:scale-100",
+    ].join(" "),
+    // 蓝色线框按钮（如反馈「有帮助/没帮助」）：点击（选中）瞬间变蓝色填充
+    outline: [
+      "bg-white text-primary-600 border border-primary-600",
+      "hover:bg-primary-50",
+      "active:scale-[0.97] active:bg-primary-600 active:text-white",
+      "focus:ring-primary-500",
+      "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:active:scale-100 disabled:active:bg-white disabled:active:text-primary-600",
     ].join(" "),
   };
 

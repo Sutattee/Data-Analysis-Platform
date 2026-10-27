@@ -9,7 +9,6 @@ import {
   defectRateOf,
   listTasks,
   primaryActionOf,
-  summaryOf,
   type DiagTask,
 } from "./defect-diagnosis-flow";
 import {
@@ -182,8 +181,6 @@ export interface WorkbenchDefect {
   sampled: number;
   rate: number | null; // 缺陷率 %
   status: string; // 未诊断 / 待判定 / …
-  summary: string; // 诊断摘要（summaryOf）
-  fresh: boolean; // 未诊断 → 主按钮蓝色实心；其余线框
   actionLabel: string;
   href: string; // 智能诊断 → 诊断详情页（未诊断自动启动）
 }
@@ -210,8 +207,6 @@ function buildDefects(): WorkbenchDefect[] {
         sampled: t.occurrence.sampled,
         rate: defectRateOf(t),
         status: t.status,
-        summary: summaryOf(t),
-        fresh: t.status === "未诊断",
         actionLabel: action.label,
         href: `/quality/diagnosis/defect/${t.id}${action.query}`,
       };

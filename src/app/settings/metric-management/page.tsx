@@ -1,10 +1,9 @@
 "use client";
 
-// 指标管理列表：搜索 + 导入 + 列表（操作：查看 / 目标值管理 / 达标反推设置）
-// 「目标值管理」进入独立页面（指标管理/目标值管理）；「达标反推设置」右侧滑出窗口配置。
-// 仅 单箱综合能耗（m7）/ 单位产量碳排放量（m1）支持上述两项，且固定排在前两项。
+// 指标管理列表：搜索 + 导入 + 列表（操作：查看 / 达标反推设置 / 删除）
+// 「达标反推设置」右侧滑出窗口配置，仅 单箱综合能耗（m7）/ 单位产量碳排放量（m1）支持，且固定排在前两项；
+// 目标值配置入口在「指标值管理」页的目标值页签。
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -13,7 +12,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import { ReverseSettingsDrawer } from "@/components/settings/ReverseSettingsDrawer";
 import { metricList } from "@/lib/mock-data/metric-management";
-import { isTargetSupported, isReverseSupported } from "@/lib/mock-data/metric-targets";
+import { isReverseSupported } from "@/lib/mock-data/metric-targets";
 import type { MetricManage } from "@/types";
 
 // 只读字段
@@ -41,7 +40,6 @@ function sortMetrics(list: MetricManage[]): MetricManage[] {
 
 export default function MetricManagementPage() {
   const toast = useToast();
-  const router = useRouter();
   const [metrics, setMetrics] = useState<MetricManage[]>(() =>
     sortMetrics(metricList.map((m) => ({ ...m })))
   );
@@ -177,18 +175,7 @@ export default function MetricManagementPage() {
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="inline-flex gap-1">
                       <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 hover:bg-primary-50" onClick={() => setDetailTarget(m)}>查看</Button>
-                      {/* 目标值管理：6 个考核指标开放；达标反推设置：仅 单箱综合能耗 / 单位产量碳排放量 支持
-                          （物料单耗/费用类——烟叶/嘴棒/商标纸/单箱可控费用——只支持目标值管理） */}
-                      {isTargetSupported(m.id) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-primary-600 hover:text-primary-700 hover:bg-primary-50"
-                          onClick={() => router.push(`/settings/metric-management/${m.id}/targets`)}
-                        >
-                          目标值管理
-                        </Button>
-                      )}
+                      {/* 达标反推设置：仅 单箱综合能耗 / 单位产量碳排放量 支持 */}
                       {isReverseSupported(m.id) && (
                         <Button
                           variant="ghost"
@@ -260,7 +247,7 @@ export default function MetricManagementPage() {
         </div>
       </Modal>
 
-      {/* 指标详情抽屉（仅基础信息；目标值管理 / 达标反推设置已移至列表操作） */}
+      {/* 指标详情抽屉（仅基础信息；达标反推设置已移至列表操作） */}
       <Drawer
         open={detailTarget !== null}
         onClose={() => setDetailTarget(null)}

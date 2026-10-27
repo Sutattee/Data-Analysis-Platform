@@ -387,7 +387,7 @@ export interface AlertRecord {
   brand?: string;             // 牌号（如「娇子」；结果类指标为「—」）
   consecutiveShifts?: number; // 连续同向偏离周期数（飘移类记录；详情展示如「3个批次」，列表置顶排序）
   baseTime?: string;          // 预测基准时间（数据截止时刻，仅缺陷预测类记录，追溯字段）
-  modelVersion?: string;      // 模型/标准版本（缺陷预测模型或工艺标准版本，追溯字段）
+  modelVersion?: string;      // 模型版本（缺陷预测模型或工艺标准版本，追溯字段）
   // —— 判定依据 ——
   strategyName: string;       // 告警策略名称
   triggerCondition: string;   // 触发条件
@@ -395,6 +395,7 @@ export interface AlertRecord {
   causeSummary?: string;      // 异常原因（空表示暂未识别到明确原因）
   causeType?: "AI生成" | "AI生成·人工修正" | "人工补录"; // 原因类型（causeSummary 存在时有值）
   suggestion?: string;        // 处置建议
+  manualCause?: string;       // 人工补录内容（质量口径「没帮助」后补录，独立展示于 AI 生成内容下方）
   // —— 责任与处理情况 ——
   receiver: string;           // 接收人
   notifyMethods: string[];    // 通知方式
@@ -479,7 +480,7 @@ export interface MetricManage {
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
 }
 
-// ========== 指标值维护（人工填报指标数据，月度值口径） ==========
+// ========== 指标值管理（人工填报指标数据，月度值口径） ==========
 export interface MetricValueRecord {
   id: string;                 // mv-001 递增
   metricId: string;           // 关联指标管理（固定 m18 工业总产值）
@@ -493,6 +494,54 @@ export interface MetricValueRecord {
   createdAt: string;          // 创建时间
   updatedBy?: string;         // 最近更新人
   updatedAt?: string;         // 最近更新时间
+}
+
+// ========== 管控值管理（指标值管理 · 管控值页签） ==========
+// 指标分类：过程管控指标 / 缺陷部位缺陷率 / 缺陷指标
+export type ControlCategory = "process" | "defectPart" | "defect";
+
+// 判断方向（在控条件："between" = 处于允许区间，含上下边界）
+export type ControlDir = "<" | "≤" | ">" | "≥" | "=" | "between";
+
+// 数值口径（校验规则：percent 0~100 / count 非负整数 / duration 非负数）
+export type ControlValueKind = "percent" | "count" | "duration";
+
+// 管控指标目录（预置，按分类展示；新增表单的可选指标来源）
+export interface ControlMetricDef {
+  id: string;                 // cm-001 递增
+  category: ControlCategory;  // 所属分类
+  name: string;               // 指标名称
+  unit: string;               // 计量单位（随指标带出，不可修改）
+  decimals: number;           // 数值精度（小数位）
+  valueKind: ControlValueKind;// 数值口径（决定校验规则）
+  defaultDir: ControlDir;     // 默认判断方向（缺陷率 ≤ / 优质品率 ≥ / 水分允许范围 between）
+}
+
+// 管控值配置（每个指标仅一条配置，停用后仍占用、不可重复新增）
+export interface MetricControlConfig {
+  id: string;                 // mc-001 递增
+  metricId: string;           // 关联目录指标
+  category: ControlCategory;  // 指标分类（快照）
+  metricName: string;         // 指标名称（快照）
+  unit: string;               // 单位（快照）
+  dir: ControlDir;            // 判断方向
+  value?: number;             // 单值比较（非 between 必填）
+  low?: number;               // 允许区间下限（between 必填）
+  high?: number;              // 允许区间上限（between 必填，必须大于下限）
+  enabled: boolean;           // 启停状态（停用后不参与管控判断）
+  updatedBy: string;          // 最近更新人
+  updatedAt: string;          // 最近更新时间 YYYY-MM-DD HH:mm
+}
+
+// 管控值变更记录（新增 / 修改 / 启用 / 停用自动留痕，时间倒序展示）
+export interface ControlChangeLog {
+  id: string;                 // cl-001 递增
+  controlId: string;          // 所属配置
+  type: "新增" | "修改" | "启用" | "停用";
+  before: string;             // 变更前内容（配置快照摘要，新增时为 "—")
+  after: string;              // 变更后内容
+  by: string;                 // 操作人
+  at: string;                 // 变更时间 YYYY-MM-DD HH:mm
 }
 
 // ========== 目标值管理（指标详情内，版本化） ==========

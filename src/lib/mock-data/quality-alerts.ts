@@ -421,7 +421,7 @@ export function buildQualityAlertRecords(): AlertRecord[] {
 //  · 记录由缺陷预测结果触发 → type 固定「预测风险」；触发时间紧随本轮预测发布时刻（14:06）之后
 //  · 数值与缺陷预测页（quality-defect-forecast）同源：窗口最高评分 / 预测水分偏差 / 箱储时长核算
 //  · 追溯字段：对象（编码沿用预测页 HS-03/ZJ17-02/CG-01）、批次、评分或预测值、阈值、窗口、
-//    预测基准时间（baseTime）及模型/标准版本（modelVersion）
+//    预测基准时间（baseTime）及模型版本（modelVersion）
 //  · 剩余允许储存时间仅可用于临近截止提醒，不能直接视为必然超时：YS-1027B 剩余 16 小时但
 //    预计总储存时长 63 小时＜上限 72 小时 → 不生成超时记录
 //  · 同一风险事件连续满足条件时按告警中心既有规则去重，等级变化及恢复沿用既有规则
@@ -459,7 +459,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
   {
     id: "ZL20261019001",
     level: "告警",
-    title: "3#烘丝机成品水分不合格风险评分预计超过80分",
+    title: "成品水分不合格风险评分预计超过80分",
     objectCode: "HS-03",
     objectName: "3#烘丝机",
     metricName: "成品水分不合格风险评分",
@@ -483,7 +483,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
   {
     id: "ZL20261019002",
     level: "预警",
-    title: "ZJ17-02卷接机组烟支刺破风险评分预计超过75分",
+    title: "烟支刺破风险评分预计超过75分",
     objectCode: "ZJ17-02",
     objectName: "ZJ17-02卷接机组",
     metricName: "烟支刺破风险评分",
@@ -507,7 +507,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
   {
     id: "ZL20261019003",
     level: "危险",
-    title: "1#储丝柜YS-1026A箱储存储时间超上限风险评分预计超过80分",
+    title: "箱储存储时间超上限风险评分预计超过80分",
     objectCode: "CG-01",
     objectName: "1#储丝柜",
     metricName: "箱储存储时间超上限风险评分",
@@ -531,7 +531,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
   {
     id: "ZL20261019004",
     level: "告警",
-    title: "3#烘丝机预测成品水分偏差+0.7pct，超出允差±0.3pct",
+    title: "预测成品水分偏差+0.7pct，超出允差±0.3pct",
     objectCode: "HS-03",
     objectName: "3#烘丝机",
     metricName: "预测成品水分偏差",
@@ -555,7 +555,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
   {
     id: "ZL20261019005",
     level: "危险",
-    title: "1#储丝柜YS-1026A预计箱储总存储时长超过上限72小时",
+    title: "预计箱储总存储时长超过上限72小时",
     objectCode: "CG-01",
     objectName: "1#储丝柜",
     metricName: "预计箱储总存储时长",
@@ -639,13 +639,13 @@ function buildStabilityAlertRecords(): AlertRecord[] {
     const deviationValue = `${sign}${fmt(absDelta)}${metric.unit}`;
     const deviationRate = `${sign}${trimPct((absDelta / Math.abs(base)) * 100)}%`;
 
-    // 标题（实测=已越界 / 预测=预计越界 / 飘移=连续N个周期越界）
+    // 标题（不含告警对象；实测=已越界 / 预测=预计越界 / 飘移=连续N个周期越界）
     const cycleUnit = qualityCycleUnitOf(metric.name); // 连续偏离单位（批次/班次/月）
     const title = spec.shifts
-      ? `${spec.machine}${metric.name}连续${spec.shifts}个${cycleUnit}${isUpper ? "超过上限" : "低于下限"}`
+      ? `${metric.name}连续${spec.shifts}个${cycleUnit}${isUpper ? "超过上限" : "低于下限"}`
       : isForecast
-        ? `${spec.machine}${metric.name}${isUpper ? "持续上升，预计越过上限" : "持续下降，预计跌破下限"}`
-        : `${spec.machine}${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
+        ? `${metric.name}${isUpper ? "持续上升，预计越过上限" : "持续下降，预计跌破下限"}`
+        : `${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
 
     // 预测风险：预计越界周期数（批次后缀如「第 2418 批（3个批次后）」）与预测窗口（如「未来10个批次」）
     const forecastShift = 2 + (i % 3); // 2~4 个统计周期后越界

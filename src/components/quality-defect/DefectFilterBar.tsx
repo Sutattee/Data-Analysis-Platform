@@ -14,7 +14,7 @@ import {
 const selCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white outline-none transition-all focus:ring-2 focus:ring-primary-500 focus:border-transparent";
 
-// 缺陷分析筛选区：统计周期（查询时间范围，控制全部图表）+
+// 缺陷分析筛选区：统计周期（近 N 个批次，控制全部图表）+
 // 部位/类别/牌号/机台/班组（控制指标卡、趋势图、明细表；热力图不跟随）+ 重置
 export function DefectFilterBar({
   value,
@@ -32,12 +32,12 @@ export function DefectFilterBar({
           <span className="text-xs text-gray-500">统计周期</span>
           <select
             value={value.period}
-            onChange={(e) => onChange({ ...value, period: Number(e.target.value) as 1 | 2 | 3 })}
+            onChange={(e) => onChange({ ...value, period: Number(e.target.value) as 10 | 20 | 30 })}
             className={selCls}
           >
-            <option value={1}>近1个月</option>
-            <option value={2}>近2个月</option>
-            <option value={3}>近3个月</option>
+            <option value={10}>近10个批次</option>
+            <option value={20}>近20个批次</option>
+            <option value={30}>近30个批次</option>
           </select>
         </label>
 

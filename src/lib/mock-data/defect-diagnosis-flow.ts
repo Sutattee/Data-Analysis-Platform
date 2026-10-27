@@ -606,9 +606,15 @@ export function getTask(id: string): DiagTask | undefined {
   return tasks.find((t) => t.id === id);
 }
 
-export function statusCounts(): { pending: number; judged: number; all: number } {
-  const p = tasks.filter((t) => t.status !== "已判定").length;
-  return { pending: p, judged: tasks.length - p, all: tasks.length };
+// tab 划分口径：是否完成智能诊断（不以人工判定为准）——
+// 待诊断 = 未诊断/诊断中；已诊断 = 待判定/已判定（智能诊断已完成）
+export function isDiagnosed(t: DiagTask): boolean {
+  return t.status === "待判定" || t.status === "已判定";
+}
+
+export function statusCounts(): { pending: number; diagnosed: number; all: number } {
+  const d = tasks.filter((t) => isDiagnosed(t)).length;
+  return { pending: tasks.length - d, diagnosed: d, all: tasks.length };
 }
 
 // 最新 AI 版本（未开始诊断为 undefined）
@@ -920,9 +926,9 @@ export function summaryOf(t: DiagTask): string {
   return j.conclusion === "原因已确定" ? j.finalCause ?? "—" : "暂未查明";
 }
 
-// 主按钮（卡片 / 表格操作列）：按处理状态两档——待判定（含未诊断/诊断中）打开智能诊断
-// （未诊断自动启动），已判定默认进入人工判定工作区只读查看
+// 主按钮（卡片 / 表格操作列）：待诊断（未诊断/诊断中）打开智能诊断并自动启动；
+// 已诊断（待判定/已判定）「查看结果」定位到智能诊断环节查看诊断结论
 export function primaryActionOf(t: DiagTask): { label: string; query: string } {
-  if (t.status === "已判定") return { label: "查看结果", query: "?tab=judge" };
+  if (isDiagnosed(t)) return { label: "查看结果", query: "?tab=ai" };
   return { label: "智能诊断", query: "?start=1" };
 }

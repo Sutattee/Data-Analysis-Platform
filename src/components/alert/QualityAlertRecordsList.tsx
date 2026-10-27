@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { ColumnFilter } from "@/components/alert/ColumnFilter";
 import { ALERT_RECORDS, ALERT_LEVELS, sortAlerts, applyHandledOverride } from "@/lib/mock-data/alerts";
-import { TYPE_DISPLAY, QUALITY_MACHINES } from "@/lib/mock-data/quality-alerts";
+import { TYPE_DISPLAY } from "@/lib/mock-data/quality-alerts";
 import type { AlertRecord } from "@/types";
 
 // 筛选条件（输入态 / 已应用 两份）
@@ -18,7 +18,6 @@ interface QualityAlertFilter {
   level: string;     // 表头筛选
   status: string;    // 表头筛选（未处理/已处理）
   type: string;      // 表头筛选（实测异常/预测风险）
-  machine: string;   // 机台下拉（全厂 + 全部机台）
   dateFrom: string;
   dateTo: string;
 }
@@ -28,7 +27,6 @@ const EMPTY_FILTER: QualityAlertFilter = {
   level: "",
   status: "",
   type: "",
-  machine: "",
   dateFrom: "",
   dateTo: "",
 };
@@ -40,7 +38,7 @@ const dateCls = selectCls;
 type Phase = "loading" | "success" | "error";
 type SortMode = "default" | "time_desc" | "time_asc";
 
-// 工艺质量 · 告警记录列表（ZL 前缀记录；标题搜索 + 机台/时间范围组合筛选 + 查询/重置；
+// 工艺质量 · 告警记录列表（ZL 前缀记录；标题搜索 + 时间范围筛选 + 查询/重置；
 // 等级/状态表头筛选；默认按等级优先级 + 同级最新优先排序）
 export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }: { basePath?: string }) {
   const router = useRouter();
@@ -99,7 +97,6 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
         (!applied.level || r.level === applied.level) &&
         matchStatus(r, applied.status) &&
         (!applied.type || TYPE_DISPLAY[r.type] === applied.type) &&
-        (!applied.machine || r.objectName === applied.machine) &&
         matchDate(r, applied.dateFrom, applied.dateTo)
     );
     if (sortMode === "time_desc") return [...filtered].sort((a, b) => b.triggerTime.localeCompare(a.triggerTime));
@@ -116,12 +113,11 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
   const paged = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
   const hasFilter = (Object.keys(applied) as (keyof QualityAlertFilter)[]).some((k) => applied[k].trim() !== "");
 
-  // 查询：应用输入态（标题/机台/时间范围），保留表头筛选（等级/状态）
+  // 查询：应用输入态（标题/时间范围），保留表头筛选（等级/状态）
   function handleSearch() {
     setApplied((prev) => ({
       ...prev,
       keyword: filter.keyword,
-      machine: filter.machine,
       dateFrom: filter.dateFrom,
       dateTo: filter.dateTo,
     }));
@@ -149,7 +145,7 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
 
   return (
     <div className="space-y-4">
-      {/* 搜索 + 筛选（一行）：搜索框（仅按告警标题模糊搜索）、机台、时间范围，后跟 查询/重置 */}
+      {/* 搜索 + 筛选（一行）：搜索框（仅按告警标题模糊搜索）、时间范围，后跟 查询/重置 */}
       <Card padding>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -159,19 +155,6 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
             placeholder="搜索告警标题"
             className="w-[260px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">机台</span>
-            <select
-              value={filter.machine}
-              onChange={(e) => setFilter({ ...filter, machine: e.target.value })}
-              className={selectCls}
-            >
-              <option value="">全部机台</option>
-              {QUALITY_MACHINES.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">时间范围</span>
             <input type="date" className={dateCls} value={filter.dateFrom} onChange={(e) => setFilter({ ...filter, dateFrom: e.target.value })} />
@@ -218,7 +201,6 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
                     </span>
                   </th>
                   <th className="text-left px-4 py-3 sticky left-0 bg-gray-50 z-10">告警标题</th>
-                  <th className="text-left px-4 py-3">告警对象</th>
                   <th className="text-left px-4 py-3">指标名称</th>
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
@@ -254,7 +236,6 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
                         {r.title}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{r.objectName}</td>
                     <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-600">{TYPE_DISPLAY[r.type]}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>

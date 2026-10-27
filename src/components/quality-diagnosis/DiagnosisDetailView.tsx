@@ -158,11 +158,7 @@ export function DiagnosisDetailView() {
         />
       </div>
       <div className={tab === "judge" ? "" : "hidden"}>
-        <HumanJudgmentWorkspace
-          task={task}
-          canOperate={canOperate}
-          onBackToAi={() => setTab("ai")}
-        />
+        <HumanJudgmentWorkspace task={task} />
       </div>
     </div>
   );

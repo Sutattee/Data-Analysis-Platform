@@ -327,6 +327,42 @@ export function applyHandledOverride(r: AlertRecord): AlertRecord {
   return { ...r, handledBy: ov.by, handledAt: ov.at, handleResult: ov.result ?? r.handleResult };
 }
 
+// ========== 人工补录与反馈（会话级覆盖 store，刷新还原） ==========
+// 质量口径详情页反馈选择 + 人工补录（点击后问题区与选中态常驻，不消失）：
+// feedback：有帮助 / 没帮助（选中态持久化）；pending：点「没帮助」待填写（输入框常驻，
+// 离开再进入仍展开）；text：已保存的补录文本（展示块 + 修正模式）
+const MANUAL_CAUSE_OVERRIDES = new Map<
+  string,
+  { feedback?: "helpful" | "nothelpful"; pending: boolean; text?: string }
+>();
+
+// 记录反馈选择（有帮助）
+export function setAlertFeedbackHelpful(id: string): void {
+  const prev = MANUAL_CAUSE_OVERRIDES.get(id) ?? { pending: false };
+  MANUAL_CAUSE_OVERRIDES.set(id, { ...prev, feedback: "helpful" });
+}
+
+// 标记待补录（点「没帮助」尚未填写保存）
+export function markAlertManualPending(id: string): void {
+  const prev = MANUAL_CAUSE_OVERRIDES.get(id) ?? { pending: false };
+  MANUAL_CAUSE_OVERRIDES.set(id, { ...prev, feedback: "nothelpful", pending: true });
+}
+
+// 保存/修正补录文本（退出编辑态，进入展示块 + 修正模式）
+export function saveAlertManualCause(id: string, text: string): void {
+  const prev = MANUAL_CAUSE_OVERRIDES.get(id) ?? { pending: false };
+  MANUAL_CAUSE_OVERRIDES.set(id, { ...prev, pending: false, text });
+}
+
+// 读取反馈与补录状态：text 存在 → 已填写；仅 pending → 待填写（输入框常驻）
+export function alertManualState(id: string): {
+  feedback?: "helpful" | "nothelpful";
+  pending: boolean;
+  text?: string;
+} {
+  return MANUAL_CAUSE_OVERRIDES.get(id) ?? { pending: false };
+}
+
 // ========== 能耗管理组织层级：车间 → 网格 → 设备 ==========
 // 供「新建告警-指定对象」分层多选 与「告警记录/管理」级联筛选 共用
 export interface OrgNode {

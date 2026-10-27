@@ -39,7 +39,6 @@ export function WorkbenchView() {
   const alarms = snapshot.alarms;
   const actualCount = alarms.filter((a) => a.typeLabel === "实测异常").length;
   const defects = snapshot.defects.filter((d) => d.status !== "已判定");
-  const freshCount = defects.filter((d) => d.status === "未诊断").length;
   const attentions = snapshot.attentions;
   const stabilityCount = attentions.filter((a) => a.kind === "稳定性预测").length;
 
@@ -170,14 +169,11 @@ export function WorkbenchView() {
           <button
             className="qw-stat"
             onClick={() => locatePanel("defects")}
-            aria-label={`待判定缺陷 ${defects.length}，定位到待判定缺陷区域`}
+            aria-label={`待诊断缺陷 ${defects.length}，定位到待诊断缺陷区域`}
           >
             <span className="qw-stat-value">{defects.length}</span>
             <span>
-              <span className="qw-stat-name">待判定缺陷</span>
-              <span className="qw-stat-desc">
-                未诊断 {freshCount} · 已有初步诊断 {defects.length - freshCount}
-              </span>
+              <span className="qw-stat-name">待诊断缺陷</span>
             </span>
           </button>
           <button

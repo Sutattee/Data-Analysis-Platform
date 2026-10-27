@@ -18,11 +18,11 @@ export const DEFECT_RATE_OPTIONS: DefectRateItem[] = [
   { key: "D", label: "D类缺陷率", value: 0.23, mom: -0.02 },
 ];
 
-// 成品优质品率（当前批次 + 近10批区间）
-export const FINISHED_PREMIUM = { value: 98.6, rangeLow: 98.4, rangeHigh: 99.4 };
+// 成品优质品率（当前批次 + 同比/环比，pct：同比 vs 去年同期 / 环比 vs 上一批次，正 = 上升）
+export const FINISHED_PREMIUM = { value: 98.6, yoy: 0.4, mom: 0.2 };
 
-// 制丝优质品率（当前批次 + 近10批区间）
-export const SILK_PREMIUM = { value: 98.6, rangeLow: 98.2, rangeHigh: 99.1 };
+// 制丝优质品率（当前批次 + 同比/环比，pct；环比小幅回落）
+export const SILK_PREMIUM = { value: 98.6, yoy: 0.3, mom: -0.1 };
 
 // 包装与卷制质量检验加权平均值（分，本月 + 近10批区间）
 export const PACKING_SCORE = { value: 96.8, rangeLow: 95.1, rangeHigh: 97.9 };

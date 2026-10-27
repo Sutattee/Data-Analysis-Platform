@@ -36,7 +36,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// 缺陷诊断抽屉：上半基本信息（档案数据 + 发生上下文），下半「缺陷原因」
+// 类别着色：A类红 / B类橙，C、D 保持深色（与缺陷明细表一致）
+const gradeCls = (g: string) =>
+  g === "A" ? "text-red-600" : g === "B" ? "text-orange-500" : "text-gray-600";
+
+// 缺陷诊断抽屉：上半字段区（档案数据 + 发生上下文，不带区块标题），下半「缺陷原因」
 // 分 4 个字段并列独立展示（原因 / 原因类型 / 诊断人 / 诊断时间）；
 // 右上「修正」仅「原因」变为编辑（≤500字），其余字段不隐藏，
 // 保存后原因类型变为「人工补录」并记录诊断人/诊断时间；
@@ -76,6 +80,8 @@ export function DefectDiagnosisDrawer({
   // 发生上下文（批次/牌号/班组）：缺陷明细行即发生记录本体；
   // 诊断明细行按登记日期关联当天发生记录，无则回退最近一次
   const occ = record ?? (item ? occurrenceContextOf(item.code, item.recordDate) : undefined);
+  // 类别（档案口径 A/B/C/D，与明细表同款着色）
+  const grade = record?.grade ?? catalog?.grade;
 
   // 展示口径：本抽屉保存值 > store 人工修正 > AI 生成
   const revised = item?.causeText ?? linked?.causeText;
@@ -133,9 +139,8 @@ export function DefectDiagnosisDrawer({
         </div>
       }
     >
-      {/* 基本信息：记录 ID + 缺陷档案 + 发生上下文 */}
+      {/* 字段区：记录 ID + 缺陷档案 + 发生上下文 + 抽检结果（数量 / 抽检数 / 缺陷率），不带区块标题 */}
       <section>
-        <h4 className="mb-2 text-sm font-semibold text-gray-800">基本信息</h4>
         <div className="rounded-xl bg-gray-50 px-4 py-2">
           <Field label="缺陷记录ID">
             <span className="font-mono text-xs">{record ? displayRecordId(record) : occ ? displayRecordId(occ) : "—"}</span>
@@ -149,6 +154,9 @@ export function DefectDiagnosisDrawer({
             <span className="font-mono text-xs">{code || "—"}</span>
           </Field>
           <Field label="缺陷名称">{record?.name ?? catalog?.name ?? "—"}</Field>
+          <Field label="类别">
+            {grade ? <span className={gradeCls(grade)}>{grade}类</span> : "—"}
+          </Field>
           <Field label="缺陷部位">{record?.part ?? catalog?.part ?? "—"}</Field>
           <Field label="工序">{catalog?.process ?? "—"}</Field>
           <Field label="机台">{machine}</Field>
@@ -158,6 +166,11 @@ export function DefectDiagnosisDrawer({
           <Field label="班次">{occ ? shiftLabelOf(occ) : "-"}</Field>
           <Field label="责任岗位">{catalog?.post ?? "—"}</Field>
           <Field label="检验日期">{occ ? formatRecordDate(occ) : "—"}</Field>
+          <Field label="缺陷数量">{occ ? occ.count : "—"}</Field>
+          <Field label="抽检数量">{occ ? occ.sampled : "—"}</Field>
+          <Field label="缺陷率">
+            {occ ? `${((occ.count / occ.sampled) * 100).toFixed(2)}%` : "—"}
+          </Field>
         </div>
       </section>
 
