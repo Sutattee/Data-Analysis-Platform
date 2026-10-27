@@ -47,9 +47,10 @@ export function DefectPanel({
                 缺陷数 {d.count} ｜ 抽检数 {d.sampled} ｜ 缺陷率{" "}
                 {d.rate === null ? "—" : `${d.rate.toFixed(2)}%`}
               </div>
+              {/* 操作按钮统一「智能诊断」：未诊断进入即自动启动；已有初判进入智能诊断环节查看结果 */}
               <div className="qw-defect-actions">
                 <button className="qw-button primary" onClick={() => router.push(d.href)}>
-                  {d.actionLabel}
+                  智能诊断
                 </button>
               </div>
             </article>

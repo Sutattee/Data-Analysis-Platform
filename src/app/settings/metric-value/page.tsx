@@ -260,7 +260,7 @@ export default function MetricValuePage() {
             </div>
             {!loading && (
               <div className="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
-                共 {filtered.length} 条；相同数据月份仅保留一条有效记录；删除后的记录不再参与指标计算和数据分析
+                共 {filtered.length} 条
               </div>
             )}
           </Card>

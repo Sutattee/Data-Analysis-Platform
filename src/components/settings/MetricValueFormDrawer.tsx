@@ -169,7 +169,6 @@ export function MetricValueFormDrawer({
               onChange={(e) => set("month", e.target.value)}
             />
             {errors.month && <p className="mt-1 text-xs text-red-500">{errors.month}</p>}
-            <p className="mt-1 text-xs text-gray-400">每条记录对应一个自然月，年度由所选月份自动识别</p>
           </div>
 
           {/* 指标值 + 单位（随指标配置带出，只读） */}
@@ -225,10 +224,6 @@ export function MetricValueFormDrawer({
               <span className="text-xs text-gray-400">{form.remark.length}/200</span>
             </div>
           </div>
-
-          <p className="text-xs text-gray-400 leading-relaxed">
-            说明：相同数据月份只能存在一条有效记录，不得重复新增；保存与删除均需二次确认并记录操作人及操作时间。
-          </p>
         </div>
       </Drawer>
 

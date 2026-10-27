@@ -181,7 +181,6 @@ export interface WorkbenchDefect {
   sampled: number;
   rate: number | null; // 缺陷率 %
   status: string; // 未诊断 / 待判定 / …
-  actionLabel: string;
   href: string; // 智能诊断 → 诊断详情页（未诊断自动启动）
 }
 
@@ -207,7 +206,6 @@ function buildDefects(): WorkbenchDefect[] {
         sampled: t.occurrence.sampled,
         rate: defectRateOf(t),
         status: t.status,
-        actionLabel: action.label,
         href: `/quality/diagnosis/defect/${t.id}${action.query}`,
       };
     });
