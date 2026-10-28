@@ -1,7 +1,9 @@
 // 缺陷风险滚动预测（工艺质量 · 缺陷预测页） — mock 预测引擎
-// 规格口径：3 个重点缺陷（成品水分不合格 / 烟支刺破 / 箱储存储时间超上限），
+// 规格口径：3 个重点缺陷（成品水分不合格 / 烟支刺破 / 箱储存储时间超上限；
+// 页面缺陷下拉仅开放 成品水分不合格 / 箱储存储时间超上限，烟支刺破保留数据供工作台深链），
 // 风险评分 0—100 分制（保留 1 位小数，表示风险高低，不代表发生概率或模型置信度），
-// 预测窗口按时间展示（默认未来 8 小时，横轴小时制）。
+// 预测窗口按已排产批次数展示（横轴批次号，未来批次数按实际数据显示）；
+// 趋势图纵轴为业务预测值（成品水分 % / 箱储储存时长 h），管控值上下限用橙色虚线展示。
 // 本期仅展示最新一轮预测：预测基准时间（数据截止时刻）与预测更新时间（后端生成时刻）
 // 为固定常量，刷新页面不改变预测更新时间。
 
@@ -30,11 +32,6 @@ export function levelOf(score: number): RiskLevel {
 const DAY = "2026-10-19";
 export const BASE_TIME = `${DAY} 14:00`; // 预测基准时间：本轮预测使用的数据截止时刻
 export const UPDATED_AT = `${DAY} 14:06`; // 预测更新时间：本轮后端结果生成时刻（刷新页面不变）
-export const WINDOW_HOURS = 8;
-
-const hm = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
-// "2026-10-19 19:00" → "10-19 19:00"（摘要 / 贡献度解释时间等展示格式）
-const shortOf = (full: string) => full.slice(5);
 
 // ===== 缺陷与预测对象 =====
 export type DefectCode = "CPSFBH" | "YZCB" | "XCCG";
@@ -42,15 +39,16 @@ export type DefectCode = "CPSFBH" | "YZCB" | "XCCG";
 export interface ForecastDefectMeta {
   code: DefectCode;
   name: string;
+  trendTitle: string; // 趋势图标题（规格 §8：如 "成品水分预测趋势（%）"）
   qualityClass: string; // 质量类别（规格书 §2 映射：A类 / C/D类 / B类）
   process: string;
   part: string;
 }
 
 export const FORECAST_DEFECTS: ForecastDefectMeta[] = [
-  { code: "CPSFBH", name: "成品水分不合格", qualityClass: "A类", process: "烘丝", part: "成品" },
-  { code: "YZCB", name: "烟支刺破", qualityClass: "C/D类", process: "卷制", part: "烟支" },
-  { code: "XCCG", name: "箱储存储时间超上限", qualityClass: "B类", process: "仓储", part: "箱储" },
+  { code: "CPSFBH", name: "成品水分不合格", trendTitle: "成品水分预测趋势（%）", qualityClass: "A类", process: "烘丝", part: "成品" },
+  { code: "YZCB", name: "烟支刺破", trendTitle: "烟支刺破风险预测趋势", qualityClass: "C/D类", process: "卷制", part: "烟支" },
+  { code: "XCCG", name: "箱储存储时间超上限", trendTitle: "箱储存储时间预测趋势（h）", qualityClass: "B类", process: "仓储", part: "箱储" },
 ];
 
 export function forecastDefectOf(code: string): ForecastDefectMeta {
@@ -85,11 +83,13 @@ const OBJECTS: Record<DefectCode, ObjectDef[]> = {
 
 // ===== 数据结构 =====
 export interface TrendPoint {
-  t: string; // 横轴刻度（小时制，如 "14:00"；本窗口不跨日，跨日时需补日期）
-  full: string; // 完整时刻（Tooltip / 摘要引用）
+  batch: string; // 横轴批次号（如 "2412"）
+  full: string; // 完整批次表述（Tooltip / 摘要引用，如 "第2412批"）
   score: number; // 风险评分（0—100，1 位小数）
-  biz?: string; // 业务预测值（如 "预测成品水分 13.2%"、"预计出库 21:00"）
-  planned?: boolean; // 未来信息来自计划 → Tooltip 标注"（计划）"
+  biz?: string; // 业务预测值（如 "预测成品水分 13.2%"、"预计第2421批出库"）
+  planned?: boolean; // 未来信息来自排产/出库计划 → Tooltip 标注"（计划）"
+  moist?: number; // 成品水分（%）：历史点 = 实际值、未来点 = 预测值（趋势图纵轴曲线）
+  hours?: number; // 箱储储存时长（h）：历史点 = 实际值、未来点 = 预测值；出库后的点不携带（曲线止于出库）
 }
 
 export type DevDir = "up" | "down" | "in" | "none";
@@ -127,27 +127,40 @@ export interface ForecastContext {
   qualityClass: string;
 }
 
-// 成品水分业务依据：模型支持时输出预测成品水分 / 允差 / 预测偏差（规格 §6）
+// 成品水分业务依据：模型支持时输出预测成品水分 / 允许范围 / 预测偏差（规格 §6）
 export interface MoistureBasis {
   predicted: string;
   tolerance: string;
   dev: string;
-  atTime: string; // 引用点时间（存在多个未来点时注明）
-  range: string; // 允差范围（标准水分 ± 允差，如 "12.2%～12.8%"）
+  range: string; // 允许范围（标准水分 ± 允差，如 "12.2%～12.8%"）
+  lo: number; // 允许下限（%）：趋势图橙色虚线管控线
+  hi: number; // 允许上限（%）：趋势图橙色虚线管控线
   std: string; // 标准水分（如 "12.5%"）
-  overText: string; // 与允差范围的对比结论（新口径：预测值 − 允差上限，如 "超上限 0.4 pct"）
+  overText: string; // 与允许范围的对比结论（如 "超上限 0.4 pct"，卡片徽章；范围内对象抽屉兜底展示）
+  overValue?: string; // 超限量值（如 "0.4 pct"，预测详情抽屉"超上限"字段；范围内对象不携带）
   overKind: "over" | "in" | "under"; // 超上限 / 范围内（含恰达上限）/ 低于下限
 }
 
-// 箱储业务依据：时长公式组（规格 §3；数值口径，remainingHours 0 = 恰达上限 / 负值 = 已超时；
-// 数据不足或不编造的预计字段缺省）
+// 箱储业务依据：时长公式组（规格 §3；预测结果 = 预计超时 / 预计不超时；
+// 已储存时长与上限仅保留在关联参数表，不再上卡片展示）
 export interface StorageBasis {
   storedHours: number; // 已储存时长 = 基准时间 − 入库时间（小时）
   limitHours: number; // 储存时长上限（小时）
-  remainingHours: number; // 剩余可储存（小时）
+  overHours?: number; // 预计超时（小时）= 预计总储存时长 − 上限
+  marginHours?: number; // 预计不超时：距上限剩余（小时）
   deadline: string; // 允许储存截止时间 = 入库时间 + 上限（MM-DD HH:mm）
-  totalHours?: number; // 预计总储存时长 = 预计出库时间 − 入库时间（小时）
-  outbound?: string; // 预计出库 / 耗用时间（含"（计划）"标注）
+}
+
+// 预测结果展示口径（卡片与预测详情抽屉共用）
+export interface StorageResult {
+  text: string;
+  tone: "over" | "safe" | "unknown";
+}
+
+export function storageResultOf(st: StorageBasis): StorageResult {
+  if (st.overHours !== undefined) return { text: `预计超时${st.overHours}小时`, tone: "over" };
+  if (st.marginHours !== undefined) return { text: `预计不超时，剩余${st.marginHours}小时`, tone: "safe" };
+  return { text: "暂无法预测", tone: "unknown" };
 }
 
 export interface DefectForecast {
@@ -171,10 +184,10 @@ export interface DefectForecast {
 
 // ===== 参数构造（按缺陷差异化，数量按实际模型输入动态展示）=====
 
-// 范围偏差：超上限 ↑ / 低于下限 ↓ / 范围内 →（百分数绝对差用 pct，规格 §9）
+// 范围偏差：超上限 ↑ / 低于下限 ↓ / 范围内 →（百分数绝对差用 pct，规格 §9；非 pct 取 1 位小数并去尾零，避免浮点尾差）
 function rangeDev(value: number | null, lo: number | undefined, hi: number | undefined, pct: boolean): ParamCell["dev"] {
   if (value === null) return { text: "—", dir: "none" };
-  const fmt = (d: number) => (pct ? `${d.toFixed(1)}pct` : `${d}`);
+  const fmt = (d: number) => (pct ? `${d.toFixed(1)}pct` : `${+d.toFixed(1)}`);
   if (hi !== undefined && value > hi) return { text: `+${fmt(value - hi)} ↑`, dir: "up" };
   if (lo !== undefined && value < lo) return { text: `-${fmt(lo - value)} ↓`, dir: "down" };
   return { text: "0 →", dir: "in" };
@@ -239,8 +252,10 @@ function storageParams(v: {
 }
 
 // ===== 种子（最新一轮预测，形状手工锚定）=====
-const pt = (hour: number, score: number): TrendPoint => ({ t: hm(hour), full: `${DAY} ${hm(hour)}`, score });
-const series = (startHour: number, scores: number[]): TrendPoint[] => scores.map((s, i) => pt(startHour + i, s));
+// 批次序列：全厂批次序号递增（2404–2412 为已产历史批次，末位 2412 = 基准批次；
+// 2413 起为有排产计划的未来批次）
+const pt = (no: number, score: number): TrendPoint => ({ batch: String(no), full: `第${no}批`, score });
+const series = (startNo: number, scores: number[]): TrendPoint[] => scores.map((s, i) => pt(startNo + i, s));
 
 interface RawContrib {
   name: string;
@@ -264,13 +279,19 @@ interface RawSeed {
   storage?: StorageBasis;
 }
 
-// 成品水分未来点附带业务预测值（预测成品水分随评分同步抬升）
+// 成品水分未来点附带业务预测值（预测成品水分随评分同步抬升；moist 供趋势图预测曲线）
 const withMoistureBiz = (future: TrendPoint[], values: number[]): TrendPoint[] =>
-  future.map((p, i) => ({ ...p, biz: `预测成品水分 ${values[i].toFixed(1)}%` }));
+  future.map((p, i) => ({ ...p, moist: values[i], biz: `预测成品水分 ${values[i].toFixed(1)}%` }));
 
-// 箱储未来点在出库前附带预计出库信息（来自计划 → 标注"计划"）
-const withOutboundBiz = (future: TrendPoint[], outboundHour: number, label: string): TrendPoint[] =>
-  future.map((p, i) => (14 + i <= outboundHour ? { ...p, biz: label, planned: true } : p));
+// 箱储未来点在出库批次前附带预计出库信息（来自计划 → 标注"计划"；dropIndex = 最后一个带标注的批次下标）
+const withOutboundBiz = (future: TrendPoint[], dropIndex: number, label: string): TrendPoint[] =>
+  future.map((p, i) => (i <= dropIndex ? { ...p, biz: label, planned: true } : p));
+
+// 点位附带趋势值（历史点 = 实际值 / 未来点 = 预测值；箱储出库后无在储物料 → 不再给值，曲线止于出库）
+const withVals = (points: TrendPoint[], values: number[], key: "moist" | "hours"): TrendPoint[] =>
+  points.map((p, i) =>
+    i >= values.length ? p : key === "moist" ? { ...p, moist: values[i] } : { ...p, hours: values[i] },
+  );
 
 // 各缺陷预测模型版本（预测详情抽屉展示；种子可用 modelVer 覆盖）
 const MODEL_VER: Record<DefectCode, string> = {
@@ -282,10 +303,10 @@ const MODEL_VER: Record<DefectCode, string> = {
 const SEEDS: RawSeed[] = [
   // ---- 成品水分不合格（烘丝机台）----
   {
-    // 高风险演示：17:00 首达高风险阈值，峰值 82.5 @ 19:00
+    // 高风险演示：第2417批首达高风险阈值，峰值 82.5 @ 第2417批
     code: "CPSFBH", objectKey: "3#烘丝机", batch: "P20261019-03", confidence: 0.86,
-    hist: series(6, [32.5, 35.8, 34.2, 41.6, 45.3, 48.9, 55.4, 61.2, 66.8]),
-    future: withMoistureBiz(series(14, [66.8, 68.9, 69.6, 73.2, 78.4, 82.5, 80.2, 77.6, 74.8]), [12.7, 12.8, 12.9, 13.0, 13.1, 13.2, 13.1, 13.1, 13.0]),
+    hist: withVals(series(2404, [32.5, 35.8, 34.2, 41.6, 45.3, 48.9, 55.4, 61.2, 66.8]), [12.2, 12.3, 12.2, 12.4, 12.3, 12.5, 12.4, 12.6, 12.7], "moist"),
+    future: withMoistureBiz(series(2412, [66.8, 68.9, 69.6, 73.2, 78.4, 82.5, 80.2, 77.6, 74.8, 72.5, 70.8]), [12.7, 12.8, 12.9, 13.0, 13.1, 13.2, 13.1, 13.1, 13.0, 12.9, 12.9]),
     params: moistureParams({ mat: 12.8, flavor: 13.1, upstream: 12.9, downtime: 18, env: 96.5 }),
     contribs: [
       { name: "加香水分均值", score: 28.4, source: "制丝", origin: "MES" },
@@ -295,13 +316,13 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 4.1, source: "制丝", origin: "MES" },
     ],
     context: { brand: "娇子", shift: "白班", shiftGroup: "甲班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "13.2%", tolerance: "±0.3%", dev: "+0.7pct", atTime: "10-19 19:00", range: "12.2%～12.8%", std: "12.5%", overText: "超上限 0.4 pct", overKind: "over" },
+    moisture: { predicted: "13.2%", tolerance: "±0.3%", dev: "+0.7pct", range: "12.2%～12.8%", lo: 12.2, hi: 12.8, std: "12.5%", overText: "超上限 0.4 pct", overValue: "0.4 pct", overKind: "over" },
   },
   {
     // 中风险演示：窗口内未达高风险阈值
     code: "CPSFBH", objectKey: "1#烘丝机", batch: "P20261019-01", confidence: 0.82,
-    hist: series(6, [26.4, 28.1, 27.5, 30.2, 33.8, 36.4, 38.9, 41.7, 44.2]),
-    future: withMoistureBiz(series(14, [44.2, 46.5, 48.3, 50.6, 52.9, 54.8, 53.2, 51.4, 49.6]), [12.6, 12.6, 12.7, 12.7, 12.8, 12.8, 12.8, 12.7, 12.7]),
+    hist: withVals(series(2404, [26.4, 28.1, 27.5, 30.2, 33.8, 36.4, 38.9, 41.7, 44.2]), [12.3, 12.4, 12.3, 12.5, 12.4, 12.5, 12.6, 12.5, 12.6], "moist"),
+    future: withMoistureBiz(series(2412, [44.2, 46.5, 48.3, 50.6, 52.9, 54.8, 53.2, 51.4, 49.6, 48.1, 46.7]), [12.6, 12.6, 12.7, 12.7, 12.8, 12.8, 12.8, 12.7, 12.7, 12.6, 12.6]),
     params: moistureParams({ mat: 12.4, flavor: 12.8, upstream: 12.6, downtime: 16, env: 97.2 }),
     contribs: [
       { name: "加香水分均值", score: 24.6, source: "制丝", origin: "MES" },
@@ -310,13 +331,13 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 4.2, source: "制丝", origin: "MES" },
     ],
     context: { brand: "长城", shift: "白班", shiftGroup: "乙班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "12.8%", tolerance: "±0.3%", dev: "+0.3pct", atTime: "10-19 19:00", range: "12.2%～12.8%", std: "12.5%", overText: "恰达允差上限", overKind: "in" },
+    moisture: { predicted: "12.8%", tolerance: "±0.3%", dev: "+0.3pct", range: "12.2%～12.8%", lo: 12.2, hi: 12.8, std: "12.5%", overText: "恰达允许上限", overKind: "in" },
   },
   {
     // 低风险演示
     code: "CPSFBH", objectKey: "5#烘丝机", batch: "P20261019-05", confidence: 0.79,
-    hist: series(6, [22.1, 23.5, 22.8, 24.6, 25.3, 26.1, 27.4, 28.2, 29.5]),
-    future: withMoistureBiz(series(14, [29.5, 30.2, 31.4, 30.8, 29.7, 28.9, 28.1, 27.3, 26.5]), [12.4, 12.4, 12.5, 12.5, 12.4, 12.4, 12.4, 12.3, 12.3]),
+    hist: withVals(series(2404, [22.1, 23.5, 22.8, 24.6, 25.3, 26.1, 27.4, 28.2, 29.5]), [12.5, 12.6, 12.5, 12.6, 12.7, 12.6, 12.5, 12.4, 12.4], "moist"),
+    future: withMoistureBiz(series(2412, [29.5, 30.2, 31.4, 30.8, 29.7, 28.9, 28.1, 27.3, 26.5, 25.8, 25.1]), [12.4, 12.4, 12.5, 12.5, 12.4, 12.4, 12.4, 12.3, 12.3, 12.3, 12.2]),
     params: moistureParams({ mat: 11.9, flavor: 12.6, upstream: 12.3, downtime: 9, env: 98.1 }),
     contribs: [
       { name: "加香水分均值", score: 14.2, source: "制丝", origin: "MES" },
@@ -324,14 +345,14 @@ const SEEDS: RawSeed[] = [
       { name: "上游工序水分", score: 7.2, source: "制丝", origin: "MES" },
     ],
     context: { brand: "宽窄", shift: "白班", shiftGroup: "丙班", process: "烘丝", part: "成品", qualityClass: "A类" },
-    moisture: { predicted: "12.5%", tolerance: "±0.3%", dev: "0pct", atTime: "10-19 16:00", range: "12.2%～12.8%", std: "12.5%", overText: "允差范围内", overKind: "in" },
+    moisture: { predicted: "12.5%", tolerance: "±0.3%", dev: "0pct", range: "12.2%～12.8%", lo: 12.2, hi: 12.8, std: "12.5%", overText: "允许范围内", overKind: "in" },
   },
   // ---- 烟支刺破（卷接机台）----
   {
     // 高风险演示：贡献度逐值对齐规格书示例（+21.0/42%、+13.5/27%、+9.5/19%、+6.0/12%）
     code: "YZCB", objectKey: "ZJ17-02卷接机组", batch: "P20261019-06", confidence: 0.84,
-    hist: series(6, [28.6, 31.2, 30.4, 35.8, 40.2, 44.6, 49.3, 55.1, 62.4]),
-    future: series(14, [62.4, 66.8, 71.5, 78.6, 74.2, 71.8, 69.4, 67.1, 64.5]),
+    hist: series(2404, [28.6, 31.2, 30.4, 35.8, 40.2, 44.6, 49.3, 55.1, 62.4]),
+    future: series(2412, [62.4, 66.8, 71.5, 78.6, 74.2, 71.8, 69.4, 67.1, 64.5, 62.0, 59.8]),
     params: punctureParams({ winnowing: 52.6, stemTrash: 3.8, stemReject: 132, recipe: "宽窄（细支 97mm） R-2026-08｜v3.2" }),
     contribs: [
       { name: "制丝柔性风选剔除量", score: 21.0, source: "制丝", origin: "MES" },
@@ -344,8 +365,8 @@ const SEEDS: RawSeed[] = [
   {
     // 中风险演示
     code: "YZCB", objectKey: "ZJ19-01卷接机组", batch: "P20261019-08", confidence: 0.8,
-    hist: series(6, [24.8, 26.2, 27.5, 29.1, 32.4, 35.2, 38.6, 41.3, 44.8]),
-    future: series(14, [44.8, 46.2, 47.9, 49.5, 51.2, 52.3, 50.8, 48.6, 46.4]),
+    hist: series(2404, [24.8, 26.2, 27.5, 29.1, 32.4, 35.2, 38.6, 41.3, 44.8]),
+    future: series(2412, [44.8, 46.2, 47.9, 49.5, 51.2, 52.3, 50.8, 48.6, 46.4, 44.9, 43.2]),
     params: punctureParams({ winnowing: 41.2, stemTrash: 2.9, stemReject: 118, recipe: "娇子（硬盒 84mm） J-2026-03｜v2.1" }),
     contribs: [
       { name: "卷烟机剔梗量", score: 23.1, source: "卷接", origin: "卷包数采" },
@@ -357,8 +378,8 @@ const SEEDS: RawSeed[] = [
   {
     // 低风险 + 无置信度演示（摘要隐藏模型置信度字段）
     code: "YZCB", objectKey: "ZJ17-04卷接机组", batch: "P20261019-11",
-    hist: series(6, [20.4, 21.6, 22.8, 23.5, 25.1, 26.4, 27.8, 28.6, 30.2]),
-    future: series(14, [30.2, 31.5, 32.8, 33.6, 32.4, 31.2, 30.1, 29.2, 28.4]),
+    hist: series(2404, [20.4, 21.6, 22.8, 23.5, 25.1, 26.4, 27.8, 28.6, 30.2]),
+    future: series(2412, [30.2, 31.5, 32.8, 33.6, 32.4, 31.2, 30.1, 29.2, 28.4, 27.6, 26.9]),
     params: punctureParams({ winnowing: 38.6, stemTrash: 2.4, stemReject: 96, recipe: "长城（软盒 84mm） C-2026-05｜v1.8" }),
     contribs: [
       { name: "制丝柔性风选剔除量", score: 18.9, source: "制丝", origin: "MES" },
@@ -368,19 +389,19 @@ const SEEDS: RawSeed[] = [
     context: { brand: "长城", shift: "白班", shiftGroup: "乙班", process: "卷制", part: "烟支", qualityClass: "C/D类" },
   },
   {
-    // 仅单点评分演示：无有效时序 → 高风险预测显示"暂无达阈值时间预测"，无可信解释不展示贡献度
+    // 仅单点评分演示：无有效时序 → 高风险预测显示"暂无达阈值批次预测"，无可信解释不展示贡献度
     code: "YZCB", objectKey: "5#卷接包机组", batch: "P20261019-12",
-    hist: series(6, [30.2, 32.5, 31.8, 35.4, 38.2, 40.6, 42.9, 45.1, 47.2]),
-    future: series(14, [47.2]),
+    hist: series(2404, [30.2, 32.5, 31.8, 35.4, 38.2, 40.6, 42.9, 45.1, 47.2]),
+    future: series(2412, [47.2]),
     params: punctureParams({ winnowing: 44.8, stemTrash: 3.0, stemReject: 124, recipe: "娇子（硬盒 84mm） J-2026-03｜v2.1" }),
     context: { brand: "娇子", shift: "白班", shiftGroup: "甲班", process: "卷制", part: "烟支", qualityClass: "C/D类" },
   },
   // ---- 箱储存储时间超上限（箱储对象 × 烟丝批次）----
   {
-    // 1#储丝柜 · 批次A：已超时演示（剩余允许时间为负 → 显示已超时时长；无出库计划不编造预计出库时间）
+    // 1#储丝柜 · 批次A：预计超时演示（预测结果 = 预计超时5小时；暂无出库计划，不编造预计出库批次）
     code: "XCCG", objectKey: "1#储丝柜", batch: "YS-1026A", confidence: 0.83,
-    hist: series(6, [82.1, 82.6, 83.2, 83.8, 84.5, 85.1, 85.8, 86.5, 88.4]),
-    future: series(14, [88.4, 88.9, 89.4, 89.8, 90.3, 90.8, 91.4, 92.1, 93.5]),
+    hist: withVals(series(2404, [82.1, 82.6, 83.2, 83.8, 84.5, 85.1, 85.8, 86.5, 88.4]), [48.0, 52.5, 50.0, 55.5, 53.0, 57.0, 55.5, 58.5, 60.0], "hours"),
+    future: withVals(series(2412, [88.4, 88.9, 89.3, 89.7, 90.1, 90.5, 90.9, 91.3, 91.7, 92.1, 92.5, 92.8, 93.1, 93.4, 93.5]), [60.0, 61.5, 63.0, 64.5, 66.0, 67.5, 69.0, 70.5, 72.0, 73.5, 74.8, 75.9, 76.6, 77.0, 77.0], "hours"),
     params: storageParams({ inbound: "10-15 08:00", limit: 72, stock: 46200, dryingActual: 8820, packingActual: 7260, outboundInfo: "暂无出库计划" }),
     contribs: [
       { name: "已储存时长", score: 45.3, source: "仓储", origin: "MES" },
@@ -389,13 +410,13 @@ const SEEDS: RawSeed[] = [
       { name: "制丝投料进度", score: 11.5, source: "制丝", origin: "MES" },
     ],
     context: { brand: "长城", shift: "白班", shiftGroup: "甲班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { storedHours: 102, limitHours: 72, remainingHours: -30, deadline: "10-18 08:00" },
+    storage: { storedHours: 102, limitHours: 72, overHours: 5, deadline: "10-18 08:00" },
   },
   {
-    // 1#储丝柜 · 批次B：预计出库来自计划（Tooltip 标注"计划"）
+    // 1#储丝柜 · 批次B：预计第2421批出库（来自计划，Tooltip 标注"计划"）
     code: "XCCG", objectKey: "1#储丝柜", batch: "YS-1027B", confidence: 0.78,
-    hist: series(6, [32.4, 33.1, 34.2, 35.6, 37.2, 38.8, 39.5, 40.1, 40.8]),
-    future: withOutboundBiz(series(14, [40.8, 42.5, 44.6, 46.2, 47.5, 48.0, 48.2, 47.6, 22.5]), 21, "预计出库 21:00"),
+    hist: series(2404, [32.4, 33.1, 34.2, 35.6, 37.2, 38.8, 39.5, 40.1, 40.8]),
+    future: withOutboundBiz(withVals(series(2412, [40.8, 42.5, 44.6, 46.2, 47.5, 48.0, 48.2, 47.6, 46.8, 22.5, 22.0, 21.6, 21.2, 20.9, 20.5]), [56.0, 57.0, 58.0, 59.0, 60.0, 61.0, 62.0, 62.5, 63.0, 63.0], "hours"), 8, "预计第2421批出库"),
     params: storageParams({ inbound: "10-17 06:00", limit: 72, stock: 38500, dryingActual: 9050, packingActual: 8120, outboundInfo: "10-19 21:00 计划领用 12t" }),
     contribs: [
       { name: "已储存时长", score: 19.8, source: "仓储", origin: "MES" },
@@ -404,13 +425,13 @@ const SEEDS: RawSeed[] = [
       { name: "制丝投料进度", score: 6.3, source: "制丝", origin: "MES" },
     ],
     context: { brand: "宽窄", shift: "白班", shiftGroup: "丙班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { storedHours: 56, limitHours: 72, remainingHours: 16, deadline: "10-20 06:00", totalHours: 63, outbound: "10-19 21:00（计划）" },
+    storage: { storedHours: 56, limitHours: 72, marginHours: 9, deadline: "10-20 06:00" },
   },
   {
-    // 2#储丝柜：中风险，预计 16:00 出库（计划）
+    // 2#储丝柜：中风险，预计第2415批出库（计划）
     code: "XCCG", objectKey: "2#储丝柜", batch: "YS-1028C", confidence: 0.81,
-    hist: series(6, [36.2, 37.1, 38.4, 39.8, 41.2, 43.6, 45.8, 48.2, 50.1]),
-    future: withOutboundBiz(series(14, [50.1, 51.0, 51.6, 38.2, 35.4, 32.1, 29.8, 27.2, 24.6]), 16, "预计出库 16:00"),
+    hist: series(2404, [36.2, 37.1, 38.4, 39.8, 41.2, 43.6, 45.8, 48.2, 50.1]),
+    future: withOutboundBiz(withVals(series(2412, [50.1, 51.0, 51.6, 38.2, 35.4, 32.1, 29.8, 27.2, 24.6, 22.1, 20.5, 19.2, 18.4, 17.6, 16.9]), [38.0, 40.0, 42.0, 44.0], "hours"), 2, "预计第2415批出库"),
     params: storageParams({ inbound: "10-18 00:00", limit: 72, stock: 35600, dryingActual: 9180, packingActual: 7980, outboundInfo: "10-19 16:00 计划领用 8t" }),
     contribs: [
       { name: "已储存时长", score: 22.4, source: "仓储", origin: "MES" },
@@ -419,7 +440,7 @@ const SEEDS: RawSeed[] = [
       { name: "库存结构", score: 5.1, source: "仓储", origin: "MES" },
     ],
     context: { brand: "娇子", shift: "白班", shiftGroup: "乙班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { storedHours: 38, limitHours: 72, remainingHours: 34, deadline: "10-20 00:00", totalHours: 64, outbound: "10-19 16:00（计划）" },
+    storage: { storedHours: 38, limitHours: 72, marginHours: 8, deadline: "10-20 00:00" },
   },
   {
     // 3#储丝柜：数据不足演示（缺领用/出库计划与部分产量 → 不编造评分 / 曲线 / 解读）
@@ -428,7 +449,7 @@ const SEEDS: RawSeed[] = [
     future: [],
     params: storageParams({ inbound: "10-18 14:00", limit: 60, stock: 41800, dryingActual: 8930, packingActual: null, outboundInfo: null }),
     context: { brand: "长城", shift: "白班", shiftGroup: "甲班", process: "仓储", part: "箱储", qualityClass: "B类" },
-    storage: { storedHours: 24, limitHours: 60, remainingHours: 36, deadline: "10-20 14:00" },
+    storage: { storedHours: 24, limitHours: 60, deadline: "10-20 14:00" },
   },
 ];
 
@@ -467,41 +488,51 @@ function buildSources(raws: RawContrib[] | undefined): SourceItem[] {
 
 // ===== 预测结果派生 =====
 
-// 窗口最高风险评分（多同分取最早时间；与趋势图最高点一致）
-export function peakOf(f: DefectForecast): { score: number; time: string; display: string } | null {
+// 窗口最高风险评分（多同分取最早批次；与趋势图最高点一致）
+export function peakOf(f: DefectForecast): { score: number; batch: string; display: string } | null {
   if (f.future.length === 0) return null;
   let best = f.future[0];
   for (const p of f.future) if (p.score > best.score) best = p;
-  return { score: best.score, time: best.full, display: shortOf(best.full) };
+  return { score: best.score, batch: best.batch, display: best.full };
 }
 
-// 高风险预测五种判定口径（规格 §7）
+// 高风险预测五种判定口径（规格 §7）：达阈值批次为有排产计划的具体批次；
+// 各口径仅表示模型评分与阈值的关系，不代表现场已发生缺陷或未来一定不会发生缺陷
 export type EtaKind = "reached" | "within" | "notReached" | "noSeries" | "unavailable";
 
 export function highRiskEta(f: DefectForecast): { kind: EtaKind; text: string } {
   if (f.status === "insufficient") return { kind: "unavailable", text: "暂无法预测" };
   const base = f.future[0];
-  if (base && base.score >= HIGH_THRESHOLD) return { kind: "reached", text: "已进入高风险" };
+  // 基准评分已达阈值：按窗口峰值批次表述（预计 xx 批次达风险阈值）
+  if (base && base.score >= HIGH_THRESHOLD)
+    return { kind: "reached", text: `预计${peakOf(f)?.batch ?? base.batch}批次达风险阈值` };
   if (f.future.length <= 1) return { kind: "noSeries", text: "暂无达阈值时间预测" };
   const hit = f.future.slice(1).find((p) => p.score >= HIGH_THRESHOLD);
-  if (hit) {
-    const hours = Number(hit.full.slice(11, 13)) - Number(base.full.slice(11, 13));
-    return { kind: "within", text: `预计${hours}小时内进入高风险` };
-  }
-  return { kind: "notReached", text: `未来${WINDOW_HOURS}小时未进入高风险` };
+  if (hit) return { kind: "within", text: `预计${hit.batch}批次达风险阈值` };
+  return { kind: "notReached", text: "未来未达风险阈值" };
 }
 
-// 预测窗口：按业务配置时长展示（默认未来 8 小时）；数据不足不展示窗口
+// 预测窗口：按已排产批次数展示（未来批次数 = 预测点数 − 基准点）；数据不足不展示窗口
 export function windowTextOf(f: DefectForecast): string {
-  return f.status === "insufficient" ? "—" : `${WINDOW_HOURS}小时`;
+  if (f.status === "insufficient") return "—";
+  return `未来 ${f.future.length - 1} 个已排产批次`;
 }
 
-// ===== AI 风险解读（三段：预测概况 / 参数关注 / 核查重点；模板拼接 ≤200 字符，不编造数值）=====
+// ===== AI 风险解读（规格 §9 解读顺序：风险概况 → 参数关注 → 核查重点；模板拼接 ≤200 字符，不编造数值）=====
 const CHECK_FOCUS: Record<DefectCode, string> = {
   CPSFBH: "建议核查加香出口水分设定、排潮风门开度及来料水分衔接",
   YZCB: "建议核查柔性风选剔除量与卷烟机剔梗量是否超出标准值",
-  XCCG: "建议核查计划投料、当前库存与卷包消耗进度是否匹配",
+  XCCG: "建议核查计划投料、库存与卷包消耗是否匹配",
 };
+
+// 窗口内评分趋势（未达阈值时替代"达阈值批次"表述）：首末对比 ±3 分视为总体平稳
+function trendWordOf(f: DefectForecast): string {
+  const first = f.future[0]?.score ?? 0;
+  const last = f.future[f.future.length - 1]?.score ?? first;
+  if (last - first > 3) return "总体上升";
+  if (first - last > 3) return "总体下降";
+  return "总体平稳";
+}
 
 export function aiInterpretation(f: DefectForecast): string[] {
   if (f.status === "insufficient") return ["数据不足，无法生成解读"];
@@ -509,18 +540,48 @@ export function aiInterpretation(f: DefectForecast): string[] {
   if (!peak) return ["数据不足，无法生成解读"];
   const lv = levelOf(peak.score);
   const eta = highRiskEta(f);
+
+  // 1. 风险概况：指标预测值 / 管控值 / 超出量（有业务依据时）→ 最高评分 / 等级
+  //    → 预计达阈值批次或窗口内趋势 → 有有效置信度时引用
+  const basis: string[] = [];
+  if (f.moisture) {
+    basis.push(`预测成品水分 ${f.moisture.predicted}（管控值 ${f.moisture.range}，${f.moisture.overText}）`);
+  } else if (f.storage) {
+    const res = storageResultOf(f.storage);
+    const total =
+      f.storage.overHours !== undefined
+        ? f.storage.limitHours + f.storage.overHours
+        : f.storage.marginHours !== undefined
+          ? f.storage.limitHours - f.storage.marginHours
+          : null;
+    if (total !== null)
+      basis.push(`预计总储存时长 ${total}h（管控值 储存上限 ${f.storage.limitHours}h，${res.text}）`);
+  }
+  const etaPart = eta.kind === "notReached" ? `窗口内评分${trendWordOf(f)}，${eta.text}` : eta.text;
   const s1 =
-    `预测窗口内最高风险评分 ${peak.score.toFixed(1)} 分（${peak.display}），等级${lv.label}，${eta.text}` +
+    (basis.length > 0 ? `${basis.join("，")}；` : "") +
+    `窗口最高风险评分 ${peak.score.toFixed(1)} 分（${peak.display}），等级${lv.label}，${etaPart}` +
     (f.confidence !== undefined ? `，模型置信度 ${Math.round(f.confidence * 100)}%` : "") +
     "。";
+
+  // 2. 参数关注：按后台已计算的贡献度排序取前 1—2 项，说明参数及其相对基准的偏差
+  //    （贡献项在参数表无对应单元格时不编造偏差；范围内项表述为"处于参考范围内"）
   const top = f.contributions
     .slice(0, 2)
     .map((c) => {
-      const dev = f.params.find((p) => p.name === c.name)?.dev.text ?? "偏离参考基准";
-      return `${c.name}（贡献 +${c.score.toFixed(1)} 分，${dev}）`;
+      const cell = f.params.find((p) => p.name === c.name);
+      const devPhrase =
+        !cell || cell.dev.dir === "none"
+          ? ""
+          : cell.dev.dir === "in"
+            ? "，处于参考范围内"
+            : `，相对基准 ${cell.dev.text}`;
+      return `${c.name}（贡献 +${c.score.toFixed(1)} 分${devPhrase}）`;
     })
     .join("、");
-  const s2 = top ? `参数关注：${top}。` : "参数关注：本轮无显著增险参数。";
+  const s2 = top ? `${top}。` : "本轮无显著增险参数。";
+
+  // 3. 核查重点：依据已配置业务规则提示核查对象；不作确定性根因结论
   const s3 = `${CHECK_FOCUS[f.code]}，具体原因需现场核查。`;
   return [s1, s2, s3];
 }
@@ -545,7 +606,7 @@ function finalize(seed: RawSeed): DefectForecast {
     contributions,
     sources: buildSources(seed.contribs),
     context: seed.context,
-    explainTime: peak ? shortOf(peak.full) : "—",
+    explainTime: peak ? peak.full : "—",
     moisture: seed.moisture,
     storage: seed.storage,
   };
@@ -561,35 +622,35 @@ export function forecastOf(code: string, objectKey: string, batch: string): Defe
   );
 }
 
-// 对象风险等级口径：按同一预测窗口内最高风险评分确定（多批次取最高风险批次）；全部批次数据不足 → "数据不足"。
-// 直接并入预测对象下拉选项展示，不再单独展示标签
-export function objectLevelTextOf(code: string, objectKey: string): string {
-  const obj = OBJECTS[(code as DefectCode) in OBJECTS ? (code as DefectCode) : "CPSFBH"].find((o) => o.key === objectKey);
-  if (!obj) return "—";
-  const peaks = obj.batches
-    .map((b) => forecastOf(code, objectKey, b))
-    .filter((f) => f.status === "ok")
-    .map((f) => peakOf(f))
-    .filter((p): p is { score: number; time: string; display: string } => p !== null)
-    .sort((a, b) => b.score - a.score);
-  return peaks.length > 0 ? levelOf(peaks[0].score).label : "数据不足";
-}
-
-// 对象清单（含全部已配置对象；下拉展示 "名称｜编码｜风险等级"）
+// 对象清单（含全部已配置对象；供深链 object 参数校验与默认目标解析）
 export interface ObjectBrief {
   key: string;
   code: string;
-  label: string;
   batches: string[];
 }
 
 export function forecastObjectsOf(code: string): ObjectBrief[] {
-  return OBJECTS[(code as DefectCode) in OBJECTS ? (code as DefectCode) : "CPSFBH"].map((o) => ({
-    key: o.key,
-    code: o.code,
-    label: `${o.key}｜${o.code}｜${objectLevelTextOf(code, o.key)}`,
-    batches: o.batches,
-  }));
+  const c = (code as DefectCode) in OBJECTS ? (code as DefectCode) : "CPSFBH";
+  return OBJECTS[c].map((o) => ({ key: o.key, code: o.code, batches: o.batches }));
+}
+
+// 牌号筛选（趋势图右上角）：当前缺陷下可选牌号（按种子出现顺序）；
+// 不同牌号预测趋势不同，同牌号多对象取窗口最高分
+export function brandOptionsOf(code: string): string[] {
+  const brands: string[] = [];
+  for (const f of FORECASTS) {
+    if (f.code !== code) continue;
+    if (!brands.includes(f.context.brand)) brands.push(f.context.brand);
+  }
+  return brands;
+}
+
+export function bestForecastOfBrand(code: string, brand: string): DefectForecast {
+  const cands = FORECASTS.filter((f) => f.code === code && f.context.brand === brand && f.status === "ok");
+  if (cands.length > 0) {
+    return cands.reduce((a, b) => ((peakOf(b)?.score ?? 0) > (peakOf(a)?.score ?? 0) ? b : a));
+  }
+  return FORECASTS.find((f) => f.code === code && f.context.brand === brand) ?? FORECASTS[0];
 }
 
 // 对象内默认关联批次：最高风险有效批次（无有效预测时取首个批次）

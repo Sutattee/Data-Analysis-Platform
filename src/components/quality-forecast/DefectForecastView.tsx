@@ -7,36 +7,36 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
-import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { RiskTrendChart } from "./RiskTrendChart";
 import { RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
 import {
-  BASE_TIME,
   FORECAST_DEFECTS,
   UPDATED_AT,
-  WINDOW_HOURS,
   aiInterpretation,
+  bestForecastOfBrand,
+  brandOptionsOf,
   defaultBatchOf,
   defaultTargetOf,
   forecastDefectOf,
-  forecastObjectsOf,
   forecastOf,
   highRiskEta,
   levelOf,
   peakOf,
+  storageResultOf,
   windowTextOf,
   type ParamCell,
 } from "@/lib/mock-data/quality-defect-forecast";
 
-const selectCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none";
 const th = "text-left px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
 
-// 缺陷下拉选项（3 个重点缺陷："名称｜编码"）
-const FORECAST_DEFECT_OPTIONS = FORECAST_DEFECTS.map((d) => ({ value: d.code, label: `${d.name}｜${d.code}` }));
+// 缺陷 tab 选项（开放 2 个重点缺陷，仅展示缺陷名称；烟支刺破保留数据供工作台深链，不开放 tab）
+const FORECAST_DEFECT_OPTIONS = FORECAST_DEFECTS.filter((d) => d.code !== "YZCB").map((d) => ({
+  value: d.code,
+  label: d.name,
+}));
 
-// AI 解读三段固定小标题
-const AI_SECTION_TITLES = ["预测概况", "参数关注", "核查重点"];
+// AI 解读三段固定小标题（规格 §9 解读顺序：风险概况 → 参数关注 → 核查重点）
+const AI_SECTION_TITLES = ["风险概况", "参数关注", "核查重点"];
 
 // 摘要信息格：label 上 / 值下两行式（各列起点对齐，长文本换行完整展示），备注行在下方
 function SummaryItem({
@@ -55,16 +55,6 @@ function SummaryItem({
       <div className="text-xs text-gray-400">{label}</div>
       <div className={`mt-1 text-sm font-semibold leading-5 ${valueCls}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs leading-4 text-gray-400">{sub}</div>}
-    </div>
-  );
-}
-
-// 只读上下文信息格：字段与值同行（缺失或不适用显示 "—"），紧随预测对象字段展示
-function ContextItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <span className="shrink-0 text-xs text-gray-500">{label}：</span>
-      <span className="text-sm text-gray-700">{value || "—"}</span>
     </div>
   );
 }
@@ -97,23 +87,75 @@ function Delayed({ delay, children }: { delay: number; children: ReactNode }) {
   return <>{children}</>;
 }
 
+// 牌号筛选（预测趋势图右上角）：不同牌号的预测趋势不同，切换即整轮切换
+function BrandFilter({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (options.length === 0) return null;
+  return (
+    <div className="relative">
+      {open && <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-400 hover:text-primary-600"
+      >
+        牌号：<span className="font-medium text-gray-800">{value}</span>
+        <span className="text-gray-400">▾</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          {options.map((b) => (
+            <button
+              key={b}
+              type="button"
+              onClick={() => {
+                onChange(b);
+                setOpen(false);
+              }}
+              className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-primary-50 ${
+                b === value ? "bg-primary-50 font-medium text-primary-700" : "text-gray-600"
+              }`}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 深链初始选中（?code=&object=&batch=，来自工作台「预测详情」）：code 取默认兜底，
-// object 按名称或机台编码匹配，batch 须属于该对象，任一无效则回退该缺陷的默认目标
+// object 按对象名匹配有效预测，batch 须命中该对象，任一无效则回退该缺陷的默认目标
 function deepTargetOf(params: URLSearchParams) {
   const base = defaultTargetOf(params.get("code") ?? undefined);
   const o = params.get("object");
-  const obj = o ? forecastObjectsOf(base.code).find((x) => x.key === o || x.code === o) : undefined;
-  const objectKey = obj?.key ?? base.objectKey;
+  let objectKey = base.objectKey;
+  if (o) {
+    const probe = forecastOf(base.code, o, "");
+    if (probe.objectKey === o) objectKey = o;
+  }
   const b = params.get("batch");
-  const batch = b && (obj ? obj.batches.includes(b) : b === base.batch) ? b : defaultBatchOf(base.code, objectKey);
+  const batch =
+    b && forecastOf(base.code, objectKey, b).batch === b ? b : defaultBatchOf(base.code, objectKey);
   return { code: base.code, objectKey, batch };
 }
 
-// 缺陷预测主视图：顶部项目及对象选择（缺陷单选 → 预测对象联动 → 多批次分别预测，字段与控件同行），
-// 只读上下文紧随其后；风险摘要字段值同行、无卡片标题（压缩高度让参数表进第一屏）；左侧主区域（预测趋势 / 关联参数表），
+// 缺陷预测主视图：顶部缺陷 tab 切换（预测对象 / 关联批次不再作为筛选项，
+// 预测对象由牌号筛选与深链参数确定；上下文信息仅在趋势图悬浮提示内展示），
+// 风险摘要字段值同行、无卡片标题
+// （压缩高度让参数表进第一屏）；左侧主区域（预测趋势含牌号筛选 / 关联参数表），
 // 右侧辅助区域（AI 解读 / 贡献度 / 来源分布）。解读区默认收起：点击「智能解读」后按
 // AI 解读文字逐字 → 贡献度 → 来源分布 → 关联参数表的顺序流式生成；切换输入后重置回按钮态。
-// 本期仅展示最新一轮预测：切换对象即整轮切换，不混合轮次。
+// 本期仅展示最新一轮预测：切换缺陷/牌号即整轮切换，不混合轮次。
 export function DefectForecastView() {
   const searchParams = useSearchParams();
   const [initial] = useState(() => deepTargetOf(searchParams));
@@ -122,13 +164,11 @@ export function DefectForecastView() {
   const [batch, setBatch] = useState(initial.batch);
   // 智能解读：进入页面不展示解读区（AI 解读 / 贡献度 / 来源分布 / 关联参数表），点击按钮后流式生成
   const [interpreting, setInterpreting] = useState(false);
-  // 预测详情抽屉：收纳辅助字段（评分 / 等级 / 置信度 / 模型版本 / 窗口 / 水分口径 / 更新时间），默认不展开
+  // 预测详情抽屉：收纳辅助字段（评分 / 等级 / 置信度 / 模型版本 / 窗口 / 业务口径 / 更新时间），默认不展开
   const [detailOpen, setDetailOpen] = useState(false);
 
   const defect = forecastDefectOf(code);
-  const objects = forecastObjectsOf(code);
-  const activeObject = objects.find((o) => o.key === objectKey) ?? objects[0];
-  const forecast = forecastOf(code, activeObject.key, batch);
+  const forecast = forecastOf(code, objectKey, batch);
   const peak = peakOf(forecast);
   const lv = peak ? levelOf(peak.score) : null;
   const eta = highRiskEta(forecast);
@@ -140,9 +180,12 @@ export function DefectForecastView() {
   });
   const aiDoneAt =
     texts.length > 0 ? sectionDelays[texts.length - 1] + texts[texts.length - 1].length * 8 + 300 : 0;
-  const ctx = forecast.context;
 
-  // 切换缺陷：整轮重置为该缺陷的默认对象（同窗口最高评分的首个有效对象）
+  // 牌号筛选：当前缺陷下的可选牌号与当前牌号
+  const brands = brandOptionsOf(code);
+  const curBrand = forecast.context.brand;
+
+  // 切换缺陷：整轮重置为该缺陷的默认目标（同窗口最高评分的首个有效对象）
   function handleChangeCode(next: string) {
     const t = defaultTargetOf(next);
     setCode(t.code);
@@ -151,10 +194,11 @@ export function DefectForecastView() {
     setInterpreting(false);
   }
 
-  // 切换对象：关联批次重置为该对象最高风险批次（多批次分别预测，不混合）
-  function handleChangeObject(nextKey: string) {
-    setObjectKey(nextKey);
-    setBatch(defaultBatchOf(code, nextKey));
+  // 切换牌号：定位该牌号下窗口最高分的预测对象（不同牌号预测趋势不同，整轮切换）
+  function handleBrand(brand: string) {
+    const f = bestForecastOfBrand(code, brand);
+    setObjectKey(f.objectKey);
+    setBatch(f.batch);
     setInterpreting(false);
   }
 
@@ -168,79 +212,42 @@ export function DefectForecastView() {
           ? "text-gray-400"
           : "text-gray-900";
 
-  // 成品水分与允差范围对比标签（新口径：预测值 − 允差上限）：超上限浅橙底橙字 / 低于下限浅蓝底蓝字 / 范围内灰
-  const overCls =
-    forecast.moisture?.overKind === "over"
+  // 成品水分与允许范围对比标签（新口径：预测值 − 允许上限）：超上限浅橙底橙字 / 低于下限浅蓝底蓝字 / 范围内灰
+  const overKind = forecast.moisture?.overKind;
+  const overBadgeCls =
+    overKind === "over"
       ? "bg-orange-50 text-orange-600"
-      : forecast.moisture?.overKind === "under"
+      : overKind === "under"
         ? "bg-blue-50 text-blue-600"
         : "bg-gray-100 text-gray-500";
+  const overTextCls =
+    overKind === "over" ? "text-orange-600" : overKind === "under" ? "text-blue-600" : "text-gray-900";
 
-  // 箱储业务依据（数值口径；预计出库 / 总时长收进预测详情抽屉）
+  // 箱储业务依据（预测结果 = 预计超时 / 预计不超时；已储存时长等收纳进关联参数表）
   const st = forecast.storage;
-
-  // 班次按"日期 班次"格式展示（与预测基准时间同日）
-  const contextItems: [string, string][] = [
-    ["牌号", ctx.brand],
-    ["班次", `${BASE_TIME.slice(5, 10)} ${ctx.shift}`],
-    ["班组", ctx.shiftGroup],
-    ["工序", ctx.process],
-    ["部位", ctx.part],
-    ["质量类别", ctx.qualityClass],
-  ];
+  const stRes = st ? storageResultOf(st) : null;
+  const stCls =
+    stRes?.tone === "over" ? "text-red-600" : stRes?.tone === "safe" ? "text-green-600" : "text-gray-400";
 
   return (
     <div className="space-y-3">
-      {/* 顶部：项目及对象选择（字段与控件同行，下拉选项直接带风险等级）+ 只读上下文紧随其后 */}
+      {/* 顶部：缺陷 tab 切换（分段式）；牌号 / 班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
+          深链到未开放 tab 的缺陷（烟支刺破）时不点亮任何 tab，仅正常展示内容 */}
       <Card>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <label className="flex items-center gap-2">
-            <span className="shrink-0 text-xs text-gray-500">缺陷</span>
-            <div className="w-48">
-              <SearchSelect
-                options={FORECAST_DEFECT_OPTIONS}
-                value={code}
-                onChange={handleChangeCode}
-                placeholder="按缺陷名称搜索"
-              />
-            </div>
-          </label>
-          <label className="flex items-center gap-2">
-            <span className="shrink-0 text-xs text-gray-500">预测对象</span>
-            <div className="w-56">
-              <select value={activeObject.key} onChange={(e) => handleChangeObject(e.target.value)} className={selectCls}>
-                {objects.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </label>
-          {activeObject.batches.length > 1 && (
-            <label className="flex items-center gap-2">
-              <span className="shrink-0 text-xs text-gray-500">关联批次</span>
-              <div className="w-40">
-                <select
-                  value={batch}
-                  onChange={(e) => {
-                    setBatch(e.target.value);
-                    setInterpreting(false);
-                  }}
-                  className={selectCls}
-                >
-                  {activeObject.batches.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </label>
-          )}
-          {/* 只读上下文（牌号 / 班次 / 班组 / 工序 / 部位 / 质量类别） */}
-          {contextItems.map(([label, value]) => (
-            <ContextItem key={label} label={label} value={value} />
+        <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
+          {FORECAST_DEFECT_OPTIONS.map((d) => (
+            <button
+              key={d.value}
+              type="button"
+              onClick={() => handleChangeCode(d.value)}
+              className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
+                code === d.value
+                  ? "bg-white font-medium text-primary-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {d.label}
+            </button>
           ))}
         </div>
       </Card>
@@ -261,10 +268,10 @@ export function DefectForecastView() {
         }
       >
         <div className={`grid gap-6 px-5 pb-5 pt-2 ${forecast.moisture || st ? "lg:grid-cols-2" : ""}`}>
-          {/* 左：风险结论（窗口 + 等级大字 + 进入高风险时间） */}
+          {/* 左：风险结论（等级大字 + 进入高风险批次） */}
           <div>
             <p className="text-xs text-gray-400">
-              {forecast.status === "ok" ? `未来${WINDOW_HOURS}小时最高风险` : "本轮预测"}
+              {forecast.status === "ok" ? "未来最高风险" : "本轮预测"}
             </p>
             <div className="mt-2">
               {lv ? (
@@ -276,78 +283,50 @@ export function DefectForecastView() {
                 <span className="text-2xl font-bold text-gray-400">—</span>
               )}
             </div>
-            <div className="mt-2 flex items-center gap-1.5">
+            <div className="mt-2">
               <span className={`text-sm font-medium ${etaCls}`}>{eta.text}</span>
-              <span
-                title="时间表示风险评分达到阈值的预计时间，不代表缺陷实际发生时间"
-                className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-gray-300 text-[10px] font-bold leading-none text-gray-400"
-              >
-                ?
-              </span>
             </div>
             {!peak && <p className="mt-1 text-xs text-gray-400">必需输入不足，本轮未生成预测</p>}
           </div>
 
-          {/* 右：业务依据（成品水分对象 → 预测水分与允差对比；箱储对象 → 储存状态核算） */}
+          {/* 右：业务依据（成品水分对象 → 预测水分与允许范围对比；箱储对象 → 预测结果核算） */}
           {forecast.moisture && (
             <div>
               <p className="text-xs text-gray-400">预测成品水分</p>
               <div className="mt-2 flex flex-wrap items-baseline gap-2">
                 <span className="text-2xl font-bold text-gray-900">{forecast.moisture.predicted}</span>
-                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${overCls}`}>
+                <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${overBadgeCls}`}>
                   {forecast.moisture.overText}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-gray-400">允差范围 {forecast.moisture.range}</p>
+              <p className="mt-2 text-xs text-gray-400">允许范围 {forecast.moisture.range}</p>
             </div>
           )}
           {!forecast.moisture && st && (
             <div>
-              {/* 上方两组重点：储存状态（视觉重点）+ 允许储存截止时间，窄屏自动换行 */}
+              {/* 预测结果（视觉重点）+ 允许储存截止时间，窄屏自动换行；已储存/上限等辅助信息不再上卡片 */}
               <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
                 <div>
-                  <p className="text-xs text-gray-400">储存状态</p>
-                  <div className="mt-2 flex items-baseline gap-1.5">
-                    {st.remainingHours < 0 ? (
-                      // 已超时：红色强调超时时长
-                      <>
-                        <span className="text-sm font-medium text-red-600">已超时</span>
-                        <span className="text-2xl font-bold text-red-600">{-st.remainingHours}</span>
-                        <span className="text-sm font-medium text-red-600">小时</span>
-                      </>
-                    ) : st.remainingHours === 0 ? (
-                      // 恰达上限：临界警示
-                      <span className="text-2xl font-bold text-orange-600">已达上限</span>
-                    ) : (
-                      // 未超时：深色强调剩余可储存时长
-                      <>
-                        <span className="text-sm font-medium text-gray-600">剩余可储存</span>
-                        <span className="text-2xl font-bold text-gray-900">{st.remainingHours}</span>
-                        <span className="text-sm font-medium text-gray-500">小时</span>
-                      </>
-                    )}
-                  </div>
+                  <p className="text-xs text-gray-400">预测结果</p>
+                  <p className={`mt-2.5 text-lg font-semibold ${stCls}`}>{stRes?.text}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">允许储存截止时间</p>
                   <p className="mt-2.5 text-lg font-semibold text-gray-900">{st.deadline}</p>
                 </div>
               </div>
-              {/* 下方一行辅助信息（标签灰、数值深色，无分隔线） */}
-              <p className="mt-3 text-xs text-gray-400">
-                已储存 <span className="font-medium text-gray-700">{st.storedHours}</span> 小时
-                <span className="mx-1.5">·</span>
-                储存上限 <span className="font-medium text-gray-700">{st.limitHours}</span> 小时
-              </p>
             </div>
           )}
         </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        {/* 左侧主区域：预测趋势 / 关联参数表 */}
+        {/* 左侧主区域：预测趋势（右上角牌号筛选）/ 关联参数表 */}
         <div className="space-y-3 xl:col-span-2">
-          <Card title={`${defect.name}风险预测趋势`}>
+          <Card
+            title={defect.trendTitle}
+            headerRight={<BrandFilter options={brands} value={curBrand} onChange={handleBrand} />}
+          >
             <RiskTrendChart forecast={forecast} />
           </Card>
 
@@ -436,11 +415,11 @@ export function DefectForecastView() {
         </div>
       </div>
 
-      {/* 预测详情抽屉：辅助字段收纳（默认不展开）；缺陷名称 / 预测对象置首，水分口径字段仅成品水分对象展示 */}
+      {/* 预测详情抽屉：辅助字段收纳（默认不展开）；缺陷名称置首，
+          成品水分对象展示 预测成品水分/允许范围/超上限，箱储对象展示 预测结果/允许储存截止时间 */}
       <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="预测详情" width={440}>
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <SummaryItem label="缺陷名称" value={defect.name} />
-          <SummaryItem label="预测对象" value={activeObject.key} />
           <SummaryItem
             label="最高风险评分"
             value={peak ? `${peak.score.toFixed(1)}分` : "—"}
@@ -451,41 +430,18 @@ export function DefectForecastView() {
             <SummaryItem label="模型置信度" value={`${Math.round(forecast.confidence * 100)}%`} />
           )}
           <SummaryItem label="模型版本" value={forecast.modelVer} />
-          <SummaryItem label="预测窗口" value={forecast.status === "ok" ? `未来${windowTextOf(forecast)}` : "—"} />
+          <SummaryItem label="预测窗口" value={windowTextOf(forecast)} />
           {forecast.moisture && (
             <>
-              <SummaryItem label="成品水分标准值" value={`${forecast.moisture.std}（${forecast.moisture.overText}）`} />
-              <SummaryItem label="允差范围" value={forecast.moisture.range} />
               <SummaryItem label="预测成品水分" value={forecast.moisture.predicted} />
-              <SummaryItem label="相对标准值偏差" value={forecast.moisture.dev} />
+              <SummaryItem label="成品水分允许范围" value={forecast.moisture.range} />
+              <SummaryItem label="超上限" value={forecast.moisture.overValue ?? forecast.moisture.overText} valueCls={overTextCls} />
             </>
           )}
-          {st && (
+          {st && stRes && (
             <>
-              <SummaryItem
-                label="储存状态"
-                value={
-                  st.remainingHours < 0
-                    ? `已超时 ${-st.remainingHours} 小时`
-                    : st.remainingHours === 0
-                      ? "已达上限"
-                      : `剩余可储存 ${st.remainingHours} 小时`
-                }
-                valueCls={
-                  st.remainingHours < 0
-                    ? "text-red-600"
-                    : st.remainingHours === 0
-                      ? "text-orange-600"
-                      : "text-gray-900"
-                }
-              />
+              <SummaryItem label="预测结果" value={stRes.text} valueCls={stCls} />
               <SummaryItem label="允许储存截止时间" value={st.deadline} />
-              <SummaryItem label="已储存时长" value={`${st.storedHours} 小时`} />
-              <SummaryItem label="储存时长上限" value={`${st.limitHours} 小时`} />
-              {st.totalHours !== undefined && (
-                <SummaryItem label="预计总储存时长" value={`${st.totalHours} 小时`} />
-              )}
-              {st.outbound && <SummaryItem label="预计出库时间" value={st.outbound} />}
             </>
           )}
           <SummaryItem label="预测更新时间" value={UPDATED_AT} />
