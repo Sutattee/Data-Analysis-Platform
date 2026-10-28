@@ -1,6 +1,7 @@
 "use client";
 
-// 稳定性预测主视图：对象信息（指标 + 机台，机台含「全部」综合曲线）→ 预测概况（左未来结论 / 右当前状态，
+// 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
+// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右当前状态，
 // 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数）右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
@@ -35,9 +36,6 @@ import {
 import { MetricTrendChart } from "./MetricTrendChart";
 import { StabilityAnomalyDrawer } from "./StabilityAnomalyDrawer";
 import { StabilityContributionChart } from "./StabilityContributionChart";
-
-const selectCls =
-  "px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200";
 
 // 当前等级标签配色（浅底 + 等级字色）：用于「当前等级」标签，与左侧未来预测等级大字区分
 const STATUS_TAG_CLS: Record<string, string> = {
@@ -95,9 +93,8 @@ export function StabilityForecastView() {
   const metric = metricOf(code)!;
   const machineText = machine === "全部" ? "全部机台" : machine;
   const forecast = machine === "全部" ? combinedForecastOf(code) : stabilityForecastOf(code, machine);
-  const machines = metricMachinesOf(code);
 
-  // 切换指标：机台重置为「全部」，全量联动；解读区收起回到按钮态
+  // 切换指标：机台重置为「全部」（深链机台随指标失效），全量联动；解读区收起回到按钮态
   function changeCode(v: string) {
     setCode(v);
     setMachine("全部");
@@ -180,7 +177,7 @@ export function StabilityForecastView() {
   // 数据不足 / 预测失败：布局与正常态一致，左 = 占位说明，右 = AI 解读提示
   if (!forecast || forecast.insufficient || forecast.failed) {
     const failed = forecast?.failed === true;
-    const reason = forecast?.reason ?? `未找到 ${metric.name}（${code}）在 ${machineText} 上的预测结果，请重新选择机台。`;
+    const reason = forecast?.reason ?? `未找到 ${metric.name}（${code}）在 ${machineText} 上的预测结果。`;
     return (
       <div className="space-y-4">
         {/* 对象信息行 */}
@@ -196,17 +193,6 @@ export function StabilityForecastView() {
                   placeholder="搜索..."
                 />
               </div>
-            </label>
-            <label className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">机台</span>
-              <select className={selectCls} value={machine} onChange={(e) => setMachine(e.target.value)}>
-                <option value="全部">全部</option>
-                {machines.map((m) => (
-                  <option key={m.machine} value={m.machine}>
-                    {m.machine}｜{m.tag.text}
-                  </option>
-                ))}
-              </select>
             </label>
           </div>
         </Card>
@@ -275,7 +261,7 @@ export function StabilityForecastView() {
 
   return (
     <div className="space-y-4">
-      {/* 对象信息：指标 + 机台选择（选项标签 = 预测最高等级）；机台「全部」= 有效机台逐点均值的综合曲线 */}
+      {/* 对象信息：仅指标选择（选项标签 = 预测最高等级）；机台不作筛选，由深链指定（默认「全部」综合曲线） */}
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
           <label className="flex items-center gap-1.5">
@@ -288,24 +274,6 @@ export function StabilityForecastView() {
                 placeholder="搜索..."
               />
             </div>
-          </label>
-          <label className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">机台</span>
-            <select
-              className={selectCls}
-              value={machine}
-              onChange={(e) => {
-                setMachine(e.target.value);
-                setInterpreting(false);
-              }}
-            >
-              <option value="全部">全部</option>
-              {machines.map((m) => (
-                <option key={m.machine} value={m.machine}>
-                  {m.machine}｜{m.tag.text}
-                </option>
-              ))}
-            </select>
           </label>
         </div>
       </Card>
