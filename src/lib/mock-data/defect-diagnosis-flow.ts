@@ -143,6 +143,7 @@ export interface DiagTask {
   aiVersions: AiVersion[]; // 多次智能诊断产生多版本
   draft?: JudgmentDraft;
   judgments: Judgment[]; // 多次修订产生多版本
+  qcSyncFailed?: boolean; // 质检平台人工判定同步失败（接口异常 → 人工判定区域展示「获取失败。」）
 }
 
 // ============ 时间工具 ============
@@ -568,6 +569,9 @@ let tasks: DiagTask[] = [
       storage: { object: "2#储丝柜", objectCode: "CG-02", batch: "YS-1027B", stored: "79h", limit: "72h", over: "7h", inAt: "2026/09/19 20:40" },
     }),
 ];
+
+// 人工判定同步失败示例：第 5 条任务（5#烘丝机 2026-09-19）→ 人工判定区域展示「获取失败。」
+tasks[4].qcSyncFailed = true;
 
 // 种子版本回填（依赖 task 完整构造后生成依据/案例）
 (function seedVersions() {

@@ -6,17 +6,31 @@ import type { DiagTask } from "@/lib/mock-data/defect-diagnosis-flow";
 const SOURCE_NOTE = "从质检平台自动获取人工判定的原因";
 
 // 人工判定环节：从质检平台自动拉取人工填报的最终缺陷原因与补充核查说明，只读展示；
-// 不在本平台录入（无单选/输入/采纳/确认/加入知识库等交互）
+// 不在本平台录入（无单选/输入/采纳/确认/加入知识库等交互）；
+// 同步失败展示「获取失败。」，质检平台未填写展示「质检平台暂未填写人工判定原因」
 export function HumanJudgmentWorkspace({ task }: { task: DiagTask }) {
+  // 质检平台接口异常，同步失败
+  if (task.qcSyncFailed) {
+    return (
+      <div className="max-w-2xl space-y-2">
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="text-sm font-semibold text-gray-800">人工判定</div>
+          <p className="mt-3 text-sm text-gray-500">获取失败。</p>
+        </div>
+        <p className="text-xs text-gray-400">{SOURCE_NOTE}</p>
+      </div>
+    );
+  }
+
   const last = task.judgments[task.judgments.length - 1];
 
-  // 质检平台尚无该缺陷的人工填报
+  // 质检平台尚未填写该缺陷的人工判定原因
   if (!last) {
     return (
       <div className="max-w-2xl space-y-2">
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="text-sm font-semibold text-gray-800">人工判定</div>
-          <p className="mt-3 text-sm text-gray-500">质检平台暂无该缺陷的人工填报原因，填报后将自动同步展示。</p>
+          <p className="mt-3 text-sm text-gray-500">质检平台暂未填写人工判定原因</p>
         </div>
         <p className="text-xs text-gray-400">{SOURCE_NOTE}</p>
       </div>

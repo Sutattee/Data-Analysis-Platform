@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
@@ -21,6 +21,7 @@ import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import {
   getAlertStrategies,
+  getAlertStrategy,
   removeAlertStrategy,
   updateAlertStrategy,
   formatConditions,
@@ -77,6 +78,7 @@ export function AlertStrategiesList({
   variant?: "default" | "expense" | "quality";
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { state } = useApp();
   const toast = useToast();
   const isAdmin = state.user?.role === "管理员";
@@ -109,6 +111,15 @@ export function AlertStrategiesList({
   const [viewTarget, setViewTarget] = useState<AlertStrategy | null>(null);
   const [recordsTarget, setRecordsTarget] = useState<AlertStrategy | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 深链 ?view=<id>（告警记录详情页「告警策略名称」跳转）：自动打开该策略只读详情抽屉
+  const deepLinkId = searchParams.get("view");
+  useEffect(() => {
+    if (!deepLinkId) return;
+    const target = getAlertStrategy(deepLinkId);
+    if (target) setViewTarget(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkId]);
 
   function runLoad() {
     setPhase("loading");
@@ -388,6 +399,8 @@ export function AlertStrategiesList({
                   )}
                   <th className="text-left px-4 py-3">触发条件</th>
                   <th className="text-left px-4 py-3">告警等级</th>
+                  {/* 质量口径：接收人 */}
+                  {isQuality && <th className="text-left px-4 py-3">接收人</th>}
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
                       启用状态
@@ -401,7 +414,9 @@ export function AlertStrategiesList({
               <tbody className="divide-y divide-gray-50">
                 {paged.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-800">{s.name}</td>
+                    <td className="px-4 py-3 text-gray-800 max-w-[240px]">
+                      <div className="truncate" title={s.name}>{s.name}</div>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{metricsOf(s)}</td>
                     {isExpense && (
                       <td className="px-4 py-3 text-gray-600 max-w-[240px]">
@@ -417,6 +432,12 @@ export function AlertStrategiesList({
                     <td className="px-4 py-3">
                       <AlertLevelBadge level={s.level} />
                     </td>
+                    {/* 质量口径：接收人（超长截断） */}
+                    {isQuality && (
+                      <td className="px-4 py-3 text-gray-600 max-w-[160px]">
+                        <div className="truncate" title={s.receivers.join("、")}>{s.receivers.join("、")}</div>
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span className={s.enabled ? "text-green-600 font-medium" : "text-gray-400"}>
                         {s.enabled ? "启用" : "停用"}
@@ -518,10 +539,10 @@ export function AlertStrategiesList({
                 value={`${viewTarget.conditions[0].consecutiveShifts}${qualityCycleUnitOf(viewTarget.conditions[0].metric)}`}
               />
             )}
-            {/* 质量口径不做通知配置，接收人/通知方式/重复提醒不展示 */}
-            {!isQuality && <DetailRow label="接收人" value={viewTarget.receivers.join("、")} />}
-            {!isQuality && <DetailRow label="通知方式" value={viewTarget.notifyMethods.join("、")} />}
-            {!isQuality && <DetailRow label="重复提醒" value={viewTarget.repeatAlert ? `开启，最多 ${viewTarget.repeatCount} 次，间隔 ${viewTarget.repeatInterval} 分钟` : "关闭"} />}
+            {/* 通知配置：接收人 / 通知方式（质量口径 = 企业微信）/ 重复提醒 */}
+            <DetailRow label="接收人" value={viewTarget.receivers.join("、")} />
+            <DetailRow label="通知方式" value={viewTarget.notifyMethods.join("、")} />
+            <DetailRow label="重复提醒" value={viewTarget.repeatAlert ? `开启，最多 ${viewTarget.repeatCount} 次，间隔 ${viewTarget.repeatInterval} 分钟` : "关闭"} />
             {/* 质量口径：创建与编辑信息（创建人/创建时间/编辑人；未被编辑过显示 —） */}
             {isQuality && <DetailRow label="创建人" value={viewTarget.creator ?? "—"} />}
             {isQuality && <DetailRow label="创建时间" value={viewTarget.createdAt ?? "—"} />}
@@ -541,7 +562,7 @@ export function AlertStrategiesList({
       <Drawer open={recordsTarget !== null} onClose={() => setRecordsTarget(null)} title="告警记录" width={620}>
         {recordsTarget && (
           <div className="space-y-3">
-            <p className="text-sm text-gray-500">策略「{recordsTarget.name}」关联的告警记录（按领域与类型匹配）：</p>
+            <p className="text-sm text-gray-500">策略「{recordsTarget.name}」关联的告警记录（按{isQuality ? "策略与指标" : "领域与类型"}匹配）：</p>
             {recordsOf(recordsTarget).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <span className="text-3xl mb-2">📭</span>

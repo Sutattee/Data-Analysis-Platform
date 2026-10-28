@@ -181,10 +181,9 @@ export function AiDiagnosisWorkspace({
                               <StreamText text={c.title} delay={d} caret />
                             </span>
                             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{c.grade}</span>
-                            <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] text-cyan-700">{c.source}</span>
                           </div>
                           <div className="mt-1.5 text-xs text-gray-400">
-                            <StreamText text={`形成时间 ${c.formedAt} ｜ 适用范围：${c.scope}`} delay={d + 100} />
+                            <StreamText text={`诊断时间 ${c.formedAt}`} delay={d + 100} />
                           </div>
                           <div className="mt-3 grid gap-2 md:grid-cols-2">
                             <div>
@@ -204,9 +203,8 @@ export function AiDiagnosisWorkspace({
                               </ul>
                             </div>
                           </div>
-                          <div className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
-                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">已确定原因：</span><span className="text-gray-600"><StreamText text={c.cause} delay={d + 380} /></span></p>
-                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">核查说明：</span><span className="text-gray-600"><StreamText text={c.checkNote} delay={d + 460} /></span></p>
+                          <div className="mt-3 border-t border-gray-50 pt-3">
+                            <p className="text-xs leading-5"><span className="font-medium text-gray-700">人工判定原因：</span><span className="text-gray-600"><StreamText text={c.cause + c.checkNote} delay={d + 380} /></span></p>
                           </div>
                         </div>
                       );

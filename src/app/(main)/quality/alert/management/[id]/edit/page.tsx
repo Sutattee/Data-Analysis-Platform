@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { QualityAlertStrategyForm } from "@/components/alert/QualityAlertStrategyForm";
 import { getAlertStrategy } from "@/lib/mock-data/alert-strategies";
 
-// 编辑数据告警（工艺质量板块，按需求文档精简字段，不含通知配置）
+// 编辑数据告警（工艺质量板块；含企业微信通知配置：通知方式/接收人/重复提醒/提醒间隔）
 export default function QualityEditStrategyPage() {
   const params = useParams<{ id: string }>();
   const initial = getAlertStrategy(params.id);

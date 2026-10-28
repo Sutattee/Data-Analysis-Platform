@@ -8,7 +8,8 @@ import { useToast } from "@/components/ui/Toast";
 import { AlertConditionBuilder } from "@/components/alert/AlertConditionBuilder";
 import { QualityThresholdNote } from "@/components/alert/QualityThresholdNote";
 import { useApp } from "@/lib/store/AppContext";
-import { ALERT_LEVELS } from "@/lib/mock-data/alerts";
+import { ALERT_LEVELS, ALERT_USERS } from "@/lib/mock-data/alerts";
+import { SearchMultiSelect } from "@/components/alert/SearchMultiSelect";
 import { objectsForMetric } from "@/lib/mock-data/objects";
 import { defaultNotifyTemplate, addAlertStrategy, updateAlertStrategy, activeTargetForMetric } from "@/lib/mock-data/alert-strategies";
 import {
@@ -32,6 +33,11 @@ interface FormData {
   relation: "且" | "或";
   level: AlertLevel;
   consecutiveShift: string; // 连续同向偏离（正整数字符串；空 = 未配置）
+  notifyMethods: string[];  // 通知方式（多选；当前选项仅「企业微信」）
+  receivers: string[];      // 接收人（多选，搜索用户名）
+  repeatAlert: boolean;     // 重复提醒开关（开启后对未处理告警重复通知）
+  repeatCount: string;      // 重复次数（正整数字符串，含首次，默认 3）
+  repeatInterval: string;   // 提醒间隔（分钟，正整数字符串，默认 5）
 }
 
 const EMPTY: FormData = {
@@ -42,7 +48,15 @@ const EMPTY: FormData = {
   relation: "且",
   level: "预警",
   consecutiveShift: "",
+  notifyMethods: ["企业微信"],
+  receivers: [],
+  repeatAlert: false,
+  repeatCount: "3",
+  repeatInterval: "5",
 };
+
+// 通知方式候选（当前仅支持企业微信）
+const QUALITY_NOTIFY_METHODS = ["企业微信"];
 
 function toFormData(s: AlertStrategy): FormData {
   return {
@@ -54,6 +68,11 @@ function toFormData(s: AlertStrategy): FormData {
     level: s.level,
     consecutiveShift:
       s.conditions[0]?.consecutiveShifts != null ? String(s.conditions[0].consecutiveShifts) : "",
+    notifyMethods: s.notifyMethods,
+    receivers: s.receivers,
+    repeatAlert: s.repeatAlert,
+    repeatCount: String(s.repeatCount ?? 3),
+    repeatInterval: String(s.repeatInterval ?? 5),
   };
 }
 
@@ -80,10 +99,11 @@ function Tip({ text }: { text: string }) {
   );
 }
 
-// 新建/编辑数据告警（工艺质量板块，按需求文档精简字段：
-// 告警名称 / 策略说明 / 告警类型 / 触发条件 / 告警等级 / 检测周期（按指标联动）/
-// 连续同向偏离（选填正整数，单位随指标周期：批次/班次/月）；
-// 告警对象不在表单展示，保存时按首条条件的指标自动带入；不含通知功能字段，保存时自动补默认值；操作 = 取消、保存）
+// 新建/编辑数据告警（工艺质量板块，按需求文档字段：
+// 告警名称 / 策略说明 / 告警类型 / 触发条件（判断方式→基准类型→基准值及单位→超出量）/
+// 告警等级 / 检测周期（按指标联动）/ 连续同向偏离（选填正整数，单位随指标周期）/
+// 通知方式（企业微信）/ 接收人（多选搜索用户名）/ 重复提醒（开关+次数）/ 提醒间隔；
+// 告警对象不在表单展示，保存时按首条条件的指标自动带入；操作 = 取消、保存）
 export function QualityAlertStrategyForm({
   mode,
   initial,
@@ -140,6 +160,15 @@ export function QualityAlertStrategyForm({
     if (shiftTrim && (!/^\d+$/.test(shiftTrim) || Number(shiftTrim) < 1)) {
       e.consecutiveShift = "连续同向偏离仅支持正整数";
     }
+    // 通知配置：通知方式/接收人必填；开启重复提醒后次数与间隔必填且为正整数
+    if (data.notifyMethods.length === 0) e.notifyMethods = "请选择通知方式";
+    if (data.receivers.length === 0) e.receivers = "请选择接收人";
+    if (data.repeatAlert) {
+      const cnt = data.repeatCount.trim();
+      if (!cnt || !/^\d+$/.test(cnt) || Number(cnt) < 1) e.repeatCount = "重复次数仅支持正整数";
+      const itv = data.repeatInterval.trim();
+      if (!itv || !/^\d+$/.test(itv) || Number(itv) < 1) e.repeatInterval = "提醒间隔仅支持正整数";
+    }
     data.conditions.forEach((c, i) => {
       const miss: string[] = [];
       if (!c.metric.trim()) miss.push("数据指标");
@@ -152,12 +181,10 @@ export function QualityAlertStrategyForm({
         (c.baselineValue.includes("～") && c.baselineValue.split("～").some((x) => !x.trim()))
       )
         miss.push("基准值");
-      // 偏离比例：选填；填写时校验区间格式（如 5-10，下限 < 上限）
+      // 超出量：选填；填写时为正数（单值，单位随指标）
       const devTrim = (c.deviation ?? "").trim();
       if (devTrim && c.baselineType !== "正常区间") {
-        const m = devTrim.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
-        if (!m) ce[i] = "偏离比例格式如 5-10";
-        else if (Number(m[1]) >= Number(m[2])) ce[i] = "偏离比例区间下限需小于上限（如 5-10）";
+        if (!/^\d+(\.\d+)?$/.test(devTrim) || Number(devTrim) <= 0) ce[i] = "超出量需为正数";
       }
       ce[i] = miss.length ? `请完善${miss.join("、")}` : "";
     });
@@ -192,11 +219,13 @@ export function QualityAlertStrategyForm({
       relation: data.relation,
       level: data.level,
       detectCycle: detectCycle ?? "每批次",
-      // 通知功能字段按口径自动补默认值（表单不做通知配置）
+      // 通知配置：企业微信 + 接收人；重复提醒开启时保存次数与间隔（关闭时剥离）
       notifyTemplate: defaultNotifyTemplate(),
-      notifyMethods: ["邮件"],
-      receivers: ["吴敏"],
-      repeatAlert: false,
+      notifyMethods: data.notifyMethods,
+      receivers: data.receivers,
+      repeatAlert: data.repeatAlert,
+      repeatCount: data.repeatAlert ? Number(data.repeatCount.trim()) : undefined,
+      repeatInterval: data.repeatAlert ? Number(data.repeatInterval.trim()) : undefined,
       enabled: initial?.enabled ?? false, // 新建默认停用
       // 创建/编辑信息（策略详情展示）：新建记当前用户与时间；编辑保留创建信息、记录最近编辑人
       creator: initial?.creator ?? state.user?.username,
@@ -250,7 +279,7 @@ export function QualityAlertStrategyForm({
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              实测异常监测当前值越界；预测风险监测预测值将越界，并支持 5 个缺陷预测指标（风险评分 / 水分偏差 / 箱储时长）。
+              实测异常监测当前值越界；预测风险监测预测值将越界，并支持 2 个缺陷预测指标（预测成品水分 / 预测箱储总存储时长）。
             </p>
           </div>
 
@@ -285,11 +314,15 @@ export function QualityAlertStrategyForm({
               relation={data.relation}
               errors={condErrors}
               metricOptions={qualityMetricOptionsOf(alertType)}
+              deviationMode="exceed"
               onChange={(conditions, relation) => setData((prev) => ({ ...prev, conditions, relation }))}
             />
-            <div className="mt-3">
-              <QualityThresholdNote />
-            </div>
+            {/* 缺陷指标预测分级示例：仅预测风险类型展示（12 个稳定性指标沿用常规条件配置） */}
+            {alertType === "预测风险" && (
+              <div className="mt-3">
+                <QualityThresholdNote />
+              </div>
+            )}
           </div>
 
           {/* 检测周期：随首条条件指标的统计周期联动（单值） */}
@@ -335,6 +368,105 @@ export function QualityAlertStrategyForm({
               <p className="mt-1 text-xs text-red-500">{errors.consecutiveShift}</p>
             )}
           </div>
+
+          {/* 通知方式（多选；当前选项仅企业微信） */}
+          <div>
+            <label className={labelCls}>通知方式 <span className="text-red-500">*</span></label>
+            <div className="flex items-center gap-4 h-[38px]">
+              {QUALITY_NOTIFY_METHODS.map((m) => (
+                <label key={m} className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary-600"
+                    checked={data.notifyMethods.includes(m)}
+                    onChange={(e) => set("notifyMethods", e.target.checked ? [m] : [])}
+                  />
+                  {m}
+                </label>
+              ))}
+            </div>
+            {errors.notifyMethods && <p className="mt-1 text-xs text-red-500">{errors.notifyMethods}</p>}
+          </div>
+
+          {/* 接收人（多选，支持搜索用户名；跨行占位便于展示已选标签） */}
+          <div className="md:col-span-2">
+            <label className={labelCls}>接收人 <span className="text-red-500">*</span></label>
+            <SearchMultiSelect
+              options={ALERT_USERS.map((u) => ({ value: u.name, label: u.name, hint: u.username }))}
+              value={data.receivers}
+              onChange={(v) => set("receivers", v)}
+              placeholder="请输入并选择用户名"
+              error={errors.receivers}
+            />
+          </div>
+
+          {/* 重复提醒（选填开关 + 次数）：开启后对未处理的同一条告警重复发送通知 */}
+          <div>
+            <label className={labelCls}>
+              重复提醒
+              <Tip text="选填。开启后，对未处理的同一条告警重复发送通知；关闭后只通知一次。" />
+            </label>
+            <div className="flex h-[38px] items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={data.repeatAlert}
+                onClick={() => set("repeatAlert", !data.repeatAlert)}
+                className={`relative inline-flex h-[22px] w-[40px] flex-shrink-0 items-center rounded-full transition-colors ${
+                  data.repeatAlert ? "bg-primary-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow transition-transform ${
+                    data.repeatAlert ? "translate-x-[19px]" : "translate-x-[2px]"
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-gray-600">{data.repeatAlert ? "开启" : "关闭"}</span>
+              {data.repeatAlert && (
+                <div className="ml-2 flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">最多提醒</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-800 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="3"
+                    value={data.repeatCount}
+                    onChange={(e) => set("repeatCount", e.target.value)}
+                  />
+                  <span className="text-xs text-gray-400">次</span>
+                </div>
+              )}
+            </div>
+            {errors.repeatCount && <p className="mt-1 text-xs text-red-500">{errors.repeatCount}</p>}
+          </div>
+
+          {/* 提醒间隔（开启重复提醒后必填；两次通知之间的间隔，分钟） */}
+          {data.repeatAlert && (
+            <div>
+              <label className={labelCls}>提醒间隔 <span className="text-red-500">*</span></label>
+              <div
+                className={`flex h-[38px] items-center rounded-lg border bg-white transition-all duration-200 focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent ${
+                  errors.repeatInterval ? "border-red-400" : "border-gray-300"
+                }`}
+              >
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="w-full h-full px-3 text-sm text-gray-800 bg-transparent focus:outline-none"
+                  placeholder="如 5"
+                  value={data.repeatInterval}
+                  onChange={(e) => set("repeatInterval", e.target.value)}
+                />
+                <span className="flex-shrink-0 px-3 text-sm text-gray-400 border-l border-gray-100">分钟</span>
+              </div>
+              {errors.repeatInterval && (
+                <p className="mt-1 text-xs text-red-500">{errors.repeatInterval}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

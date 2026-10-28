@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { QualityAlertStrategyForm } from "@/components/alert/QualityAlertStrategyForm";
 
-// 新建数据告警（工艺质量板块，按需求文档精简字段，不含通知配置）
+// 新建数据告警（工艺质量板块；含企业微信通知配置：通知方式/接收人/重复提醒/提醒间隔）
 export default function QualityNewStrategyPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-96px)] gap-4">

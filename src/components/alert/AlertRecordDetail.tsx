@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useApp } from "@/lib/store/AppContext";
 import { ALERT_RECORDS, applyHandledOverride, confirmAlertHandled, alertManualState, markAlertManualPending, saveAlertManualCause, setAlertFeedbackHelpful } from "@/lib/mock-data/alerts";
 import { expenseAlertRecordById } from "@/lib/mock-data/expense-alerts";
+import { getAlertStrategies } from "@/lib/mock-data/alert-strategies";
 import { qualityDetailFieldsOf, qualityCycleUnitOf, TYPE_DISPLAY } from "@/lib/mock-data/quality-alerts";
 import type { AlertRecord } from "@/types";
 
@@ -55,7 +56,6 @@ export function AlertRecordDetail({
   const router = useRouter();
   const toast = useToast();
   const { state, addRecentVisit } = useApp();
-  const isAdmin = state.user?.role === "管理员";
   const isExpense = layout === "expense";
   const isQuality = layout === "quality";
 
@@ -121,6 +121,9 @@ export function AlertRecordDetail({
       </div>
     );
   }
+
+  // 判定依据跳转目标：按策略名快照匹配当前策略（历史记录的策略名可能已不存在 → 回退管理列表页）
+  const strategy = record ? getAlertStrategies().find((s) => s.name === record.strategyName) : undefined;
 
   // 当前时间 YYYY-MM-DD HH:mm（处理时间取值）
   function formatNow(): string {
@@ -276,37 +279,36 @@ export function AlertRecordDetail({
               <Field label="指标名称" value={record.metricName} />
               <Field label="告警值" value={record.valueLabel} />
               <Field label="基准 / 阈值" value={record.baselineLabel} />
-              <Field label="偏离值" value={record.deviationValue} />
-              <Field label="偏离率" value={record.deviationRate} />
-              {/* 缺陷预测类记录：模型版本（追溯字段，如「缺陷风险滚动预测模型 v2.3」） */}
-              {record.modelVersion && <Field label="模型版本" value={record.modelVersion} />}
+              {/* 质量口径 = 超出量（绝对量，如 +1.52pct）；其余口径 = 偏离值 + 偏离率 */}
+              <Field label={isQuality ? "超出量" : "偏离值"} value={record.deviationValue} />
+              {!isQuality && <Field label="偏离率" value={record.deviationRate} />}
+              {/* 飘移类记录：连续同向偏离（如「3个批次」，单位随指标周期） */}
+              {isQuality && record.consecutiveShifts != null && (
+                <Field label="连续同向偏离" value={`${record.consecutiveShifts}个${qualityCycleUnitOf(record.metricName)}`} />
+              )}
             </div>
           )}
         </Card>
 
-        {/* 判定依据 */}
+        {/* 判定依据：点击策略名称跳转告警管理并自动打开该策略只读详情（?view= 深链） */}
         <Card title="判定依据">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <Field
               label="告警策略名称"
               value={
-                isAdmin ? (
-                  <button
-                    onClick={() => router.push(basePath.replace("/records", "/management"))}
-                    className="text-primary-600 hover:text-primary-700 hover:underline"
-                  >
-                    {record.strategyName}
-                  </button>
-                ) : (
-                  record.strategyName
-                )
+                <button
+                  onClick={() =>
+                    router.push(
+                      `${basePath.replace("/records", "/management")}${strategy ? `?view=${strategy.id}` : ""}`
+                    )
+                  }
+                  className="text-primary-600 hover:text-primary-700 hover:underline"
+                >
+                  {record.strategyName}
+                </button>
               }
             />
             <Field label="触发条件" value={record.triggerCondition} />
-            {/* 工艺质量口径：飘移类记录展示连续同向偏离（如「3个批次」，单位随指标周期） */}
-            {isQuality && record.consecutiveShifts != null && (
-              <Field label="连续同向偏离" value={`${record.consecutiveShifts}个${qualityCycleUnitOf(record.metricName)}`} />
-            )}
           </div>
         </Card>
 
@@ -406,11 +408,24 @@ export function AlertRecordDetail({
           )}
         </Card>
 
-        {/* 处理情况（费用/质量口径：处理人 + 状态；质量口径不带区块标题，字段直接展示，
-            另含处理时间；点击有帮助/没帮助后置为已处理） */}
+        {/* 处理情况（费用/质量口径）：
+            质量口径含 接收人/通知方式（企业微信）/通知状态 + 处理人/状态/处理时间，分两行三列对齐；
+            点击有帮助/没帮助后置为已处理 */}
         {(isExpense || isQuality) && (
-          <Card title={isQuality ? undefined : "处理情况"}>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+          <Card title="处理情况">
+            <div className={isQuality ? "grid grid-cols-3 gap-x-6 gap-y-4" : "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4"}>
+              {isQuality && <Field label="接收人" value={record.receiver} />}
+              {isQuality && <Field label="通知方式" value={record.notifyMethods.join("、")} />}
+              {isQuality && (
+                <Field
+                  label="通知状态"
+                  value={
+                    <span className={record.notifyStatus === "已发送" ? "text-green-600" : "text-red-600"}>
+                      {record.notifyStatus}
+                    </span>
+                  }
+                />
+              )}
               <Field label="处理人" value={record.handledBy} />
               <Field
                 label="状态"

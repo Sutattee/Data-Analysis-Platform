@@ -1,61 +1,67 @@
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import type { AlertLevel } from "@/types";
 
-// 五级阈值示例行（产品规则示例，以「松散回潮非稳态指数」为例，基准 = 上限 4%）
-// 偏离比例＝（实际指数－4%）÷4%×100%，达到上限即触发，按偏离比例划分五个等级
-interface ThresholdRow {
-  level: AlertLevel | null; // null = 不触发
-  op: string;        // 判断方式
-  baseType: string;  // 基准类型
-  base: string;      // 基准值
-  band: string;      // 偏离比例
-  range: string;     // 实际触发范围
+// 缺陷指标预测风险分级示例（新建/编辑数据告警 · 预测风险类型时展示）：
+// 同一规则组按最高级别命中；同时「≥上限或≤下限」记录实际命中哪一侧；
+// 等级变化及恢复沿用告警中心既有去重规则（持续异常只保留一条，恢复正常后再异常才生成新记录）
+interface DefectRow {
+  level: AlertLevel;
+  metric: string;   // 预测指标
+  cond: string;     // 触发条件
 }
 
-const THRESHOLD_ROWS: ThresholdRow[] = [
-  { level: null, op: "—", baseType: "—", base: "—", band: "—", range: "指数＜4.00%" },
-  { level: "提示", op: "≥", baseType: "上限", base: "4%", band: "≥0%且＜5%", range: "指数≥4.00%且＜4.20%" },
-  { level: "关注", op: "≥", baseType: "上限", base: "4%", band: "≥5%且＜10%", range: "指数≥4.20%且＜4.40%" },
-  { level: "预警", op: "≥", baseType: "上限", base: "4%", band: "≥10%且＜20%", range: "指数≥4.40%且＜4.80%" },
-  { level: "告警", op: "≥", baseType: "上限", base: "4%", band: "≥20%且＜50%", range: "指数≥4.80%且＜6.00%" },
-  { level: "危险", op: "≥", baseType: "上限", base: "4%", band: "≥50%", range: "指数≥6.00%" },
+const MOISTURE_ROWS: DefectRow[] = [
+  { level: "预警", metric: "预测成品水分", cond: "≥上限12.8% 或 ＜下限12.2%（超限即触发）" },
+  { level: "告警", metric: "预测成品水分", cond: "≥上限12.8% 超出0.5pct 或 ＜下限12.2% 超出0.5pct" },
+  { level: "危险", metric: "预测成品水分", cond: "≥上限12.8% 超出1pct 或 ＜下限12.2% 超出1pct" },
 ];
 
-// 工艺质量五级阈值示例表（新建/编辑数据告警 · 触发条件区块下方说明）
+const STORAGE_ROWS: DefectRow[] = [
+  { level: "告警", metric: "预测箱储总存储时长", cond: "＞储存时长上限 72小时 超出2小时" },
+  { level: "危险", metric: "预测箱储总存储时长", cond: "＞储存时长上限 72小时 超出5小时" },
+];
+
+const TH_STYLE = "text-left py-1.5 pr-4 font-medium";
+const TD_STYLE = "py-1.5 pr-4 text-gray-700";
+
+function DefectTable({ rows }: { rows: DefectRow[] }) {
+  return (
+    <table className="w-full text-xs whitespace-nowrap">
+      <thead>
+        <tr className="text-gray-500 border-b border-blue-100">
+          <th className={TH_STYLE}>告警等级</th>
+          <th className={TH_STYLE}>预测指标</th>
+          <th className="text-left py-1.5 font-medium">触发条件</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-blue-50">
+        {rows.map((r) => (
+          <tr key={r.metric + r.level}>
+            <td className="py-1.5 pr-4"><AlertLevelBadge level={r.level} /></td>
+            <td className={TD_STYLE}>{r.metric}</td>
+            <td className="py-1.5 text-gray-700">{r.cond}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// 缺陷指标预测告警分级示例（产品示例，请以实际规则进行配置）
 export function QualityThresholdNote() {
   return (
     <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3">
       <p className="text-xs leading-relaxed text-gray-600">
-        告警等级阈值示例（以「松散回潮非稳态指数」为例，产品示例，请以实际规则进行配置）：
-        达到上限即触发，并按相对上限的偏离比例划分五个等级，偏离比例＝（实际指数－4%）÷4%×100%。
+        缺陷指标预测告警分级示例（以标准水分 12.5%、允差 ±0.3pct，储存时长上限 72 小时为例，产品示例，请以实际规则进行配置）：
+        同一规则组按最高级别命中；指标持续异常期间只保留一条告警记录，恢复正常后再次异常才生成新记录。
       </p>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full text-xs whitespace-nowrap">
-          <thead>
-            <tr className="text-gray-500 border-b border-blue-100">
-              <th className="text-left py-1.5 pr-4 font-medium">告警等级</th>
-              <th className="text-left py-1.5 pr-4 font-medium">判断方式</th>
-              <th className="text-left py-1.5 pr-4 font-medium">基准类型</th>
-              <th className="text-left py-1.5 pr-4 font-medium">基准值</th>
-              <th className="text-left py-1.5 pr-4 font-medium">偏离比例</th>
-              <th className="text-left py-1.5 font-medium">实际触发范围</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-blue-50">
-            {THRESHOLD_ROWS.map((r) => (
-              <tr key={r.band + (r.level ?? "none")}>
-                <td className="py-1.5 pr-4">
-                  {r.level ? <AlertLevelBadge level={r.level} /> : <span className="text-gray-400">不告警</span>}
-                </td>
-                <td className="py-1.5 pr-4 text-gray-700">{r.op}</td>
-                <td className="py-1.5 pr-4 text-gray-700">{r.baseType}</td>
-                <td className="py-1.5 pr-4 text-gray-700">{r.base}</td>
-                <td className="py-1.5 pr-4 text-gray-700">{r.band}</td>
-                <td className="py-1.5 text-gray-700">{r.range}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-2 space-y-2">
+        <div className="overflow-x-auto">
+          <DefectTable rows={MOISTURE_ROWS} />
+        </div>
+        <div className="overflow-x-auto">
+          <DefectTable rows={STORAGE_ROWS} />
+        </div>
       </div>
     </div>
   );

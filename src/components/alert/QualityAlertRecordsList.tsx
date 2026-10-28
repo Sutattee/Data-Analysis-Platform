@@ -201,19 +201,20 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
                     </span>
                   </th>
                   <th className="text-left px-4 py-3 sticky left-0 bg-gray-50 z-10">告警标题</th>
-                  <th className="text-left px-4 py-3">指标名称</th>
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
                       告警类型
                       <ColumnFilter options={["实测异常", "预测风险"]} value={applied.type} onChange={(v) => applyColumnFilter("type", v)} />
                     </span>
                   </th>
+                  <th className="text-left px-4 py-3">指标名称</th>
                   <th className="text-left px-4 py-3 cursor-pointer select-none" onClick={toggleTimeSort}>
                     <span className="inline-flex items-center gap-1">
                       告警触发时间
                       <span className="text-gray-400">{sortMode === "time_desc" ? "↓" : sortMode === "time_asc" ? "↑" : "↕"}</span>
                     </span>
                   </th>
+                  <th className="text-left px-4 py-3">接收人</th>
                   <th className="text-left px-4 py-3">
                     <span className="inline-flex items-center gap-0.5">
                       状态
@@ -236,9 +237,10 @@ export function QualityAlertRecordsList({ basePath = "/quality/alert/records" }:
                         {r.title}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-600">{TYPE_DISPLAY[r.type]}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.metricName}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{r.triggerTime}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.receiver ?? "—"}</td>
                     <td className={`px-4 py-3 text-xs ${r.handledBy ? "text-green-600" : "text-gray-400"}`}>
                       {r.handledBy ? "已处理" : "未处理"}
                     </td>

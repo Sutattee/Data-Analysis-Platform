@@ -27,6 +27,9 @@ interface AlertConditionBuilderProps {
   errors?: string[];
   onChange: (conditions: AlertCondition[], relation: "且" | "或") => void;
   metricOptions?: string[]; // 指标候选（不传用能源口径 METRIC_OPTIONS；生产管理入口传辅料白名单）
+  // 选填阈值字段模式：exceed = 超出量（质量口径：单值 + 指标单位，% 指标记作 pct）；
+  // range = 偏离比例区间（能源/生产口径默认：双输入框 "5-10"）
+  deviationMode?: "exceed" | "range";
 }
 
 // 新建一条空条件
@@ -47,6 +50,7 @@ export function AlertConditionBuilder({
   errors = [],
   onChange,
   metricOptions,
+  deviationMode = "range",
 }: AlertConditionBuilderProps) {
   const isForecast = type === "预测风险";
   const options = metricOptions ?? (isForecast ? FORECAST_METRIC_OPTIONS : METRIC_OPTIONS);
@@ -313,26 +317,44 @@ export function AlertConditionBuilder({
                   </div>
                 )}
 
-                {/* 偏离比例（选填；正常区间隐藏，双输入框中间“-”）*/}
+                {/* 超出量（质量口径：单值 + 指标单位，% 指标单位记作 pct）/ 偏离比例区间（能源/生产口径）；
+                    均为选填，正常区间类型隐藏 */}
                 {!isRange && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500">偏离比例(%，选填)</span>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        className={inputCls}
-                        value={devLo}
-                        onChange={(e) => update(i, { deviation: `${e.target.value}-${devHi}` })}
-                        placeholder="如 5"
-                      />
-                      <span className="text-sm text-gray-400">-</span>
-                      <input
-                        className={inputCls}
-                        value={devHi}
-                        onChange={(e) => update(i, { deviation: `${devLo}-${e.target.value}` })}
-                        placeholder="如 10"
-                      />
+                  deviationMode === "exceed" ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">超出量(选填)</span>
+                      <div className="flex">
+                        <input
+                          className={`${inputCls} rounded-r-none`}
+                          value={c.deviation ?? ""}
+                          onChange={(e) => update(i, { deviation: e.target.value })}
+                          placeholder="如 1"
+                        />
+                        <span className="inline-flex h-[38px] items-center rounded-r-lg border border-l-0 border-gray-300 bg-gray-50 px-3 text-xs text-gray-400">
+                          {unit === "%" ? "pct" : unit || "—"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-gray-500">偏离比例(%，选填)</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          className={inputCls}
+                          value={devLo}
+                          onChange={(e) => update(i, { deviation: `${e.target.value}-${devHi}` })}
+                          placeholder="如 5"
+                        />
+                        <span className="text-sm text-gray-400">-</span>
+                        <input
+                          className={inputCls}
+                          value={devHi}
+                          onChange={(e) => update(i, { deviation: `${devLo}-${e.target.value}` })}
+                          placeholder="如 10"
+                        />
+                      </div>
+                    </div>
+                  )
                 )}
 
                 {/* 预测范围（仅预测风险）：缺陷风险评分指标 → 「预测时间窗口」（小时制）；

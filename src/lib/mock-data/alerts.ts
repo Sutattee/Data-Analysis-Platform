@@ -83,6 +83,7 @@ export const ALERT_USERS = [
   { username: "zhouting", name: "周婷" },
   { username: "gaoyadong", name: "高亚东" },
   { username: "wumin", name: "吴敏" },
+  { username: "suheng", name: "苏恒" },
 ];
 
 const NOTIFY_COMBOS: string[][] = [

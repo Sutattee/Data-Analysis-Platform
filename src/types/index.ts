@@ -419,7 +419,7 @@ export interface AlertCondition {
   operator: AlertOperator;        // 判断方式
   baselineType: AlertBaselineType; // 基准类型
   baselineValue: string;          // 基准值；正常区间为 "下限~上限"；目标值为系统带入的目标值
-  deviation?: string;             // 偏离比例区间 %（如 5-10；正常区间类型不填）
+  deviation?: string;             // 超出量（绝对量，单位随指标；正常区间类型不填）
   consecutiveShifts?: number;     // 连续同向偏离周期数（质量口径；连续 N 个统计周期同向越界触发）
 }
 
