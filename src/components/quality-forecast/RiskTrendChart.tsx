@@ -65,10 +65,23 @@ function valOfPoint(
 // 等级变化标记：升级点（等级高于前一点）+ 触发等级的基准点；prominent = 首次达到窗口最高等级
 interface Mark {
   batch: string;
+  full: string; // 完整批次表述（点击回传 / 抽屉批次字段）
   value: number;
+  score: number; // 该点风险评分（点击回传）
   level: DefectLevel;
   color: string;
   prominent: boolean;
+}
+
+// 点击回传信息：等级 + 点位业务值与评分 + 生产上下文入口（视图据此匹配告警记录并覆写数值字段）；
+// measured = 基准批次点（最新实测值，实测异常口径），否则为预测趋势上的点（预测风险口径）
+export interface DefectAnomalyClickInfo {
+  batch: string;
+  full: string;
+  value: number;
+  score: number;
+  level: DefectLevel;
+  measured?: boolean;
 }
 
 function TrendTooltip({
@@ -130,7 +143,14 @@ function TrendTooltip({
   );
 }
 
-export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
+export function RiskTrendChart({
+  forecast: f,
+  onAnomalyClick,
+}: {
+  forecast: DefectForecast;
+  // 升级点 / 触发等级的基准批次点点击回传（视图匹配告警记录后滑出异常详情抽屉）
+  onAnomalyClick?: (info: DefectAnomalyClickInfo) => void;
+}) {
   // 纵轴模式：优先业务预测值（成品水分 / 储存时长），无业务值（烟支刺破深链）退回风险评分
   const mode: Mode = f.future.some((p) => p.moist !== undefined)
     ? "moist"
@@ -168,7 +188,9 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
       if (levelOf(base.score).label !== "正常") {
         mk.push({
           batch: base.batch,
+          full: base.full,
           value: valOfPoint(base, mode) ?? base.score,
+          score: base.score,
           level: levelOf(base.score).label,
           color: levelOf(base.score).color,
           prominent: false,
@@ -180,7 +202,7 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
         if (levelRankOf(lv) > levelRankOf(prev)) {
           const v = valOfPoint(p, mode);
           if (v !== undefined) {
-            mk.push({ batch: p.batch, value: v, level: lv, color: levelOf(p.score).color, prominent: p.batch === firstMaxBatch });
+            mk.push({ batch: p.batch, full: p.full, value: v, score: p.score, level: lv, color: levelOf(p.score).color, prominent: p.batch === firstMaxBatch });
           }
         }
         prev = lv;
@@ -213,10 +235,33 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
 
   // 标记点查询表（batch → 标记）：数据点渲染与 hover 光晕取等级色
   const markMap = new Map(marks.map((mk) => [mk.batch, mk]));
-  // 基准批次蓝圈（未触发等级时；触发等级由等级标记呈现）
+  // 点击回传统一构造：基准批次点（batch = baseLabel）为最新实测值 → measured（实测异常口径）
+  const clickInfoOf = (mk: Mark): DefectAnomalyClickInfo => ({
+    batch: mk.batch,
+    full: mk.full,
+    value: mk.value,
+    score: mk.score,
+    level: mk.level,
+    measured: mk.batch === baseLabel,
+  });
+  // 基准批次蓝圈（未触发等级时；触发等级由等级标记呈现）；等级标记点叠加透明点击热区
+  // （视觉标记由 ReferenceDot 呈现），hover 高亮点同样携带点击（默认 activeDot 会覆盖热区拦截点击）
   const futureDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
-    if (markMap.has(payload?.batch ?? "")) return null;
+    const mk = markMap.get(payload?.batch ?? "");
+    if (mk && onAnomalyClick && Number.isFinite(cx) && Number.isFinite(cy)) {
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={11}
+          fill="transparent"
+          style={{ cursor: "pointer" }}
+          onClick={() => onAnomalyClick(clickInfoOf(mk))}
+        />
+      );
+    }
+    if (mk) return null;
     if (payload?.batch === baseLabel && Number.isFinite(cx) && Number.isFinite(cy)) {
       return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
     }
@@ -226,6 +271,21 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
     const { cx, cy, payload } = props;
     const mk = markMap.get(payload?.batch ?? "");
     const color = mk ? mk.color : "#2563eb";
+    if (mk && onAnomalyClick && Number.isFinite(cx) && Number.isFinite(cy)) {
+      return (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={7}
+          fill={color}
+          fillOpacity={0.3}
+          stroke={color}
+          strokeWidth={1.5}
+          style={{ cursor: "pointer" }}
+          onClick={() => onAnomalyClick(clickInfoOf(mk))}
+        />
+      );
+    }
     return <circle cx={cx} cy={cy} r={7} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={1.5} />;
   };
 

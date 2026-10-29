@@ -8,8 +8,11 @@ import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
 import { BrandFilter } from "@/components/forecast/BrandFilter";
-import { RiskTrendChart } from "./RiskTrendChart";
+import { RiskTrendChart, type DefectAnomalyClickInfo } from "./RiskTrendChart";
+import { DefectAnomalyDrawer } from "./DefectAnomalyDrawer";
 import { RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
+import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
+import type { AlertRecord } from "@/types";
 import {
   FORECAST_DEFECTS,
   UPDATED_AT,
@@ -39,6 +42,14 @@ const FORECAST_DEFECT_OPTIONS = FORECAST_DEFECTS.filter((d) => d.code !== "YZCB"
 
 // AI 解读三段固定小标题（规格 §9 解读顺序：风险概况 → 参数关注 → 核查重点）
 const AI_SECTION_TITLES = ["风险概况", "参数关注", "核查重点"];
+
+// 缺陷 → 告警侧指标名（与告警侧缺陷预测记录同源）：趋势图标记点点击时按此匹配告警记录；
+// 烟支刺破（YZCB）风险评分类预测记录已下线 → 无匹配记录时不滑出异常详情抽屉
+const DEFECT_ALERT_METRIC: Record<string, string> = {
+  CPSFBH: "预测成品水分",
+  YZCB: "烟支刺破风险评分",
+  XCCG: "预测箱储总存储时长",
+};
 
 // 摘要信息格：label 上 / 值下两行式（各列起点对齐，长文本换行完整展示），备注行在下方
 function SummaryItem({
@@ -105,8 +116,9 @@ function deepTargetOf(params: URLSearchParams) {
   return { code: base.code, objectKey, batch };
 }
 
-// 缺陷预测主视图：顶部缺陷 tab 切换（预测对象 / 关联批次不再作为筛选项，
-// 预测对象由牌号筛选与深链参数确定；上下文信息仅在趋势图悬浮提示内展示），
+// 缺陷预测主视图：顶部缺陷 tab 切换 + 当前缺陷工序 / 质量类别展示（预测对象 / 关联批次
+// 不再作为筛选项，预测对象由牌号筛选与深链参数确定；其余上下文仅在趋势图悬浮提示内展示）；
+// 点击趋势图等级标记点（升级点 / 触发等级的基准批次点）匹配告警记录滑出异常详情抽屉，
 // 风险摘要字段值同行、无卡片标题
 // （压缩高度让参数表进第一屏）；左侧主区域（预测趋势含牌号筛选 / 关联参数表），
 // 右侧辅助区域（AI 解读 / 贡献度 / 来源分布）。解读区默认收起：点击「智能解读」后按
@@ -122,6 +134,8 @@ export function DefectForecastView() {
   const [interpreting, setInterpreting] = useState(false);
   // 预测详情抽屉：收纳辅助字段（评分 / 等级 / 置信度 / 模型版本 / 窗口 / 业务口径 / 更新时间），默认不展开
   const [detailOpen, setDetailOpen] = useState(false);
+  // 点击趋势图等级标记点（升级点 / 触发等级的基准批次点）→ 匹配告警记录，滑出异常详情抽屉
+  const [anomalyRecord, setAnomalyRecord] = useState<AlertRecord | null>(null);
 
   const defect = forecastDefectOf(code);
   const forecast = forecastOf(code, objectKey, batch);
@@ -158,6 +172,57 @@ export function DefectForecastView() {
     setInterpreting(false);
   }
 
+  // 升级点 / 触发等级的基准批次点点击 → 告警记录匹配（指标 + 对象，逐级放宽），再按点位数值覆写
+  // 展示字段后滑出异常详情抽屉；无匹配记录（如烟支刺破深链，风险评分类预测记录已下线）不滑出
+  function openAnomalyDrawer(info: DefectAnomalyClickInfo) {
+    const metricName = DEFECT_ALERT_METRIC[code] ?? defect.name;
+    const match = (r: AlertRecord) => r.domain === "工艺质量" && r.metricName === metricName;
+    const rec =
+      ALERT_RECORDS.find((r) => match(r) && r.objectName === objectKey) ?? ALERT_RECORDS.find(match);
+    if (rec) setAnomalyRecord(pointAlertOf(rec, info));
+  }
+
+  // 以点击点位的数值覆写告警记录展示字段（等级 / 告警值 / 基准阈值 / 超出量 / 批次 / 班次 / 班组 /
+  // 牌号 / 工序与点位一致；点位在预测曲线上 → 告警类型 = 预测风险，基准批次点为最新实测值 → 实测异常）；
+  // 原因、建议、触发时间等无法由点位派生的字段保留告警记录原文
+  function pointAlertOf(rec: AlertRecord, info: DefectAnomalyClickInfo): AlertRecord {
+    const m = forecast.moisture;
+    const st = forecast.storage;
+    const fmt = (v: number) => v.toFixed(1);
+    let valueLabel: string;
+    let baselineLabel = rec.baselineLabel;
+    let deviation = "-";
+    if (m) {
+      // 成品水分：基准 / 阈值 = 允许范围；超出量 = 越出边界的绝对差（超上限 / 超下限）
+      valueLabel = `${info.measured ? "当前值" : "预测值"}${fmt(info.value)}%`;
+      baselineLabel = `${m.lo}%～${m.hi}%`;
+      if (info.value > m.hi) deviation = `超上限${fmt(info.value - m.hi)}pct`;
+      else if (info.value < m.lo) deviation = `超下限${fmt(m.lo - info.value)}pct`;
+    } else if (st) {
+      // 箱储：基准 / 阈值 = 储存时长上限；超出量 = 预计超时
+      valueLabel = `${info.measured ? "当前值" : "预测值"}${fmt(info.value)}h`;
+      baselineLabel = `≤${st.limitHours}h`;
+      if (info.value > st.limitHours) deviation = `超上限${fmt(info.value - st.limitHours)}h`;
+    } else {
+      // 评分兜底模式（烟支刺破深链）：无业务管控值
+      valueLabel = `${info.measured ? "当前值" : "预测值"}${fmt(info.value)}分`;
+    }
+    return {
+      ...rec,
+      level: info.level === "正常" ? rec.level : info.level,
+      type: info.measured ? "当前异常" : "预测风险",
+      metricName: defect.name, // 抽屉首行 = 缺陷名称
+      valueLabel,
+      baselineLabel,
+      deviationValue: deviation,
+      batch: `第 ${info.batch} 批`,
+      shiftLabel: forecast.context.shift,
+      shift: forecast.context.shiftGroup,
+      brand: forecast.context.brand,
+      process: forecast.context.process,
+    };
+  }
+
   // 等级变化文案配色（与稳定性预测页同口径）：升级按目标等级 / 同级持续按当前等级 /
   // 降级为好转（绿）/ 窗口内正常·暂无法预测 深灰
   const changeCls =
@@ -188,24 +253,35 @@ export function DefectForecastView() {
 
   return (
     <div className="space-y-3">
-      {/* 顶部：缺陷 tab 切换（分段式）；牌号 / 班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
+      {/* 顶部：缺陷 tab 切换（分段式）+ 当前缺陷静态信息（工序 / 质量类别，随缺陷切换）；
+          牌号 / 班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
           深链到未开放 tab 的缺陷（烟支刺破）时不点亮任何 tab，仅正常展示内容 */}
       <Card>
-        <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
-          {FORECAST_DEFECT_OPTIONS.map((d) => (
-            <button
-              key={d.value}
-              type="button"
-              onClick={() => handleChangeCode(d.value)}
-              className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
-                code === d.value
-                  ? "bg-white font-medium text-primary-700 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
+            {FORECAST_DEFECT_OPTIONS.map((d) => (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => handleChangeCode(d.value)}
+                className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
+                  code === d.value
+                    ? "bg-white font-medium text-primary-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>
+              工序：<span className="font-medium text-gray-700">{defect.process}</span>
+            </span>
+            <span>
+              质量类别：<span className="font-medium text-gray-700">{defect.qualityClass}</span>
+            </span>
+          </div>
         </div>
       </Card>
 
@@ -284,7 +360,7 @@ export function DefectForecastView() {
             title={defect.trendTitle}
             headerRight={<BrandFilter options={brands} value={curBrand} onChange={handleBrand} />}
           >
-            <RiskTrendChart forecast={forecast} />
+            <RiskTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 
           {/* 关联参数表：智能解读生成后延迟出现，按行逐字写入 */}
@@ -405,6 +481,9 @@ export function DefectForecastView() {
           <SummaryItem label="预测更新时间" value={UPDATED_AT} />
         </div>
       </Drawer>
+
+      {/* 异常详情抽屉：点击趋势图等级标记点（升级点 / 触发等级的基准批次点）滑出，查看告警详情跳告警记录详情页 */}
+      <DefectAnomalyDrawer record={anomalyRecord} onClose={() => setAnomalyRecord(null)} />
     </div>
   );
 }
