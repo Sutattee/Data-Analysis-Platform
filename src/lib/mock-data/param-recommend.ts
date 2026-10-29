@@ -187,7 +187,7 @@ export function absDiffOf(b: BatchRecord): number | null {
 // ============ 下一批次推荐 ============
 
 export const DRYING_RANGE = { low: 12.5, high: 13.5 }; // 烘丝出口水分工艺允许范围 %
-export const MODEL_VER = "烘丝出口水分推荐模型 v2.3";
+export const MODEL_VER = "加香出口水分推荐模型 v2.3";
 export const DATA_AS_OF = "2026-10-22 09:30"; // 数据截至
 export const REC_CHAIN = { cabinetLoss: 0.75, flavorGain: 0.05 }; // 推算链：目标 + 柜内损耗 − 加香增量
 

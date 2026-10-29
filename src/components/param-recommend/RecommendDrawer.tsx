@@ -70,30 +70,23 @@ export function RecommendDrawer({
               {/* 工单信息 */}
               <Section title="工单信息">
                 <Field label="工单号" value={batch.workOrder} />
-                <Field label="批次" value={batch.batch} />
+                <Field label="下一批次" value={batch.batch} />
                 <Field label="牌号" value={batch.brand} />
                 <Field label="产线" value={batch.line} />
               </Section>
 
-              {/* 目标与推算结果：目标标准 + 工艺范围 + 推算链（叶丝柜入口水分 → 烘丝出口推荐值）+ 置信度 */}
+              {/* 目标与推算结果：加香合格标准 + 成品水分允许范围 + 建议值 + 置信度 */}
               <Section title="目标与推算结果">
                 {rec.std ? (
-                  <>
-                    <Field label="加香出口水分目标" value={`${fmt2(rec.std.goal)}%`} />
-                    <Field label="加香合格范围" value={`${fmt2(rec.std.low)}%～${fmt2(rec.std.high)}%`} />
-                  </>
+                  <Field label="加香出口水分合格范围" value={`${fmt2(rec.std.low)}%～${fmt2(rec.std.high)}%`} />
                 ) : (
                   <Field label="加香出口水分标准" value={<span className="text-gray-400">标准缺失</span>} />
                 )}
-                <Field label="烘丝出口水分允许范围" value={`${fmt2(DRYING_RANGE.low)}%～${fmt2(DRYING_RANGE.high)}%`} />
+                <Field label="成品水分允许范围" value={`${fmt2(DRYING_RANGE.low)}%～${fmt2(DRYING_RANGE.high)}%`} />
                 {rec.status === "已生成" && rec.value !== undefined ? (
                   <>
                     <Field
-                      label="叶丝柜入口水分（模型推算）"
-                      value={rec.inletMoisture === undefined ? "-" : `${fmt2(rec.inletMoisture)}%`}
-                    />
-                    <Field
-                      label="烘丝出口水分建议值"
+                      label="加香出口水分建议值"
                       value={
                         <span className="font-semibold text-primary-600">{fmt2(rec.value)}%</span>
                       }
@@ -113,7 +106,7 @@ export function RecommendDrawer({
                 return (
                   <Section title="历史依据与生成信息">
                     <Field label="参与计算的历史批次" value="同产线同牌号近10个有效批次（不足10批时基于现有批次计算）" />
-                    <Field label="有效批次" value={`${valid.length} 批`} />
+                    <Field label="有效批次" value={`${valid.length}批`} />
                     {valid.length > 0 && (
                       <Field label="批次范围" value={`${valid[0].batch}～${valid[valid.length - 1].batch}`} />
                     )}
