@@ -245,8 +245,6 @@ export function AlertRecordDetail({
               {isQuality && record.type === "预测风险" && (
                 <Field label="预测窗口" value={record.forecastWindow} />
               )}
-              {/* 缺陷预测类记录：预测基准时间（数据截止时刻，追溯字段） */}
-              {record.baseTime && <Field label="预测基准时间" value={record.baseTime} />}
               <Field label="告警触发时间" value={record.triggerTime} />
             </div>
           ) : (

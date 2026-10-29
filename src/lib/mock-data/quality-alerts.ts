@@ -424,7 +424,7 @@ export function buildQualityAlertRecords(): AlertRecord[] {
 //  · 记录由缺陷预测结果触发 → type 固定「预测风险」；触发时间紧随本轮预测发布时刻（14:06）之后
 //  · 数值与缺陷预测页（quality-defect-forecast）同源：窗口最高评分 / 预测水分偏差 / 箱储时长核算
 //  · 追溯字段：对象（编码沿用预测页 HS-03/ZJ17-02/CG-01）、批次、评分或预测值、阈值、窗口、
-//    预测基准时间（baseTime）及模型版本（modelVersion）
+//    模型版本（modelVersion）
 //  · 剩余允许储存时间仅可用于临近截止提醒，不能直接视为必然超时：YS-1027B 剩余 16 小时但
 //    预计总储存时长 63 小时＜上限 72 小时 → 不生成超时记录
 //  · 同一风险事件连续满足条件时按告警中心既有规则去重，等级变化及恢复沿用既有规则
@@ -456,7 +456,6 @@ interface DefectRecordSpec {
   modelVersion: string;
 }
 
-const DEFECT_BASE_TIME = "2026-10-19 14:00"; // 预测基准时间（数据截止时刻，与缺陷预测页一致）
 const DEFECT_MODEL_VERSION = "缺陷风险滚动预测模型 v2.3";
 
 const DEFECT_SPECS: DefectRecordSpec[] = [
@@ -531,7 +530,6 @@ function buildDefectAlertRecords(): AlertRecord[] {
     // 追溯字段（缺陷预测类记录专属）
     batch: spec.batch,
     forecastWindow: spec.forecastWindow,
-    baseTime: DEFECT_BASE_TIME,
     modelVersion: spec.modelVersion,
     shift: spec.shift,
     shiftLabel: "10-19 白班",
