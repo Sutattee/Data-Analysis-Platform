@@ -1,7 +1,7 @@
 "use client";
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
-// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：预测值 + 超上限·超下限 + 管控值，
+// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：超限最大预测值 + 超限标签 + 管控值，
 // 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数，趋势图右上角牌号筛选切换牌号视角数据）
 // 右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
@@ -227,7 +227,7 @@ export function StabilityForecastView() {
   const contributions = contributionsOf(forecast);
   // 无规则时贡献与分布均进入空状态
   const breakdown = metric.rule ? sourceBreakdownOf(forecast) : [];
-  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：预测值 + 超上限·超下限超出量
+  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：超限最大预测值 + 超上限·超下限超出量
   const peak = peakOfForecast(forecast);
   const ai = aiInterpretation(forecast, code, machineText);
   // 流式时序：解读各段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载来源参数 / 风险来源 / 来源分布
@@ -312,21 +312,27 @@ export function StabilityForecastView() {
             </div>
           </div>
 
-          {/* 右：窗口预测极值（预测值深色大数字 + 超上限/超下限超出量 + 管控值小字） */}
+          {/* 右：窗口预测极值（超限最大预测值大数字 + 超限标签随值展示 + 管控值小字） */}
           <div>
-            <p className="text-xs text-gray-400">预测值</p>
-            <div className="mt-2 flex flex-wrap items-baseline gap-1">
-              <span className="text-2xl font-bold tabular-nums text-gray-900">
-                {peak ? peak.value.toFixed(metric.decimals) : "—"}
+            <p className="text-xs text-gray-400">超限最大预测值</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-2">
+              <span className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold tabular-nums text-gray-900">
+                  {peak ? peak.value.toFixed(metric.decimals) : "—"}
+                </span>
+                <span className="text-sm font-medium text-gray-500">{metric.unit}</span>
               </span>
-              <span className="text-sm font-medium text-gray-500">{metric.unit}</span>
+              {peak?.over !== undefined && (
+                <span
+                  className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${
+                    peak.side === "上限" ? "bg-amber-50 text-orange-600" : "bg-blue-50 text-blue-600"
+                  }`}
+                >
+                  超{peak.side}：{peak.over.toFixed(metric.decimals)}
+                  {exceedUnitOf(metric.unit)}
+                </span>
+              )}
             </div>
-            <p className="mt-2 text-xs text-gray-400">
-              超{peak?.side ?? "上限"}：
-              {peak && peak.over !== undefined
-                ? `${peak.over.toFixed(metric.decimals)}${exceedUnitOf(metric.unit)}`
-                : "—"}
-            </p>
             <p className="mt-2 text-xs text-gray-400">管控值：{controlText}</p>
           </div>
         </div>

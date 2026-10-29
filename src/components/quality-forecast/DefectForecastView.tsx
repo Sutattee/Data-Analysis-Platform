@@ -322,10 +322,10 @@ export function DefectForecastView() {
             {!peak && <p className="mt-1 text-xs text-gray-400">必需输入不足，本轮未生成预测</p>}
           </div>
 
-          {/* 右：业务依据（成品水分对象 → 预测水分与允许范围对比；箱储对象 → 预测结果核算） */}
+          {/* 右：业务依据（成品水分对象 → 超限最大预测值与允许范围对比；箱储对象 → 预计超时核算） */}
           {forecast.moisture && (
             <div>
-              <p className="text-xs text-gray-400">预测成品水分</p>
+              <p className="text-xs text-gray-400">超限最大预测值</p>
               <div className="mt-2 flex flex-wrap items-baseline gap-2">
                 <span className="text-2xl font-bold text-gray-900">{forecast.moisture.predicted}</span>
                 <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${overBadgeCls}`}>
@@ -337,10 +337,10 @@ export function DefectForecastView() {
           )}
           {!forecast.moisture && st && (
             <div>
-              {/* 预测结果（视觉重点）+ 允许储存截止时间，窄屏自动换行；已储存/上限等辅助信息不再上卡片 */}
+              {/* 超限最大预测值（视觉重点）+ 允许储存截止时间，窄屏自动换行；已储存/上限等辅助信息不再上卡片 */}
               <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
                 <div>
-                  <p className="text-xs text-gray-400">预测结果</p>
+                  <p className="text-xs text-gray-400">超限最大预测值</p>
                   <p className={`mt-2.5 text-lg font-semibold ${stCls}`}>{stRes?.text}</p>
                 </div>
                 <div>
