@@ -1,9 +1,11 @@
 "use client";
 
-// 异常详情抽屉（稳定性预测页趋势图点击等级标记点滑出：升级点 / 触发等级的基准点）：布局与修正功能对齐过程管控
-// 详情页的异常详情抽屉，数据取自告警记录（AlertRecord）——数值字段（等级/告警值/基准/偏离/
-// 批次/班组/牌号等）由视图按点击点位的实际数值覆写，与点位保持一致；预测风险型展示预测窗口，
-// 飘移类展示连续同向偏离；异常原因 / 处置建议支持「修正」；底部「查看告警详情」跳告警记录详情页。
+// 异常详情抽屉（稳定性预测页趋势图点击等级标记点滑出：升级点 / 触发等级的基准点）：布局对齐
+// 能源消耗板块的异常详情抽屉（Section/Field 同构），数据取自告警记录（AlertRecord）——数值字段
+// （等级/告警值/基准阈值/超出量/批次/班次/班组/牌号等）由视图按点击点位的实际数值覆写，与点位
+// 保持一致；无数值字段不展示；预测风险型展示预测窗口，飘移类展示连续同向偏离；
+// 异常原因 / 处置建议支持「修正」，AI 原因标注「原因由 AI 分析数据自动生成」；
+// 底部「查看告警详情」跳告警记录详情页。
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
@@ -26,7 +28,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="mb-2 text-xs font-bold text-gray-900">{title}</h4>
+      <h4 className="mb-2 text-xs font-semibold text-gray-500">{title}</h4>
       <div className="grid grid-cols-2 gap-3">{children}</div>
     </div>
   );
@@ -110,33 +112,31 @@ export function StabilityAnomalyDrawer({
           {/* 指标名称 */}
           <p className="text-sm text-gray-500">{record.metricName}</p>
 
-          {/* 核心异常数据 */}
+          {/* 核心异常数据（无数值字段不展示：批次/班次/班组/牌号随指标周期与点位上下文而定） */}
           <Section title="核心异常数据">
             <Field label="告警等级" value={<AlertLevelBadge level={record.level} />} />
             <Field label="告警类型" value={TYPE_DISPLAY[record.type] ?? record.type} />
             <Field label="业务域" value={record.domain} />
-            <Field label="批次" value={record.batch ?? "-"} />
-            <Field label="机台" value={record.objectName} />
-            <Field label="班组" value={record.shift ?? "-"} />
-            <Field label="牌号" value={record.brand ?? "-"} />
-            {/* 班次（白班/夜班，取点位上下文；批/班周期指标有、月周期指标无 → 不展示） */}
+            {record.batch && <Field label="批次" value={record.batch} />}
             {record.shiftLabel && <Field label="班次" value={record.shiftLabel} />}
+            {record.shift && <Field label="班组" value={record.shift} />}
+            {record.brand && <Field label="牌号" value={record.brand} />}
             {record.process && <Field label="工序" value={record.process} />}
             <Field label="告警触发时间" value={record.triggerTime} />
             <Field label="告警值" value={record.valueLabel} />
-            <Field label="基准 / 阈值" value={record.baselineLabel} />
-            <Field label="偏离值" value={record.deviationValue} />
-            <Field label="偏离率" value={record.deviationRate} />
+            <Field label="基准阈值" value={record.baselineLabel} />
+            {/* 超出量：越出管控值边界的绝对差（% 指标以 pct 计，如 +0.35pct）；未越界 - */}
+            <Field label="超出量" value={record.deviationValue} />
             {isForecast && <Field label="预测窗口" value={record.forecastWindow ?? "-"} />}
             {record.consecutiveShifts !== undefined && (
               <Field label="连续同向偏离" value={`${record.consecutiveShifts}个${record.batch?.includes("批") ? "批次" : "班次"}`} />
             )}
           </Section>
 
-          {/* 异常原因（可修正；保存后原因类型 = 人工补录） */}
+          {/* 异常原因（可修正；AI 原因标注生成方式，保存后转为人工补录并记录补录人/时间） */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h4 className="text-xs font-bold text-gray-900">异常原因</h4>
+              <h4 className="text-xs font-semibold text-gray-500">异常原因</h4>
               {!editing && hasCause && (
                 <Button
                   size="sm"
@@ -156,10 +156,8 @@ export function StabilityAnomalyDrawer({
                 ) : (
                   <p className="text-sm text-gray-400">当前数据不足，暂无法确定异常原因</p>
                 )}
-                {hasCause && (
-                  <p className="text-xs text-gray-400">
-                    原因类型：{savedMeta ? "人工补录" : (record.causeType ?? "AI识别")}
-                  </p>
+                {hasCause && !savedMeta && (
+                  <p className="text-xs text-gray-400">原因由 AI 分析数据自动生成</p>
                 )}
                 {savedMeta && (
                   <p className="text-xs text-gray-400">
@@ -195,7 +193,7 @@ export function StabilityAnomalyDrawer({
           {/* 处置建议（可修正） */}
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-900">处置建议</span>
+              <span className="text-xs font-semibold text-gray-500">处置建议</span>
               {!suggestionEditing && (
                 <Button
                   size="sm"
@@ -237,7 +235,7 @@ export function StabilityAnomalyDrawer({
 
           {/* 判定依据 */}
           <div>
-            <h4 className="mb-2 text-xs font-bold text-gray-900">判定依据</h4>
+            <h4 className="mb-2 text-xs font-semibold text-gray-500">判定依据</h4>
             <p className="break-words text-sm text-gray-800">{`${record.strategyName}｜${record.triggerCondition}`}</p>
           </div>
         </div>

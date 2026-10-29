@@ -31,7 +31,7 @@ export const QUALITY_TYPE_OPTIONS = ["实测异常", "预测风险"];
 
 /* ---------------- 12 个数据指标主数据 ---------------- */
 
-export type QualityCycle = "每批次" | "每班次" | "每月";
+export type QualityCycle = "每批次" | "每班次" | "每月" | "每日";
 
 // 缺陷预测指标形态（预测风险类型专属的 5 个缺陷指标）：
 // score = 风险评分（0—100 分，判预测时间窗口内最高评分）/ moistureDev = 预测成品水分 /
@@ -90,7 +90,7 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
     ] },
   },
   {
-    name: "加香出口水分不达标次数", sfCode: "SF05", process: "加香", unit: "次", decimals: 0, cycle: "每月",
+    name: "加香出口水分不达标次数", sfCode: "SF05", process: "加香", unit: "次", decimals: 0, cycle: "每日",
     objects: ["1#加香机", "2#加香机", "3#加香机"],
     rule: { op: ">=", levels: [
       { level: "危险", threshold: 7 }, { level: "告警", threshold: 5 }, { level: "提示", threshold: 4 },
@@ -225,10 +225,10 @@ export function qualityObjectsOfMetric(name: string): string[] {
   return m ? [...m.objects] : [];
 }
 
-// 统计周期 → 连续同向偏离单位（表单位后缀与条件文案：每批次→批次 / 每班次→班次 / 每月→月）
+// 统计周期 → 连续同向偏离单位（表单位后缀与条件文案：每批次→批次 / 每班次→班次 / 每月→月 / 每日→日）
 export function qualityCycleUnitOf(name: string): string {
   const cycle = METRIC_MAP.get(name)?.cycle;
-  return cycle === "每班次" ? "班次" : cycle === "每月" ? "月" : "批次";
+  return cycle === "每班次" ? "班次" : cycle === "每月" ? "月" : cycle === "每日" ? "日" : "批次";
 }
 
 /* ---------------- 基准与偏离比例（产品规则：等级按相对基准的偏离比例划分） ---------------- */
@@ -373,7 +373,7 @@ const SPECS: RecordSpec[] = [
   { m: 3, machine: "5#烘丝机", level: "危险", value: 0.58, shifts: 3, shiftBaseline: 0.5 },
   // 成品水分标准偏差 · 飘移示例（连续 5 个批次 > 上限 2.20% 触发，产生危险级记录；危险等级按排序规则置顶）
   { m: 1, machine: "3#松散回潮机", level: "危险", value: 2.35, shifts: 5, shiftBaseline: 2.2 },
-  // 加香出口水分不达标次数（月度）
+  // 加香出口水分不达标次数（每日）
   { m: 4, machine: "2#加香机", level: "危险", value: 8 },
   { m: 4, machine: "1#加香机", level: "告警", forecast: true, value: 5 },
   // 非细支单支重量偏差
@@ -585,17 +585,21 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         : `${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
 
     // 预测风险：预计越界周期数（批次后缀如「第 2418 批（3个批次后）」）与预测窗口
-    // （批周期与缺陷预测页同源口径「已排产批次」，如「未来 10 个已排产批次」）
+    // （批周期与缺陷预测页同源口径「已排产批次」；日周期与稳定性预测页 SF05 同口径「未来已排产的22日」）
     const forecastShift = 2 + (i % 3); // 2~4 个统计周期后越界
     const windowUnit = cycleUnit === "批次" ? "已排产批次" : cycleUnit;
-    const forecastWindow = isForecast ? `未来 ${[5, 10, 15][i % 3]} 个${windowUnit}` : undefined;
+    const forecastWindow = isForecast
+      ? cycleUnit === "日"
+        ? "未来已排产的22日"
+        : `未来 ${[5, 10, 15][i % 3]} 个${windowUnit}`
+      : undefined;
 
     const triggerTime = tsAt(3300 + i * 263);
-    // 班次（批/班周期指标；月度指标无班次）：按触发时间推定 —— 8~20 点白班、其余夜班；
+    // 班次（批/班周期指标；月度/每日指标无班次）：按触发时间推定 —— 8~20 点白班、其余夜班；
     // 日期格式与稳定性预测页班次标签一致（如「7-19 白班」）
     const triggerHour = Number(triggerTime.slice(11, 13));
     const shiftLabel =
-      metric.cycle !== "每月"
+      metric.cycle === "每批次" || metric.cycle === "每班次"
         ? `${Number(triggerTime.slice(5, 7))}-${Number(triggerTime.slice(8, 10))} ${triggerHour >= 8 && triggerHour < 20 ? "白班" : "夜班"}`
         : undefined;
     const dateStr = triggerTime.slice(0, 10).replace(/-/g, "");
@@ -624,13 +628,13 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         : undefined,
       // 质量扩展（详情基本信息；字段按指标展示，见 qualityDetailFieldsOf）
       // 批次：实测「第 N 批」/ 预测「第 N 批（M个周期后）」；月度指标实测「本月」、
-      // 预测为预计越界月份「9月（2个月后）」（触发月 + M 个月；首条复现需求示例「第 2417 批」）
+      // 预测为预计越界月份「9月（2个月后）」（触发月 + M 个月）；日周期后缀如「（3日后）」
       batch:
         metric.cycle === "每月"
           ? isForecast
             ? `${((Number(triggerTime.slice(5, 7)) - 1 + forecastShift) % 12) + 1}月（${forecastShift}个月后）`
             : "本月"
-          : `第 ${2417 + i} 批${isForecast ? `（${forecastShift}个${cycleUnit}后）` : ""}`,
+          : `第 ${2417 + i} 批${isForecast ? `（${forecastShift}${cycleUnit === "日" ? "日" : `个${cycleUnit}`}后）` : ""}`,
       forecastWindow,
       shift: SHIFTS[i % 3],
       shiftLabel, // 班次（白班/夜班，批/班周期指标生成；月度指标不生成 → 详情不展示）

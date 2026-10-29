@@ -1,8 +1,9 @@
 "use client";
 
 // 指标预测趋势图：历史实测实线 + 预测虚线 + 管控值线（橙色虚线，双侧型两条 + 区间底色）+ 等级升级标记
-// 管控值 = 等级规则最轻级边界（仅一条橙线标注数值，不逐等级画线）；首达预测最高等级的点重点标注
-// 纵轴为指标实际数值及单位；横轴展示批号 / 月份（班周期指标同为批次刻度，班次信息在悬浮提示）
+// + 基准竖线（灰色虚线，标注「基准批次」/「基准日期」）；管控值 = 等级规则最轻级边界（仅一条橙线
+// 标注数值，不逐等级画线）；首达预测最高等级的点重点标注；纵轴为指标实际数值及单位；
+// 横轴展示批号 / 月份 / 日期（班周期指标同为批次刻度，班次信息在悬浮提示）
 import {
   CartesianGrid,
   Line,
@@ -19,6 +20,8 @@ import {
   LEVEL_COLOR,
   controlTextOf,
   currentLevelOf,
+  exceedDeltaOfValue,
+  exceedUnitOf,
   levelOfValue,
   maxFutureLevelOf,
   metricOf,
@@ -30,6 +33,7 @@ import {
 import type { AlertLevel } from "@/types";
 
 const CONTROL_COLOR = "#f97316"; // 管控值线（橙）
+const BASELINE_COLOR = "#9ca3af"; // 基准竖线（灰）
 
 interface Row {
   label: string;
@@ -38,29 +42,12 @@ interface Row {
   point?: TrendPoint; // 点位生产上下文（批次 / 班次 / 班组 / 牌号；Tooltip 展示）
 }
 
-// 超限比例：越出最轻级边界（基准）时的相对偏离（带方向符号）；未越限返回 null（Tooltip 不展示）
-function overPctOfValue(v: number, rule: AlertRule): string | null {
-  const lightest = rule.levels[rule.levels.length - 1];
-  let delta: number | null = null;
-  let base = 0;
-  if (rule.op === "between") {
-    const { low, high } = lightest;
-    if (high !== undefined && v > high) {
-      delta = v - high;
-      base = Math.abs(high);
-    } else if (low !== undefined && v < low) {
-      delta = v - low;
-      base = Math.abs(low);
-    }
-  } else {
-    const t = lightest.threshold;
-    if (t !== undefined && ((rule.op === ">=" && v >= t) || (rule.op === "<=" && v <= t))) {
-      delta = v - t;
-      base = Math.abs(t);
-    }
-  }
-  if (delta === null || base < 1e-9) return null;
-  return `${delta >= 0 ? "+" : "-"}${Math.round((Math.abs(delta) / base) * 1000) / 10}%`;
+// 超出量：越出最轻级边界（= 管控值）的绝对差（带方向符号，% 指标以 pct 计，如 +0.35pct）；
+// 未越界返回 null（Tooltip 不展示该行）
+function exceedTextOfValue(v: number, rule: AlertRule, decimals: number, unit: string): string | null {
+  const delta = exceedDeltaOfValue(v, rule);
+  if (delta === null) return null;
+  return `${delta >= 0 ? "+" : "-"}${Math.abs(delta).toFixed(decimals)}${exceedUnitOf(unit)}`;
 }
 
 // 等级升级点：future[i]（i≥1）等级高于前一点（首点对比当前实测等级）；prominent = 首次达到预测最高等级
@@ -167,7 +154,7 @@ export function MetricTrendChart({
             dataKey="label"
             tick={{ fontSize: 10 }}
             stroke="#9ca3af"
-            interval={0}
+            interval={metric.cycle === "日" ? 1 : 0} // 日周期 28 点隔一显示，避免刻度重叠
             minTickGap={20}
             height={30}
           />
@@ -177,8 +164,15 @@ export function MetricTrendChart({
             tick={{ fontSize: 10 }}
             stroke="#9ca3af"
           />
-          {/* 预测区（基准 → 窗口末）浅色底标注 */}
-          <ReferenceArea x1={baseLabel} x2={lastLabel} fill="#2563eb" fillOpacity={0.04} label={{ value: "预测区", position: "insideTopLeft", fontSize: 10, fill: "#93c5fd" }} />
+          {/* 预测区（基准 → 窗口末）浅色底 */}
+          <ReferenceArea x1={baseLabel} x2={lastLabel} fill="#2563eb" fillOpacity={0.04} />
+          {/* 基准竖线：基准批次 / 基准日期（日周期）——历史与预测的分界，灰色虚线标注 */}
+          <ReferenceLine
+            x={baseLabel}
+            stroke={BASELINE_COLOR}
+            strokeDasharray="4 4"
+            label={{ value: metric.cycle === "日" ? "基准日期" : "基准批次", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
+          />
           {/* 管控值线：最轻级边界一条橙色虚线（双侧型 = 上下两条 + 正常区间浅色底），标注管控值数值 */}
           {lightest && rule && rule.op === "between" && lightest.low !== undefined && lightest.high !== undefined && (
             <>
@@ -334,7 +328,7 @@ export function MetricTrendChart({
               const value = row.histValue ?? row.futureValue ?? 0;
               const isHist = row.histValue !== null && row.histValue !== undefined;
               const lv = rule ? levelOfValue(value, rule) : null;
-              const overPct = rule ? overPctOfValue(value, rule) : null;
+              const exceed = rule ? exceedTextOfValue(value, rule, metric.decimals, metric.unit) : null;
               const pt = row.point;
               return (
                 <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 text-xs shadow-md">
@@ -342,14 +336,7 @@ export function MetricTrendChart({
                     {isHist ? "实际值" : "预测值"}：{value.toFixed(metric.decimals)}
                     {metric.unit}
                   </p>
-                  {pt?.batch && <p className="mt-0.5 text-gray-500">批次：第 {pt.batch} 批</p>}
-                  {metric.cycle === "月" && <p className="mt-0.5 text-gray-500">月份：{row.label}</p>}
-                  <p className="mt-0.5 text-gray-500">机台：{forecast.machine}</p>
-                  {pt?.shift && <p className="mt-0.5 text-gray-500">班次：{pt.shift}</p>}
-                  {pt?.shiftGroup && <p className="mt-0.5 text-gray-500">班组：{pt.shiftGroup}</p>}
-                  {pt?.brand && <p className="mt-0.5 text-gray-500">牌号：{pt.brand}</p>}
-                  <p className="mt-0.5 text-gray-500">工序：{metric.process}</p>
-                  {overPct !== null && <p className="mt-0.5 font-medium text-red-500">超限比例：{overPct}</p>}
+                  {exceed !== null && <p className="mt-0.5 font-medium text-red-500">超出量：{exceed}</p>}
                   {rule &&
                     (lv ? (
                       <p className="mt-0.5 font-medium" style={{ color: LEVEL_COLOR[lv] }}>
@@ -358,6 +345,11 @@ export function MetricTrendChart({
                     ) : (
                       <p className="mt-0.5 text-green-600">告警等级：正常</p>
                     ))}
+                  {pt?.batch && <p className="mt-0.5 text-gray-500">批次：第 {pt.batch} 批</p>}
+                  <p className="mt-0.5 text-gray-500">机台：{forecast.machine}</p>
+                  {pt?.shift && <p className="mt-0.5 text-gray-500">班次：{pt.shift}</p>}
+                  {pt?.shiftGroup && <p className="mt-0.5 text-gray-500">班组：{pt.shiftGroup}</p>}
+                  {pt?.brand && <p className="mt-0.5 text-gray-500">牌号：{pt.brand}</p>}
                 </div>
               );
             }}
@@ -382,7 +374,7 @@ export function MetricTrendChart({
         )}
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full border-2 border-blue-700 bg-white" />
-          基准{metric.cycle === "月" ? "月份" : "批次"}
+          基准{metric.cycle === "月" ? "月份" : metric.cycle === "日" ? "日期" : "批次"}
         </span>
         {hasUpgrades && (
           <span className="flex items-center gap-1">

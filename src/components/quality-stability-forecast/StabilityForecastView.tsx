@@ -1,7 +1,7 @@
 "use client";
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
-// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右当前状态，
+// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：最大预测值 + 超上限·超下限 + 管控值，
 // 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数）右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
@@ -22,11 +22,13 @@ import {
   aiInterpretation,
   combinedForecastOf,
   contributionsOf,
+  exceedUnitOf,
   levelChangeOf,
   maxFutureLevelOf,
   metricMachinesOf,
   metricOf,
   paramDirection,
+  peakOfForecast,
   sourceBreakdownOf,
   stabilityForecastOf,
   statusOf,
@@ -36,16 +38,6 @@ import {
 import { MetricTrendChart } from "./MetricTrendChart";
 import { StabilityAnomalyDrawer } from "./StabilityAnomalyDrawer";
 import { StabilityContributionChart } from "./StabilityContributionChart";
-
-// 当前等级标签配色（浅底 + 等级字色）：用于「当前等级」标签，与左侧未来预测等级大字区分
-const STATUS_TAG_CLS: Record<string, string> = {
-  提示: "bg-slate-100 text-slate-600",
-  关注: "bg-yellow-50 text-yellow-600",
-  预警: "bg-orange-50 text-orange-600",
-  告警: "bg-red-50 text-red-600",
-  危险: "bg-red-100 text-red-700",
-  正常: "bg-green-50 text-green-600",
-};
 
 // 摘要单项
 function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
@@ -123,8 +115,8 @@ export function StabilityForecastView() {
     if (rec) setAnomalyAlert(pointAlertOf(rec, info));
   }
 
-  // 以点击点位的数值覆写告警记录展示字段（等级 / 告警值 / 基准 / 偏离 / 批次 / 班次 / 班组 / 牌号 /
-  // 预测窗口等与点位一致；点位在预测曲线上 → 告警类型 = 预测风险，基准点为最新实测值 →
+  // 以点击点位的数值覆写告警记录展示字段（等级 / 告警值 / 基准阈值 / 超出量 / 批次 / 班次 / 班组 /
+  // 牌号 / 预测窗口等与点位一致；点位在预测曲线上 → 告警类型 = 预测风险，基准点为最新实测值 →
   // 实测异常、告警值「当前值」且不展示预测窗口）；
   // 策略、原因、建议、触发时间等无法由点位派生的字段保留告警记录原文
   function pointAlertOf(
@@ -133,26 +125,23 @@ export function StabilityForecastView() {
   ): AlertRecord {
     const fmt = (v: number) => v.toFixed(metric.decimals);
     const rule = metric.rule;
-    // 基准 = 管控值边界（最轻级，与图上管控值线一致）；偏离 = 越出侧边界的差值与比例
+    // 基准阈值 = 管控值边界（最轻级，与图上管控值线一致，如「上限≤2.00%」）；
+    // 超出量 = 越出侧边界的绝对差（带方向符号，% 指标以 pct 计，如 +0.35pct）；未越界 = -
     let baselineText = rec.baselineLabel;
     let delta: number | null = null;
-    let baseAbs = 0;
     if (rule) {
       const lightest = rule.levels[rule.levels.length - 1];
       if (rule.op === "between" && lightest.low !== undefined && lightest.high !== undefined) {
-        baselineText = `下限 ${fmt(lightest.low)}${metric.unit}｜上限 ${fmt(lightest.high)}${metric.unit}`;
+        baselineText = `下限≥${fmt(lightest.low)}${metric.unit}｜上限≤${fmt(lightest.high)}${metric.unit}`;
         if (info.value > lightest.high) {
           delta = info.value - lightest.high;
-          baseAbs = Math.abs(lightest.high);
         } else if (info.value < lightest.low) {
           delta = info.value - lightest.low;
-          baseAbs = Math.abs(lightest.low);
         }
       } else if (rule.op !== "between" && lightest.threshold !== undefined) {
         const t = lightest.threshold;
-        baselineText = `${rule.op === ">=" ? "上限" : "下限"} ${fmt(t)}${metric.unit}`;
+        baselineText = `${rule.op === ">=" ? "上限" : "下限"}${rule.op === ">=" ? "≤" : "≥"}${fmt(t)}${metric.unit}`;
         delta = info.value - t;
-        baseAbs = Math.abs(t);
       }
     }
     return {
@@ -162,11 +151,9 @@ export function StabilityForecastView() {
       objectName: machineText,
       valueLabel: `${info.measured ? "当前值" : "预测值"}${fmt(info.value)}${metric.unit}`,
       baselineLabel: baselineText,
-      deviationValue: delta === null ? "-" : `${delta >= 0 ? "+" : "-"}${fmt(Math.abs(delta))}${metric.unit}`,
-      deviationRate:
-        delta === null || baseAbs < 1e-9 ? "-" : `${delta >= 0 ? "+" : "-"}${Math.round((Math.abs(delta) / baseAbs) * 1000) / 10}%`,
+      deviationValue: delta === null ? "-" : `${delta >= 0 ? "+" : "-"}${fmt(Math.abs(delta))}${exceedUnitOf(metric.unit)}`,
       batch: info.point?.batch ? `第 ${info.point.batch} 批` : undefined,
-      shiftLabel: info.point?.shift, // 班次取点位上下文（批/班周期有、月周期无），不沿用原记录
+      shiftLabel: info.point?.shift, // 班次取点位上下文（批/班周期有、月/日周期无），不沿用原记录
       shift: info.point?.shiftGroup,
       brand: info.point?.brand,
       forecastWindow: info.measured ? undefined : rec.forecastWindow ?? windowTextOf(metric.cycle),
@@ -228,6 +215,8 @@ export function StabilityForecastView() {
   const contributions = contributionsOf(forecast);
   // 无规则时贡献与分布均进入空状态
   const breakdown = metric.rule ? sourceBreakdownOf(forecast) : [];
+  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：最大预测值 + 超上限·超下限超出量
+  const peak = peakOfForecast(forecast);
   const ai = aiInterpretation(forecast, code, machineText);
   // 流式时序：解读各段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载来源参数 / 风险来源 / 来源分布
   const sectionDelays: number[] = [];
@@ -236,9 +225,6 @@ export function StabilityForecastView() {
   });
   const aiDoneAt =
     ai.length > 0 ? sectionDelays[ai.length - 1] + ai[ai.length - 1].text.length * 8 + 300 : 0;
-  // 当前等级配色：文字色（抽屉）/ 浅底标签色（主卡片）；— = 无法判定灰
-  const statusCls = status === "—" ? "text-gray-400" : status === "正常" ? "text-green-600" : LEVEL_TEXT_CLS[status];
-  const statusTagCls = status === "—" ? "bg-gray-100 text-gray-400" : STATUS_TAG_CLS[status];
   // 等级变化文案配色：升级按目标等级 / 同级持续按当前等级 / 降级为好转（绿）/ 其余深灰
   const changeCls =
     change.kind === "upgrade" && change.toLevel !== undefined
@@ -278,7 +264,7 @@ export function StabilityForecastView() {
         </div>
       </Card>
 
-      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（当前状态）约 5:5，突出未来风险 */}
+      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（窗口预测极值）约 5:5，突出未来风险 */}
       <Card
         title="预测概况"
         divider={false}
@@ -314,18 +300,21 @@ export function StabilityForecastView() {
             </div>
           </div>
 
-          {/* 右：当前状态（最新实际值深色大数字 + 当前等级标签 + 管控值小字；与左侧未来预测等级区分） */}
+          {/* 右：窗口预测极值（最大预测值深色大数字 + 超上限/超下限超出量 + 管控值小字） */}
           <div>
-            <p className="text-xs text-gray-400">最新实际值</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-xs text-gray-400">最大预测值</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-1">
               <span className="text-2xl font-bold tabular-nums text-gray-900">
-                {forecast.base.toFixed(metric.decimals)}
+                {peak ? peak.value.toFixed(metric.decimals) : "—"}
               </span>
               <span className="text-sm font-medium text-gray-500">{metric.unit}</span>
-              <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${statusTagCls}`}>
-                当前等级：{status}
-              </span>
             </div>
+            <p className="mt-2 text-xs text-gray-400">
+              超{peak?.side ?? "上限"}：
+              {peak && peak.over !== undefined
+                ? `${peak.over.toFixed(metric.decimals)}${exceedUnitOf(metric.unit)}`
+                : "—"}
+            </p>
             <p className="mt-2 text-xs text-gray-400">管控值：{controlText}</p>
           </div>
         </div>
@@ -475,8 +464,13 @@ export function StabilityForecastView() {
             {forecast.base.toFixed(metric.decimals)}
             {metric.unit}
           </SummaryItem>
-          <SummaryItem label="当前等级">
-            <span className={statusCls}>{status}</span>
+          {/* 超出量：窗口极值相对管控值边界（超上限0.55 / 超上限1次 式）；未越界 — */}
+          <SummaryItem label="超出量">
+            {peak && peak.over !== undefined ? (
+              `超${peak.side}${peak.over.toFixed(metric.decimals)}${exceedUnitOf(metric.unit)}`
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
           </SummaryItem>
           <SummaryItem label="管控值">{controlText}</SummaryItem>
           <SummaryItem label="预测窗口">{windowTextOf(metric.cycle)}</SummaryItem>

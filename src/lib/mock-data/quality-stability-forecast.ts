@@ -1,8 +1,9 @@
 // 稳定性预测 —— 模拟数据（会话内静态，本期仅展示最新一轮预测结果）
 // 基于机台生产参数、过程指标及车间环境数据对稳定性指标滚动预测，按五级等级体系判定：
 // 提示 / 关注 / 预警 / 告警 / 危险（严重程度递增，颜色与告警中心一致），「正常」仅为展示状态，
-// 未配置规则、暂无法判定不能归为正常；统计周期三种（批 / 月 / 班）→ 横轴为批号 / 月份 / 班次，
-// 预测窗口随周期（10 批次 / 3 个月 / 10 班次）；规则方向三种（上限型 ≥ / 下限型 ≤ / 双侧超出型），
+// 未配置规则、暂无法判定不能归为正常；统计周期四种（批 / 月 / 班 / 日）→ 横轴为批号 / 月份 / 日期
+// （班周期同为批次刻度，班次信息在悬浮提示），预测窗口随周期（10 批次 / 3 个月 / 10 班次 / 22 日）；
+// 规则方向三种（上限型 ≥ / 下限型 ≤ / 双侧超出型），
 // 各指标按启用等级配置多条阈值边界，等级变化预测文本由实测值与预测序列计算派生；
 // 参考范围、基准值与等级阈值原表标注「待提供」，此处预置模拟值供演示，可直接替换。
 import { BRAND_OPTIONS, SHIFT_OPTIONS } from "@/lib/mock-data/quality-defect";
@@ -123,7 +124,7 @@ export const PARAM_SPECS: Record<string, ParamSpec> = {
 
 // ============ 指标档案 ============
 
-export type Cycle = "批" | "月" | "班";
+export type Cycle = "批" | "月" | "班" | "日";
 
 export interface StabilityMetricDef {
   code: string; // 指标编码
@@ -163,7 +164,7 @@ export const STABILITY_METRICS: StabilityMetricDef[] = [
     machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
   },
   {
-    code: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "月", process: "加香",
+    code: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "日", process: "加香",
     params: [PARAM_DEFS.flavorMoist, PARAM_DEFS.cutFlow, PARAM_DEFS.flavorFlow, PARAM_DEFS.envTemp, PARAM_DEFS.envHum],
     rule: { op: ">=", levels: [{ level: "告警", threshold: 5 }, { level: "提示", threshold: 4 }] },
     machines: ["1#加香机", "2#加香机", "3#加香机"],
@@ -198,15 +199,16 @@ export function metricOf(code: string): StabilityMetricDef | undefined {
   return STABILITY_METRICS.find((m) => m.code === code);
 }
 
-// 预测窗口：批 / 班 10 步，月 3 步
+// 预测窗口：批 / 班 10 步，月 3 步，日 22 步
 function windowSizeOf(cycle: Cycle): number {
-  return cycle === "月" ? 3 : 10;
+  return cycle === "月" ? 3 : cycle === "日" ? 22 : 10;
 }
 
-// 窗口文案：批 / 班周期以已排产批次为窗口单位（班周期横轴同为批次刻度）；月周期为自然月
+// 窗口文案：批 / 班周期以已排产批次为窗口单位（班周期横轴同为批次刻度）；月周期为自然月；
+// 日周期为已排产日（与告警侧 SF05 预测窗口同口径）
 export function windowTextOf(cycle: Cycle): string {
   const n = windowSizeOf(cycle);
-  return cycle === "月" ? `未来${n}个月` : `未来${n}个已排产批次`;
+  return cycle === "月" ? `未来${n}个月` : cycle === "日" ? `未来已排产的${n}日` : `未来${n}个已排产批次`;
 }
 
 // ============ 预测结果 ============
@@ -295,8 +297,9 @@ const SEEDS: ForecastSeed[] = [
     values: [127.3], phis: [0.14] },
   { code: "SF04", machine: "5#烘丝机", base: 0.18, histFrom: 0.24, futureSpec: { kind: "drift", delta: -0.03 }, conf: 0.85, updatedAt: "2026-10-10 07:15",
     values: [118.0], phis: [0.03] },
-  // ===== SF05 加香出口水分不达标次数（提示≥4/告警≥5，月）=====
-  { code: "SF05", machine: "1#加香机", base: 6, histFrom: 4, futureSpec: { kind: "hold" }, conf: 0.78, updatedAt: "2026-10-10 08:00",
+  // ===== SF05 加香出口水分不达标次数（提示≥4/告警≥5，日）=====
+  // 1#：实测 5.4 已达告警级 → 窗口内高位维持（演示「预计持续告警」）
+  { code: "SF05", machine: "1#加香机", base: 5.4, histFrom: 4, futureSpec: { kind: "hold" }, conf: 0.78, updatedAt: "2026-10-10 08:00",
     values: [13.4, 6820, 55.6, 26.2, 63.5], phis: [1.4, 0.9, 0.7, 0, 0] },
   { code: "SF05", machine: "2#加香机", base: 4, histFrom: 3, futureSpec: { kind: "climb", target: 5, hitStep: 2 }, conf: null, updatedAt: "2026-10-10 06:30",
     values: [12.8, 6560, 53.1, 24.4, 58.2], phis: [0.8, 0.5, 0.3, 0, 0.2] },
@@ -347,11 +350,29 @@ const SEEDS: ForecastSeed[] = [
 const roundTo = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d;
 
 // 批 / 班周期统一批次刻度（班周期横轴不再用班次，班次信息保留在点位上下文）；
-// 月周期为自然月（基准 10 月，跨年顺延 1 月）
+// 月周期为自然月（基准 10 月，跨年顺延 1 月）；日周期为 M-DD 日期刻度（基准 10-29，
+// 历史 6 天 + 预测基准起顺延 22 日，跨月自动进位至 11 月）
+function dayLabels(): { hist: string[]; future: string[] } {
+  const daysInMonth = (m: number) => new Date(2026, m, 0).getDate();
+  const seq: string[] = [];
+  let m = 10;
+  let d = 24; // 历史首日 10-24
+  for (let i = 0; i < 6 + 22; i += 1) {
+    seq.push(`${m}-${d < 10 ? `0${d}` : `${d}`}`);
+    d += 1;
+    if (d > daysInMonth(m)) {
+      m += 1;
+      d = 1;
+    }
+  }
+  return { hist: seq.slice(0, 6), future: seq.slice(5) }; // future 首点 = 基准 10-29
+}
+
 function labelsOf(cycle: Cycle): { hist: string[]; future: string[] } {
   if (cycle === "月") {
     return { hist: ["5月", "6月", "7月", "8月", "9月", "10月"], future: ["10月", "11月", "12月", "1月"] };
   }
+  if (cycle === "日") return dayLabels();
   const hist = [2346, 2347, 2348, 2349, 2350, 2351].map(String);
   const future = [2351, 2352, 2353, 2354, 2355, 2356, 2357, 2358, 2359, 2360, 2361].map(String);
   return { hist, future };
@@ -366,7 +387,8 @@ function hashOf(s: string): number {
   return h;
 }
 
-// 点位生产上下文（确定性）：批 / 班周期带批号（= 横轴刻度）+ 生产班次 + 班组 / 牌号；月周期无；
+// 点位生产上下文（确定性）：批 / 班周期带批号（= 横轴刻度）+ 生产班次 + 班组 / 牌号；
+// 月 / 日周期无（按自然周期聚合，无数值字段悬浮与抽屉均不展示）；
 // g = 全局点位序号（历史 0..5，预测首点与历史末点重合），h = 机台偏移
 function pointMeta(
   cycle: Cycle,
@@ -374,10 +396,10 @@ function pointMeta(
   g: number,
   h: number
 ): Pick<TrendPoint, "batch" | "shift" | "shiftGroup" | "brand"> {
-  if (cycle === "月") return {};
+  if (cycle === "月" || cycle === "日") return {};
   return {
     batch: label,
-    shift: `10-${6 + Math.floor(g / 2)} ${g % 2 === 0 ? "白班" : "夜班"}`,
+    shift: `10-${6 + Math.floor(g / 2)}${g % 2 === 0 ? "白班" : "夜班"}`,
     shiftGroup: SHIFT_OPTIONS[(g + h + 1) % SHIFT_OPTIONS.length],
     brand: BRAND_OPTIONS[(g + h) % BRAND_OPTIONS.length],
   };
@@ -472,12 +494,17 @@ export function levelChangeOf(f: StabilityForecast): { kind: LevelChangeKind; te
   const cur = currentLevelOf(f);
   const max = maxFutureLevelOf(f);
   // 窗口首达某等级点的触发表述：批 / 班周期用横轴批号（如 2355批次已触发告警）；
-  // 月周期按基准 2026-10 顺延自然月并跨年（如 26年12月已触发关注 / 27年1月已触发告警）
+  // 月周期按基准 2026-10 顺延自然月并跨年（如 26年12月已触发关注 / 27年1月已触发告警）；
+  // 日周期用 M月D日（横轴刻度 11-05 → 11月5日已触发告警）
   const hitTextOf = (lv: AlertLevel, step: number): string => {
     if (metric.cycle === "月") {
       const m = 10 + step;
       const y = 26 + Math.floor((m - 1) / 12);
       return `${y}年${((m - 1) % 12) + 1}月已触发${lv}`;
+    }
+    if (metric.cycle === "日") {
+      const [mm, dd] = (f.future[step]?.label ?? "").split("-");
+      return mm && dd ? `${+mm}月${+dd}日已触发${lv}` : `已触发${lv}`;
     }
     return `${f.future[step]?.label ?? ""}批次已触发${lv}`;
   };
@@ -506,6 +533,63 @@ export function statusOf(f: StabilityForecast): AlertLevel | "正常" | "—" {
   const metric = metricOf(f.code)!;
   if (f.insufficient || f.failed || !metric.rule) return "—";
   return currentLevelOf(f) ?? "正常";
+}
+
+// ============ 超出量 / 预测极值派生（卡片右侧、预测详情、悬浮提示共用口径） ============
+
+// 超出量单位展示：百分比指标以 pct 计（与告警记录详情「超出量」口径一致）
+export function exceedUnitOf(unit: string): string {
+  return unit === "%" ? "pct" : unit;
+}
+
+// 点位超出量：越出最轻级边界（= 管控值）的带方向差值（正 = 超上限 / 负 = 低于下限）；
+// 未越界返回 null（悬浮提示、抽屉均不展示）
+export function exceedDeltaOfValue(v: number, rule: AlertRule): number | null {
+  const lightest = rule.levels[rule.levels.length - 1];
+  if (rule.op === "between") {
+    const { low, high } = lightest;
+    if (high !== undefined && v > high) return v - high;
+    if (low !== undefined && v < low) return v - low;
+    return null;
+  }
+  const t = lightest.threshold;
+  if (t === undefined) return null;
+  if (rule.op === ">=" && v > t) return v - t;
+  if (rule.op === "<=" && v < t) return v - t;
+  return null;
+}
+
+// 窗口最不利预测极值：沿规则方向取窗口内（不含基准）最不利点——上限型取最大值、
+// 下限型取最小值、双侧型取越出边界的极值（未越界取任一极值，方向记「上限」）；
+// over = 相对管控值边界的超出量（未越界 → undefined，展示「—」）
+export interface ForecastPeak {
+  value: number;
+  side: "上限" | "下限";
+  over: number | undefined;
+}
+
+export function peakOfForecast(f: StabilityForecast): ForecastPeak | null {
+  const metric = metricOf(f.code)!;
+  const rule = metric.rule;
+  if (!rule || f.insufficient || f.failed) return null;
+  const vals = f.future.slice(1).map((p) => p.value);
+  if (vals.length === 0) return null;
+  const lightest = rule.levels[rule.levels.length - 1];
+  if (rule.op === "between" && lightest.low !== undefined && lightest.high !== undefined) {
+    const maxV = Math.max(...vals);
+    const minV = Math.min(...vals);
+    if (maxV > lightest.high) return { value: maxV, side: "上限", over: maxV - lightest.high };
+    if (minV < lightest.low) return { value: minV, side: "下限", over: lightest.low - minV };
+    return { value: maxV, side: "上限", over: undefined };
+  }
+  const t = lightest.threshold;
+  if (t === undefined) return null;
+  if (rule.op === ">=") {
+    const maxV = Math.max(...vals);
+    return { value: maxV, side: "上限", over: maxV > t ? maxV - t : undefined };
+  }
+  const minV = Math.min(...vals);
+  return { value: minV, side: "下限", over: minV < t ? t - minV : undefined };
 }
 
 // ============ 查询接口 ============
