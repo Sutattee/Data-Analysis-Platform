@@ -7,7 +7,7 @@ import { PM_TO_DETAIL } from "@/lib/mock-data/process-control-detail";
 import { PROCESS_METRICS } from "@/lib/mock-data/quality";
 
 // 模块二「过程管控」：9 项过程指标表（全宽）；
-// 行内展示最新实际值/管控值/超限比例/近期均值（带统计周期）/半年均值评价，最新实际值超管控值的标红；
+// 行内展示最新实际值（纯数值）/管控值/超限比例/近期均值（带统计周期）/半年均值评价，最新实际值超管控值的标红；
 // 管控值支持上限型（≤X）与区间型（值落在区间内达标）；整行、指标名称与「详情」进入过程管控详情页
 export function ProcessControlModule() {
   const router = useRouter();
@@ -58,13 +58,11 @@ export function ProcessControlModule() {
                       {m.name}
                     </span>
                   </td>
-                  {/* 最新实际值：超管控值标红，口径（批次/班次班组/本月）以「｜」分隔 */}
+                  {/* 最新实际值（纯数值 + 单位，不带统计周期）：超管控值标红 */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`font-medium ${latestOver ? "text-red-600" : "text-gray-800"}`}>
                       {m.latestValue}
                     </span>
-                    <span className="text-gray-300">｜</span>
-                    <span className="text-[11px] text-gray-400">{m.latestNote}</span>
                   </td>
                   {/* 管控值：待配置置灰 */}
                   <td

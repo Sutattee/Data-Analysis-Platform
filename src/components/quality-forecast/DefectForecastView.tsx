@@ -300,7 +300,7 @@ export function DefectForecastView() {
           {!forecast.moisture && st && (
             <div>
               {/* 超限最大预测值 = 预计总储存时长（上限 + 预计超时）：超时 → 红色大字 + 浅黄底橙字「超时Nh」
-                  标签；不超时 → 深灰大字 + 绿色「剩余Nh」；截止时间收为一行灰色小字置于其下 */}
+                  标签；不超时 → 深灰大字 + 绿色「不超时」；截止时间收为一行灰色小字置于其下 */}
               <p className="text-xs text-gray-400">超限最大预测值</p>
               {st.overHours !== undefined || st.marginHours !== undefined ? (
                 <div className="mt-2 flex flex-wrap items-baseline gap-2">
@@ -317,7 +317,7 @@ export function DefectForecastView() {
                     </span>
                   ) : (
                     <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-green-50 text-green-600">
-                      剩余{st.marginHours}h
+                      不超时
                     </span>
                   )}
                 </div>

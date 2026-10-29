@@ -99,10 +99,9 @@ export interface ProcessMetric {
   halfYearPass: boolean; // 半年均值评价：达标 / 未达标
   latestValue: string; // 最新监测值（如 4.8%）
   latestNum: number; // 最新监测数值（与管控值比较，超标准标红）
-  latestNote: string; // 最新监测口径（批次/班组/本月）
   recent: string; // 近期均值展示
   recentNum: number; // 近期均值数值
-  recentNote: string; // 近期均值统计周期（近10批次 / 近3个月 / 近10班次）
+  recentNote: string; // 近期均值统计周期（近10批次 / 近3个月）
   deviation: string; // 超限比例展示（相对管控值；如 +20% / +15% / 0% / -，- = 待配置无基准）
   tolerance: string; // 管控值展示（如 ≤4.0% / ≤3次 / 12.50%～13.50% / 待配置）
   toleranceNum: number | null; // 上限型管控值数值（null = 非上限型或待配置）
@@ -118,7 +117,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "4.8%",
     latestNum: 4.8,
-    latestNote: "批次20260817-02",
     recent: "4.1%",
     recentNum: 4.1,
     recentNote: "近10批次",
@@ -134,7 +132,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: false,
     latestValue: "1.65%",
     latestNum: 1.65,
-    latestNote: "批次20260817-02",
     recent: "1.57%",
     recentNum: 1.57,
     recentNote: "近10批次",
@@ -150,7 +147,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "0.41%",
     latestNum: 0.41,
-    latestNote: "批次20260816-05",
     recent: "0.45%",
     recentNum: 0.45,
     recentNote: "近10批次",
@@ -166,7 +162,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "12.4%",
     latestNum: 12.4,
-    latestNote: "批次20260816-05",
     recent: "12.49%",
     recentNum: 12.49,
     recentNote: "近10批次",
@@ -183,7 +178,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "0次",
     latestNum: 0,
-    latestNote: "本月",
     recent: "1次",
     recentNum: 1,
     recentNote: "近3个月",
@@ -199,10 +193,9 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: false,
     latestValue: "46mg",
     latestNum: 46,
-    latestNote: "09-28 白班 乙班",
     recent: "42mg",
     recentNum: 42,
-    recentNote: "近10班次",
+    recentNote: "近10批次",
     deviation: "+15%",
     tolerance: "≤40mg",
     toleranceNum: 40,
@@ -215,10 +208,9 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "3.1%",
     latestNum: 3.1,
-    latestNote: "09-28 夜班 甲班",
     recent: "2.97%",
     recentNum: 2.97,
-    recentNote: "近10班次",
+    recentNote: "近10批次",
     deviation: "0%",
     tolerance: "≤3.2%",
     toleranceNum: 3.2,
@@ -231,10 +223,9 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "2.4%",
     latestNum: 2.4,
-    latestNote: "09-28 夜班 丙班",
     recent: "2.55%",
     recentNum: 2.55,
-    recentNote: "近10班次",
+    recentNote: "近10批次",
     deviation: "0%",
     tolerance: "≤2.6%",
     toleranceNum: 2.6,
@@ -247,10 +238,9 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     halfYearPass: true,
     latestValue: "1.09%",
     latestNum: 1.09,
-    latestNote: "09-28 白班 丁班",
     recent: "1.43%",
     recentNum: 1.43,
-    recentNote: "近10班次",
+    recentNote: "近10批次",
     deviation: "0%",
     tolerance: "≤1.5%",
     toleranceNum: 1.5,
