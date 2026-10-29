@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
 import { BrandFilter } from "@/components/forecast/BrandFilter";
@@ -50,27 +49,6 @@ const DEFECT_ALERT_METRIC: Record<string, string> = {
   YZCB: "烟支刺破风险评分",
   XCCG: "预测箱储总存储时长",
 };
-
-// 摘要信息格：label 上 / 值下两行式（各列起点对齐，长文本换行完整展示），备注行在下方
-function SummaryItem({
-  label,
-  value,
-  sub,
-  valueCls = "text-gray-900",
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  valueCls?: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="text-xs text-gray-400">{label}</div>
-      <div className={`mt-1 text-sm font-semibold leading-5 ${valueCls}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs leading-4 text-gray-400">{sub}</div>}
-    </div>
-  );
-}
 
 // 参数偏差单元格：超上限 ↑ 橙 / 低于下限 ↓ 蓝 / 范围内 → 灰 / 不适用 — 浅灰
 function DevCell({ dev, delay = 0 }: { dev: ParamCell["dev"]; delay?: number }) {
@@ -132,8 +110,6 @@ export function DefectForecastView() {
   const [batch, setBatch] = useState(initial.batch);
   // 智能解读：进入页面不展示解读区（AI 解读 / 贡献度 / 来源分布 / 关联参数表），点击按钮后流式生成
   const [interpreting, setInterpreting] = useState(false);
-  // 预测详情抽屉：收纳辅助字段（评分 / 等级 / 置信度 / 模型版本 / 窗口 / 业务口径 / 更新时间），默认不展开
-  const [detailOpen, setDetailOpen] = useState(false);
   // 点击趋势图等级标记点（升级点 / 触发等级的基准批次点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyRecord, setAnomalyRecord] = useState<AlertRecord | null>(null);
 
@@ -288,22 +264,9 @@ export function DefectForecastView() {
         </div>
       </Card>
 
-      {/* 预测概况：标题 + 预测详情入口；正文左（风险结论）右（业务依据）约 5:5，无分隔线 */}
-      <Card
-        title="预测概况"
-        divider={false}
-        padding={false}
-        headerRight={
-          <button
-            type="button"
-            onClick={() => setDetailOpen(true)}
-            className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700"
-          >
-            预测详情
-          </button>
-        }
-      >
-        <div className={`grid gap-6 px-5 pb-5 pt-2 ${forecast.moisture || st ? "lg:grid-cols-2" : ""}`}>
+      {/* 预测概况：正文三区（左风险结论 / 中业务依据 / 右模型信息）约 1:1:1，无分隔线 */}
+      <Card title="预测概况" divider={false} padding={false}>
+        <div className={`grid gap-6 px-5 pb-5 pt-2 ${forecast.moisture || st ? "lg:grid-cols-3" : ""}`}>
           {/* 左：风险结论（窗口最高等级大字 + 等级变化预测） */}
           <div>
             <p className="text-xs text-gray-400">
@@ -340,19 +303,28 @@ export function DefectForecastView() {
           )}
           {!forecast.moisture && st && (
             <div>
-              {/* 超限最大预测值（视觉重点）+ 允许储存截止时间，窄屏自动换行；已储存/上限等辅助信息不再上卡片 */}
-              <div className="flex flex-wrap items-start gap-x-10 gap-y-4">
-                <div>
-                  <p className="text-xs text-gray-400">超限最大预测值</p>
-                  <p className={`mt-2.5 text-lg font-semibold ${stCls}`}>{stRes?.text}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">允许储存截止时间</p>
-                  <p className="mt-2.5 text-lg font-semibold text-gray-900">{st.deadline}</p>
-                </div>
-              </div>
+              {/* 超限最大预测值（视觉重点）；允许储存截止时间收为一行灰色小字置于其下 */}
+              <p className="text-xs text-gray-400">超限最大预测值</p>
+              <p className={`mt-2.5 text-lg font-semibold ${stCls}`}>{stRes?.text}</p>
+              <p className="mt-2 text-xs text-gray-400">允许储存截止时间：{st.deadline}</p>
             </div>
           )}
+
+          {/* 右：模型信息（三行行内式：预测更新时间 / 模型置信度 / 模型版本） */}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs text-gray-400">
+              预测更新时间 <span className="text-gray-700">{UPDATED_AT}</span>
+            </p>
+            <p className="text-xs text-gray-400">
+              模型置信度{" "}
+              <span className="text-gray-700">
+                {forecast.confidence !== undefined ? `${Math.round(forecast.confidence * 100)}%` : "—"}
+              </span>
+            </p>
+            <p className="text-xs text-gray-400">
+              模型版本 <span className="text-gray-700">{forecast.modelVer}</span>
+            </p>
+          </div>
         </div>
       </Card>
 
@@ -447,40 +419,6 @@ export function DefectForecastView() {
           )}
         </div>
       </div>
-
-      {/* 预测详情抽屉：辅助字段收纳（默认不展开）；缺陷名称置首，
-          成品水分对象展示 预测成品水分/允许范围/超上限，箱储对象展示 预测结果/允许储存截止时间 */}
-      <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="预测详情" width={440}>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          <SummaryItem label="缺陷名称" value={defect.name} />
-          <SummaryItem
-            label="最高风险评分"
-            value={peak ? `${peak.score.toFixed(1)}分` : "—"}
-            valueCls={lv ? lv.textCls : "text-gray-400"}
-          />
-          <SummaryItem label="预测最高等级" value={lv ? lv.label : "—"} valueCls={lv ? lv.textCls : "text-gray-400"} />
-          <SummaryItem label="等级变化预测" value={change.text} valueCls={changeCls} />
-          {forecast.confidence !== undefined && (
-            <SummaryItem label="模型置信度" value={`${Math.round(forecast.confidence * 100)}%`} />
-          )}
-          <SummaryItem label="模型版本" value={forecast.modelVer} />
-          <SummaryItem label="预测窗口" value={windowTextOf(forecast)} />
-          {forecast.moisture && (
-            <>
-              <SummaryItem label="预测成品水分" value={forecast.moisture.predicted} />
-              <SummaryItem label="成品水分允许范围" value={forecast.moisture.range} />
-              <SummaryItem label="超上限" value={forecast.moisture.overValue ?? forecast.moisture.overText} valueCls={overTextCls} />
-            </>
-          )}
-          {st && stRes && (
-            <>
-              <SummaryItem label="预测结果" value={stRes.text} valueCls={stCls} />
-              <SummaryItem label="允许储存截止时间" value={st.deadline} />
-            </>
-          )}
-          <SummaryItem label="预测更新时间" value={UPDATED_AT} />
-        </div>
-      </Drawer>
 
       {/* 异常详情抽屉：点击趋势图等级标记点（升级点 / 触发等级的基准批次点）滑出，查看告警详情跳告警记录详情页 */}
       <DefectAnomalyDrawer record={anomalyRecord} onClose={() => setAnomalyRecord(null)} />

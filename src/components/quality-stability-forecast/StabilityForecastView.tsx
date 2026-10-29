@@ -2,14 +2,13 @@
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
 // 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：超限最大预测值 + 超限标签 + 管控值，
-// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数，顶部指标筛选旁的牌号筛选切换牌号视角数据）
+// 模型信息上概况卡第三区）→ 左列（预测趋势 + 来源工序参数，顶部指标筛选旁的牌号筛选切换牌号视角数据）
 // 右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
@@ -41,16 +40,6 @@ import {
 import { MetricTrendChart } from "./MetricTrendChart";
 import { StabilityAnomalyDrawer } from "./StabilityAnomalyDrawer";
 import { StabilityContributionChart } from "./StabilityContributionChart";
-
-// 摘要单项
-function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1 text-xs text-gray-500">{label}</div>
-      <div className="text-sm font-medium text-gray-800">{children}</div>
-    </div>
-  );
-}
 
 // 延迟挂载：到时才渲染子节点（智能解读流式编排用；图表卡片延迟出现，挂载时播放自带入场生长动画）
 function Delayed({ delay, children }: { delay: number; children: ReactNode }) {
@@ -84,8 +73,6 @@ export function StabilityForecastView() {
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
   // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 来源工序参数），点击按钮后流式生成
   const [interpreting, setInterpreting] = useState(false);
-  // 预测详情抽屉：收纳辅助字段（指标名称 / 等级变化 / 管控值 / 置信度 / 更新时间等），默认不展开
-  const [detailOpen, setDetailOpen] = useState(false);
 
   const metric = metricOf(code)!;
   const machineText = machine === "全部" ? "全部机台" : machine;
@@ -227,7 +214,7 @@ export function StabilityForecastView() {
   const contributions = contributionsOf(forecast);
   // 无规则时贡献与分布均进入空状态
   const breakdown = metric.rule ? sourceBreakdownOf(forecast) : [];
-  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：超限最大预测值 + 超上限·超下限超出量
+  // 窗口最不利预测极值（预测概况卡中区）：超限最大预测值 + 超上限·超下限超出量
   const peak = peakOfForecast(forecast);
   const ai = aiInterpretation(forecast, code, machineText);
   // 流式时序：解读各段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载来源参数 / 风险来源 / 来源分布
@@ -278,22 +265,9 @@ export function StabilityForecastView() {
         </div>
       </Card>
 
-      {/* 预测概况：标题 + 预测详情入口；正文左（未来预测结论）右（窗口预测极值）约 5:5，突出未来风险 */}
-      <Card
-        title="预测概况"
-        divider={false}
-        padding={false}
-        headerRight={
-          <button
-            type="button"
-            onClick={() => setDetailOpen(true)}
-            className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700"
-          >
-            预测详情
-          </button>
-        }
-      >
-        <div className="grid gap-6 px-5 pb-5 pt-2 lg:grid-cols-2">
+      {/* 预测概况：正文三区（左未来结论 / 中窗口预测极值 / 右模型信息）约 1:1:1，突出未来风险 */}
+      <Card title="预测概况" divider={false} padding={false}>
+        <div className="grid gap-6 px-5 pb-5 pt-2 lg:grid-cols-3">
           {/* 左：预测结论（窗口最高等级大字 + 升级时间；合并原预测窗口 / 最高等级 / 等级变化三字段） */}
           <div>
             <p className="text-xs text-gray-400">{metric.rule ? `${windowTextOf(metric.cycle)}最高等级` : "本轮预测"}</p>
@@ -336,6 +310,22 @@ export function StabilityForecastView() {
               )}
             </div>
             <p className="mt-2 text-xs text-gray-400">管控值：{controlText}</p>
+          </div>
+
+          {/* 右：模型信息（三行行内式：预测更新时间 / 模型置信度 / 模型版本） */}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs text-gray-400">
+              预测更新时间 <span className="text-gray-700">{forecast.updatedAt}</span>
+            </p>
+            <p className="text-xs text-gray-400">
+              模型置信度{" "}
+              <span className="text-gray-700">
+                {forecast.confidence === null ? "—" : `${Math.round(forecast.confidence * 100)}%`}
+              </span>
+            </p>
+            <p className="text-xs text-gray-400">
+              模型版本 <span className="text-gray-700">{metric.modelVer}</span>
+            </p>
           </div>
         </div>
       </Card>
@@ -463,43 +453,6 @@ export function StabilityForecastView() {
           ) : null}
         </div>
       </div>
-
-      {/* 预测详情抽屉：辅助字段收纳（默认不展开）；指标名称置首 */}
-      <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="预测详情" width={440}>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          <SummaryItem label="指标名称">{metric.name}</SummaryItem>
-          <SummaryItem label="预测最高等级">
-            {!metric.rule || change.kind === "unavailable" ? (
-              <span className="text-gray-400">—</span>
-            ) : maxLv === null ? (
-              <span className="text-green-600">正常</span>
-            ) : (
-              <span className={LEVEL_TEXT_CLS[maxLv]}>{maxLv}</span>
-            )}
-          </SummaryItem>
-          <SummaryItem label="等级变化预测">
-            <span className={changeCls}>{change.text}</span>
-          </SummaryItem>
-          <SummaryItem label="最新实际值">
-            {forecast.base.toFixed(metric.decimals)}
-            {metric.unit}
-          </SummaryItem>
-          {/* 超出量：窗口极值相对管控值边界（超上限0.55 / 超上限1次 式）；未越界 — */}
-          <SummaryItem label="超出量">
-            {peak && peak.over !== undefined ? (
-              `超${peak.side}${peak.over.toFixed(metric.decimals)}${exceedUnitOf(metric.unit)}`
-            ) : (
-              <span className="text-gray-400">—</span>
-            )}
-          </SummaryItem>
-          <SummaryItem label="管控值">{controlText}</SummaryItem>
-          <SummaryItem label="预测窗口">{windowTextOf(metric.cycle)}</SummaryItem>
-          <SummaryItem label="模型置信度">
-            {forecast.confidence === null ? <span className="text-gray-400">—</span> : `${Math.round(forecast.confidence * 100)}%`}
-          </SummaryItem>
-          <SummaryItem label="预测更新时间">{forecast.updatedAt}</SummaryItem>
-        </div>
-      </Drawer>
 
       {/* 异常详情抽屉（点击趋势图等级标记点：升级点 / 触发等级的基准点） */}
       <StabilityAnomalyDrawer record={anomalyAlert} onClose={() => setAnomalyAlert(null)} />

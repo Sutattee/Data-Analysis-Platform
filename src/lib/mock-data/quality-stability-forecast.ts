@@ -135,6 +135,7 @@ export interface StabilityMetricDef {
   process: string; // 关联工序（来源归属之一）
   params: StabilityParamDef[]; // 来源工序参数（与 seed values/phis 顺序一一对应）
   rule: AlertRule | null; // null = 未配置等级规则
+  modelVer: string; // 预测模型版本（概况卡展示）
   machines: string[]; // 支持机台
 }
 
@@ -143,54 +144,63 @@ export const STABILITY_METRICS: StabilityMetricDef[] = [
     code: "SF01", name: "成品水分标准偏差", unit: "%", decimals: 2, cycle: "批", process: "松散回潮",
     params: [PARAM_DEFS.wallTemp, PARAM_DEFS.airTemp],
     rule: { op: ">=", levels: [{ level: "危险", threshold: 2.4 }, { level: "告警", threshold: 2.2 }, { level: "预警", threshold: 2.1 }, { level: "关注", threshold: 2.0 }] },
+    modelVer: "MoistNet v2.3",
     machines: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
   },
   {
     code: "SF02", name: "松散回潮非稳态指数", unit: "", decimals: 2, cycle: "批", process: "松散回潮",
     params: [PARAM_DEFS.wallTemp],
     rule: null, // 演示「未配置等级规则」
+    modelVer: "StabIndex v1.4",
     machines: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
   },
   {
     code: "SF03", name: "烘丝工序非稳态指数", unit: "", decimals: 2, cycle: "批", process: "烘丝",
     params: [PARAM_DEFS.exhaust, PARAM_DEFS.steamPress],
     rule: { op: ">=", levels: [{ level: "危险", threshold: 1.35 }, { level: "告警", threshold: 1.2 }, { level: "预警", threshold: 1.15 }, { level: "关注", threshold: 1.1 }] },
+    modelVer: "StabIndex v1.4",
     machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
   },
   {
     code: "SF04", name: "烘丝机出口水分偏差", unit: "%", decimals: 2, cycle: "批", process: "烘丝",
     params: [PARAM_DEFS.airTemp],
     rule: { op: "between", levels: [{ level: "告警", low: -0.5, high: 0.5 }, { level: "关注", low: -0.4, high: 0.4 }] },
+    modelVer: "MoistNet v2.3",
     machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
   },
   {
     code: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "日", process: "加香",
     params: [PARAM_DEFS.flavorMoist, PARAM_DEFS.cutFlow, PARAM_DEFS.flavorFlow, PARAM_DEFS.envTemp, PARAM_DEFS.envHum],
     rule: { op: ">=", levels: [{ level: "告警", threshold: 5 }, { level: "提示", threshold: 4 }] },
+    modelVer: "CountNet v1.2",
     machines: ["1#加香机", "2#加香机", "3#加香机"],
   },
   {
     code: "SF06", name: "非细支单支重量偏差", unit: "mg", decimals: 1, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.rollSpeed],
     rule: { op: "between", levels: [{ level: "告警", low: -20, high: 20 }, { level: "预警", low: -18, high: 18 }] },
+    modelVer: "WeightNet v2.0",
     machines: ["1#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
   },
   {
     code: "SF07", name: "烟支单支克重偏差", unit: "mg", decimals: 1, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.fillValue],
     rule: { op: "<=", levels: [{ level: "危险", threshold: -18 }, { level: "告警", threshold: -15 }, { level: "预警", threshold: -13.5 }, { level: "关注", threshold: -12 }] }, // 下限型：克重不足
+    modelVer: "WeightNet v2.0",
     machines: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
   },
   {
     code: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.rollSpeed, PARAM_DEFS.fillValue],
     rule: { op: ">=", levels: [{ level: "告警", threshold: 3.5 }, { level: "预警", threshold: 3.35 }, { level: "关注", threshold: 3.2 }, { level: "提示", threshold: 3.0 }] },
+    modelVer: "FirmNet v1.6",
     machines: ["2#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
   },
   {
     code: "SF09", name: "中支烟支硬度变异系数", unit: "%", decimals: 2, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.rollSpeed, PARAM_DEFS.fillValue],
     rule: { op: ">=", levels: [{ level: "告警", threshold: 4.0 }, { level: "预警", threshold: 3.85 }, { level: "关注", threshold: 3.7 }, { level: "提示", threshold: 3.5 }] },
+    modelVer: "FirmNet v1.6",
     machines: ["2#卷接包机组", "3#卷接包机组", "4#卷接包机组"],
   },
 ];
