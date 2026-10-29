@@ -1,7 +1,7 @@
 "use client";
 
 // 下一批次推荐卡：左侧 💧 标签 + 大号建议值（数字从 0 增长动效）+ 允许范围区间位置横条；
-// 右侧批次信息 + 叶丝柜入口水分（模型推算）+ 置信度（算法提供才展示）。
+// 右侧批次信息 + 置信度（算法提供才展示）。
 // 已生成不展示状态标签；数据不足 / 暂无待生产仅文字说明；超出工艺范围 / 生成失败保留状态标签与原因文案；
 // 重算期间（updating）仅降透明度提示，不展示文字标签。
 import { Card } from "@/components/ui/Card";
@@ -65,7 +65,7 @@ export function RecommendCard({
           <div className="mt-4 flex flex-col gap-5 lg:flex-row">
             {/* 核心建议：💧 标签在上 + 大号推荐值（数字从 0 增长动效）+ 允许范围横条 */}
             <div className="lg:w-[36%] lg:border-r lg:border-gray-100 lg:pr-6">
-              <p className="text-sm font-medium text-gray-600">💧 烘丝出口水分建议值</p>
+              <p className="text-sm font-medium text-gray-600">💧 加香出口水分建议值</p>
               <div className="mt-1.5 flex items-baseline gap-1">
                 <span className="text-4xl font-bold tracking-tight tabular-nums text-primary-600">
                   <CountUp to={rec.value!} />
@@ -73,13 +73,13 @@ export function RecommendCard({
                 <span className="text-lg font-semibold text-primary-600">%</span>
               </div>
 
-              {/* 烘丝出口水分允许范围横条：左上角标题 + 右上角「建议值位置」，竖指针标记建议值在区间中的位置 */}
+              {/* 加香出口水分允许范围横条：左上角标题 + 右上角「建议值位置」，竖指针标记建议值在区间中的位置 */}
               {(() => {
                 const pos = ((rec.value! - DRYING_RANGE.low) / (DRYING_RANGE.high - DRYING_RANGE.low)) * 100;
                 return (
                   <div className="mt-5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-500">烘丝出口水分允许范围</span>
+                      <span className="text-[11px] font-medium text-gray-500">加香出口水分允许范围</span>
                       <span className="flex items-center gap-1.5 text-[11px] font-medium text-primary-600">
                         <span className="inline-block h-2 w-2 rounded-sm bg-primary-600" />
                         建议值位置
@@ -107,16 +107,6 @@ export function RecommendCard({
                   value={rec.batch ? rec.batch.batch : "-"}
                 />
                 <InfoField label="牌号 / 产线" value={rec.batch ? `${rec.batch.brand} / ${rec.batch.line}` : "-"} />
-                <InfoField
-                  label="叶丝柜入口水分（模型推算）"
-                  value={
-                    rec.inletMoisture !== undefined ? (
-                      <span className="font-medium text-primary-700">{fmt2(rec.inletMoisture)}%</span>
-                    ) : (
-                      "-"
-                    )
-                  }
-                />
                 {rec.confidence !== undefined && (
                   <InfoField
                     label="模型置信度"

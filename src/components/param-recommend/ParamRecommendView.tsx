@@ -1,7 +1,7 @@
 "use client";
 
-// 工艺参数推荐主视图：以加香出口水分达标为目标，结合牌号 / 产线 / 近 N 批历史自动推荐下一批次烘丝出口水分。
-// 自上而下：筛选栏（产线 Tab + 牌号，历史范围固定近 10 批）→ 下一批次推荐卡 → 左右双图（实际与建议 / 达标情况）→ 推荐记录折叠区。
+// 工艺参数推荐主视图：以加香出口水分达标为目标，结合牌号 / 产线 / 近 N 批历史自动推荐下一批次加香出口水分。
+// 自上而下：筛选栏（产线 Tab + 牌号，历史范围固定近 10 批）→ 下一批次推荐卡 → 左右双图（成品水分趋势 / 达标情况）→ 推荐记录折叠区。
 // 产线 / 牌号变化 → 推荐卡短暂降透明度（输入变化自动重算）；推荐依据与批次详情共用抽屉。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
@@ -13,7 +13,7 @@ import {
   type BatchRecord,
 } from "@/lib/mock-data/param-recommend";
 import { RecommendCard } from "./RecommendCard";
-import { DryingAdviceChart } from "./DryingAdviceChart";
+import { MoistureTrendChart } from "./MoistureTrendChart";
 import { FlavorComplianceChart } from "./FlavorComplianceChart";
 import { RecommendRecords } from "./RecommendRecords";
 import { RecommendDrawer } from "./RecommendDrawer";
@@ -96,7 +96,7 @@ export function ParamRecommendView() {
 
       {/* 左右双图：窄屏上下排列 */}
       <div className="grid gap-4 xl:grid-cols-2">
-        <DryingAdviceChart line={lineName} brand={brand} range={10} rec={rec} onRecordClick={setDrawerTarget} />
+        <MoistureTrendChart line={lineName} brand={brand} range={10} onRecordClick={setDrawerTarget} />
         <FlavorComplianceChart line={lineName} brand={brand} range={10} onRecordClick={setDrawerTarget} />
       </div>
 
