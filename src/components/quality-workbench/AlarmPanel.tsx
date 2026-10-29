@@ -29,7 +29,7 @@ function typeBadgeOf(a: WorkbenchAlarm): { text: string; cls: string } {
 
 const MAX_ALARMS = 5; // 首页容量上限（展示前 5 条待处理告警）
 
-// 待处理告警面板：类型筛选（计数为完整范围分类总数，不随筛选变化）+ 三档排序 + 重点告警 AI 解读 + 底部全量入口
+// 待处理告警面板：类型筛选（计数为完整范围分类总数，不随筛选变化）+ 两档排序 + 重点告警 AI 解读 + 底部全量入口
 export function AlarmPanel({
   alarms,
   highlighted,
@@ -64,9 +64,7 @@ export function AlarmPanel({
             <h2 id="qw-alarms-title">待处理告警</h2>
             <span className="qw-count">{filtered.length}</span>
           </div>
-          <span className="qw-small">与告警中心同步</span>
         </div>
-        <p className="qw-panel-description">进入告警详情，查看智能原因分析与处置建议并处理。</p>
       </div>
       <div className="qw-toolbar">
         <div className="qw-tabs" role="group" aria-label="告警类型筛选">
@@ -89,7 +87,6 @@ export function AlarmPanel({
             aria-label="告警排序"
           >
             <option value="priority">综合优先级</option>
-            <option value="oldest">等待时间最长</option>
             <option value="latest">最新触发</option>
           </select>
         </label>

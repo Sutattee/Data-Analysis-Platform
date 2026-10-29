@@ -48,7 +48,7 @@ export interface WorkbenchAlarm {
   forecastKind?: "稳定性预测" | "缺陷预测";
 }
 
-export type AlarmSortKey = "priority" | "oldest" | "latest";
+export type AlarmSortKey = "priority" | "latest";
 
 /** 质量域 ZL 记录（应用会话级处理覆盖后） */
 function qualityRecords(): AlertRecord[] {
@@ -145,13 +145,11 @@ const ALARM_BINDINGS: Array<(r: AlertRecord) => boolean> = [
 /**
  * 告警排序（PRD §3.2/3.3）：
  * priority 综合优先级 = 等级降序 → 同级实测先于预测 → 回退首次待处理时间升序 → 稳定主键；
- * oldest 等待时间最长（触发时间升序）；latest 最新触发（降序）
+ * latest 最新触发（降序）
  */
 export function sortAlarms(alarms: WorkbenchAlarm[], key: AlarmSortKey): WorkbenchAlarm[] {
   const list = [...alarms];
-  if (key === "oldest") {
-    list.sort((a, b) => a.triggerTime.localeCompare(b.triggerTime) || a.id.localeCompare(b.id));
-  } else if (key === "latest") {
+  if (key === "latest") {
     list.sort((a, b) => b.triggerTime.localeCompare(a.triggerTime) || a.id.localeCompare(b.id));
   } else {
     list.sort(
