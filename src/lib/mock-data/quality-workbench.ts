@@ -14,7 +14,6 @@ import {
 import {
   forecastOf,
   levelChangeOf as defectLevelChangeOf,
-  peakOf,
   UPDATED_AT,
   type DefectCode,
 } from "./quality-defect-forecast";
@@ -228,7 +227,8 @@ export interface WorkbenchAttention {
 /**
  * 预测关注（容量 ≤6，去重口径：已有关联待处理告警的对象只在告警区展示）：
  * p1 稳定性：SF07 烟支单支克重偏差 —— 关联告警已确认处理，持续跟踪预测走势；
- * p2 缺陷：YZCB 烟支刺破 @ZJ17-04 —— 本轮有预测、未触发告警
+ * p2 缺陷：CPSFBH 成品水分 @1#烘丝机 —— 预测值恰达允许上限，本轮有预测、未触发告警
+ * （3#烘丝机预测成品水分已有关联待处理告警 a3，按去重口径只在告警区展示）
  */
 function buildAttentions(): WorkbenchAttention[] {
   const list: WorkbenchAttention[] = [];
@@ -252,18 +252,18 @@ function buildAttentions(): WorkbenchAttention[] {
     });
   }
 
-  const f2 = forecastOf("YZCB", "ZJ17-04卷接机组", "P20261019-11");
-  const peak = peakOf(f2);
+  const f2 = forecastOf("CPSFBH", "1#烘丝机", "P20261019-01");
+  const m = f2.moisture;
   const change = defectLevelChangeOf(f2);
   list.push({
     key: "p2",
     kind: "缺陷预测",
-    name: "烟支刺破风险评分",
-    machine: "ZJ17-04卷接机组",
+    name: "预测成品水分",
+    machine: "1#烘丝机",
     statusText: "未触发告警",
-    summary: peak ? `预测窗口最高 ${peak.score.toFixed(1)} 分（${peak.display}），${change.text}` : change.text,
+    summary: m ? `预测窗口超限最大预测值 ${m.predicted}（${m.overText}），${change.text}` : change.text,
     updatedLabel: UPDATED_AT.slice(-5),
-    forecastHref: `/quality/forecast/defect?code=YZCB&object=${enc("ZJ17-04卷接机组")}&batch=${enc("P20261019-11")}`,
+    forecastHref: `/quality/forecast/defect?code=CPSFBH&object=${enc("1#烘丝机")}&batch=${enc("P20261019-01")}`,
   });
 
   return list;
