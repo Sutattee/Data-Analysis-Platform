@@ -241,7 +241,7 @@ export function AlertRecordDetail({
               {record.shiftLabel && <Field label="班次" value={record.shiftLabel} />}
               {/* 来源工序（SF 稳定性指标关联；结果类指标无 → 不展示） */}
               {record.process && <Field label="工序" value={record.process} />}
-              {/* 工艺质量口径：预测风险型记录展示预测窗口（如「未来10个批次」）；实测异常不展示 */}
+              {/* 工艺质量口径：预测风险型记录展示预测窗口（如「未来 10 个已排产批次」）；实测异常不展示 */}
               {isQuality && record.type === "预测风险" && (
                 <Field label="预测窗口" value={record.forecastWindow} />
               )}

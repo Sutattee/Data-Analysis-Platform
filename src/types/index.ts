@@ -381,7 +381,7 @@ export interface AlertRecord {
   // —— 工艺质量扩展（详情基本信息：批次/班组/牌号/工序）——
   batch?: string;             // 批次（实测如「第 2417 批」/预测如「第 2418 批（3个批次后）」；月度指标为「本月」）
   process?: string;           // 来源工序（SF 稳定性指标关联，如「松散回潮」；结果类指标无 → 不展示）
-  forecastWindow?: string;    // 预测窗口（仅预测风险，如「未来10个批次」；实测异常不展示）
+  forecastWindow?: string;    // 预测窗口（仅预测风险，如「未来 10 个已排产批次」；实测异常不展示）
   shift?: string;             // 班组（甲班/乙班/丙班）
   shiftLabel?: string;        // 班次（白班/夜班，如「7-19 白班」；批/班周期指标按触发时间推定，月度指标不生成）
   brand?: string;             // 牌号（如「娇子」；结果类指标为「—」）

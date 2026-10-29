@@ -444,6 +444,7 @@ interface DefectRecordSpec {
   deviationValue: string;
   deviationRate: string;
   batch: string;
+  forecastWindow: string; // 预测窗口（与缺陷预测页同源：未来 N 个已排产批次）
   shift: string;
   brand: string;
   process: string;
@@ -472,6 +473,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
     deviationValue: "+0.7pct",
     deviationRate: "+233.3%",
     batch: "P20261019-03",
+    forecastWindow: "未来 10 个已排产批次",
     shift: "甲班",
     brand: "娇子",
     process: "烘丝",
@@ -491,11 +493,12 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
     objectName: "1#储丝柜",
     metricName: "预测箱储总存储时长",
     triggerTime: "2026-10-19 14:11",
-    valueLabel: "预计总储存时长 ≥102小时（暂无出库计划）",
+    valueLabel: "预计总储存时长 ≥102小时",
     baselineLabel: "储存时长上限 72小时",
     deviationValue: "≥+30小时",
     deviationRate: "+41.7%",
     batch: "YS-1026A",
+    forecastWindow: "未来 14 个已排产批次",
     shift: "甲班",
     brand: "长城",
     process: "仓储",
@@ -527,7 +530,7 @@ function buildDefectAlertRecords(): AlertRecord[] {
     deviationRate: spec.deviationRate,
     // 追溯字段（缺陷预测类记录专属）
     batch: spec.batch,
-    forecastWindow: "未来8小时",
+    forecastWindow: spec.forecastWindow,
     baseTime: DEFECT_BASE_TIME,
     modelVersion: spec.modelVersion,
     shift: spec.shift,
@@ -583,9 +586,11 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         ? `${metric.name}${isUpper ? "持续上升，预计越过上限" : "持续下降，预计跌破下限"}`
         : `${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
 
-    // 预测风险：预计越界周期数（批次后缀如「第 2418 批（3个批次后）」）与预测窗口（如「未来10个批次」）
+    // 预测风险：预计越界周期数（批次后缀如「第 2418 批（3个批次后）」）与预测窗口
+    // （批周期与缺陷预测页同源口径「已排产批次」，如「未来 10 个已排产批次」）
     const forecastShift = 2 + (i % 3); // 2~4 个统计周期后越界
-    const forecastWindow = isForecast ? `未来${[5, 10, 15][i % 3]}个${cycleUnit}` : undefined;
+    const windowUnit = cycleUnit === "批次" ? "已排产批次" : cycleUnit;
+    const forecastWindow = isForecast ? `未来 ${[5, 10, 15][i % 3]} 个${windowUnit}` : undefined;
 
     const triggerTime = tsAt(3300 + i * 263);
     // 班次（批/班周期指标；月度指标无班次）：按触发时间推定 —— 8~20 点白班、其余夜班；
