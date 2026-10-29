@@ -7,7 +7,7 @@ import { PM_TO_DETAIL } from "@/lib/mock-data/process-control-detail";
 import { PROCESS_METRICS } from "@/lib/mock-data/quality";
 
 // 模块二「过程管控」：9 项过程指标表（全宽）；
-// 行内展示最新实际值（纯数值）/管控值/超限比例/近期均值（带统计周期）/半年均值评价，最新实际值超管控值的标红；
+// 行内展示最新实际值（纯数值）/管控值/近期均值（带统计周期）/半年均值评价，最新实际值超管控值的标红；
 // 管控值支持上限型（≤X）与区间型（值落在区间内达标）；整行、指标名称与「详情」进入过程管控详情页
 export function ProcessControlModule() {
   const router = useRouter();
@@ -25,7 +25,6 @@ export function ProcessControlModule() {
               <th className={th}>指标</th>
               <th className={th}>最新实际值</th>
               <th className={th}>管控值</th>
-              <th className={th}>超限比例</th>
               <th className={th}>近期均值</th>
               <th className={th}>半年均值评价</th>
               <th className={`${th} text-right`}>操作</th>
@@ -37,8 +36,6 @@ export function ProcessControlModule() {
               const latestOver = m.tolRange
                 ? m.latestNum < m.tolRange[0] || m.latestNum > m.tolRange[1]
                 : m.toleranceNum !== null && m.latestNum > m.toleranceNum;
-              // 偏离比例无基准（待配置）时为 "-"，置灰展示
-              const noDeviation = m.deviation === "-";
               return (
                 <tr
                   key={m.id}
@@ -71,14 +68,6 @@ export function ProcessControlModule() {
                     }`}
                   >
                     {m.tolerance}
-                  </td>
-                  {/* 超限比例：无基准（-）置灰 */}
-                  <td
-                    className={`px-4 py-3 whitespace-nowrap ${
-                      noDeviation ? "text-gray-300" : "text-gray-800"
-                    }`}
-                  >
-                    {m.deviation}
                   </td>
                   {/* 近期均值：值「｜」统计周期（近10批次 / 近30日） */}
                   <td className="px-4 py-3 whitespace-nowrap">

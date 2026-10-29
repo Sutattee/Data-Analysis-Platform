@@ -102,7 +102,6 @@ export interface ProcessMetric {
   recent: string; // 近期均值展示
   recentNum: number; // 近期均值数值
   recentNote: string; // 近期均值统计周期（近10批次 / 近30日）
-  deviation: string; // 超限比例展示（相对管控值；如 +20% / +15% / 0% / -，- = 待配置无基准）
   tolerance: string; // 管控值展示（如 ≤4.0% / ≤3次 / 12.50%～13.50% / 待配置）
   toleranceNum: number | null; // 上限型管控值数值（null = 非上限型或待配置）
   tolRange?: [number, number]; // 区间型管控 [下限, 上限]
@@ -120,7 +119,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "4.1%",
     recentNum: 4.1,
     recentNote: "近10批次",
-    deviation: "+20%",
     tolerance: "≤4.0%",
     toleranceNum: 4.0,
   },
@@ -135,7 +133,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "1.57%",
     recentNum: 1.57,
     recentNote: "近10批次",
-    deviation: "+18.15%",
     tolerance: "≤1.55%",
     toleranceNum: 1.55,
   },
@@ -150,7 +147,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "0.45%",
     recentNum: 0.45,
     recentNote: "近10批次",
-    deviation: "-",
     tolerance: "待配置",
     toleranceNum: null,
   },
@@ -165,7 +161,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "12.49%",
     recentNum: 12.49,
     recentNote: "近10批次",
-    deviation: "-20%",
     tolerance: "12.50%～13.50%",
     toleranceNum: null,
     tolRange: [12.5, 13.5],
@@ -181,7 +176,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "1次",
     recentNum: 1,
     recentNote: "近30日",
-    deviation: "0%",
     tolerance: "≤3次",
     toleranceNum: 3,
   },
@@ -196,7 +190,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "42mg",
     recentNum: 42,
     recentNote: "近10批次",
-    deviation: "+15%",
     tolerance: "≤40mg",
     toleranceNum: 40,
   },
@@ -211,7 +204,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "2.97%",
     recentNum: 2.97,
     recentNote: "近10批次",
-    deviation: "0%",
     tolerance: "≤3.2%",
     toleranceNum: 3.2,
   },
@@ -226,7 +218,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "2.55%",
     recentNum: 2.55,
     recentNote: "近10批次",
-    deviation: "0%",
     tolerance: "≤2.6%",
     toleranceNum: 2.6,
   },
@@ -241,7 +232,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recent: "1.43%",
     recentNum: 1.43,
     recentNote: "近10批次",
-    deviation: "0%",
     tolerance: "≤1.5%",
     toleranceNum: 1.5,
   },
