@@ -2,7 +2,7 @@
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
 // 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：超限最大预测值 + 超限标签 + 管控值，
-// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数，趋势图右上角牌号筛选切换牌号视角数据）
+// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数，顶部指标筛选旁的牌号筛选切换牌号视角数据）
 // 右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
@@ -78,7 +78,7 @@ export function StabilityForecastView() {
   });
   const [code, setCode] = useState(initial.metric);
   const [machine, setMachine] = useState(initial.machine);
-  // 牌号筛选（趋势图右上角）：不同牌号的预测趋势与数据不同，切换即整轮重算
+  // 牌号筛选（顶部指标筛选旁）：不同牌号的预测趋势与数据不同，切换即整轮重算
   const [brand, setBrand] = useState("全部");
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
@@ -259,7 +259,8 @@ export function StabilityForecastView() {
 
   return (
     <div className="space-y-4">
-      {/* 对象信息：仅指标选择（选项标签 = 预测最高等级）；机台不作筛选，由深链指定（默认「全部」综合曲线） */}
+      {/* 对象信息：指标选择（选项标签 = 预测最高等级）+ 牌号筛选（全部 / 娇子 / 长城 / 宽窄，
+          筛选后展示该牌号视角的趋势与数据）；机台不作筛选，由深链指定（默认「全部」综合曲线） */}
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
           <label className="flex items-center gap-1.5">
@@ -273,6 +274,7 @@ export function StabilityForecastView() {
               />
             </div>
           </label>
+          <BrandFilter options={STABILITY_BRAND_OPTIONS} value={brand} onChange={changeBrand} />
         </div>
       </Card>
 
@@ -341,12 +343,9 @@ export function StabilityForecastView() {
       {/* 左右布局：左 = 预测趋势 + 来源工序参数；右 = AI 解读 + 风险来源 + 工序分布（紧凑一屏） */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
-          {/* 指标预测趋势：右上角牌号筛选（全部 / 娇子 / 长城 / 宽窄），筛选后展示该牌号视角的趋势与数据 */}
+          {/* 指标预测趋势（牌号筛选已上移至顶部指标筛选旁） */}
           <Card>
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-800">{metric.name}预测趋势</h3>
-              <BrandFilter options={STABILITY_BRAND_OPTIONS} value={brand} onChange={changeBrand} />
-            </div>
+            <h3 className="mb-1 text-sm font-semibold text-gray-800">{metric.name}预测趋势</h3>
             <MetricTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 

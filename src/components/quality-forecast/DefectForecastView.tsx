@@ -120,7 +120,7 @@ function deepTargetOf(params: URLSearchParams) {
 // 不再作为筛选项，预测对象由牌号筛选与深链参数确定；其余上下文仅在趋势图悬浮提示内展示）；
 // 点击趋势图等级标记点（升级点 / 触发等级的基准批次点）匹配告警记录滑出异常详情抽屉，
 // 风险摘要字段值同行、无卡片标题
-// （压缩高度让参数表进第一屏）；左侧主区域（预测趋势含牌号筛选 / 关联参数表），
+// （压缩高度让参数表进第一屏）；左侧主区域（预测趋势 / 关联参数表，牌号筛选在顶部缺陷 tab 旁），
 // 右侧辅助区域（AI 解读 / 贡献度 / 来源分布）。解读区默认收起：点击「智能解读」后按
 // AI 解读文字逐字 → 贡献度 → 来源分布 → 关联参数表的顺序流式生成；切换输入后重置回按钮态。
 // 本期仅展示最新一轮预测：切换缺陷/牌号即整轮切换，不混合轮次。
@@ -253,26 +253,29 @@ export function DefectForecastView() {
 
   return (
     <div className="space-y-3">
-      {/* 顶部：缺陷 tab 切换（分段式）+ 当前缺陷静态信息（工序 / 质量类别，随缺陷切换）；
-          牌号 / 班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
+      {/* 顶部：缺陷 tab 切换（分段式）+ tab 旁牌号筛选 + 当前缺陷静态信息（工序 / 质量类别，随缺陷切换）；
+          班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
           深链到未开放 tab 的缺陷（烟支刺破）时不点亮任何 tab，仅正常展示内容 */}
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
-            {FORECAST_DEFECT_OPTIONS.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => handleChangeCode(d.value)}
-                className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
-                  code === d.value
-                    ? "bg-white font-medium text-primary-700 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
+              {FORECAST_DEFECT_OPTIONS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => handleChangeCode(d.value)}
+                  className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
+                    code === d.value
+                      ? "bg-white font-medium text-primary-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <BrandFilter options={brands} value={curBrand} onChange={handleBrand} />
           </div>
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <span>
@@ -354,12 +357,9 @@ export function DefectForecastView() {
       </Card>
 
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-        {/* 左侧主区域：预测趋势（右上角牌号筛选）/ 关联参数表 */}
+        {/* 左侧主区域：预测趋势（牌号筛选已上移至顶部缺陷 tab 旁）/ 关联参数表 */}
         <div className="space-y-3 xl:col-span-2">
-          <Card
-            title={defect.trendTitle}
-            headerRight={<BrandFilter options={brands} value={curBrand} onChange={handleBrand} />}
-          >
+          <Card title={defect.trendTitle}>
             <RiskTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 
