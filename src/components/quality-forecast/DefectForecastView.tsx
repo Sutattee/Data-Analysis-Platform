@@ -221,38 +221,34 @@ export function DefectForecastView() {
   const overTextCls =
     overKind === "over" ? "text-orange-600" : overKind === "under" ? "text-blue-600" : "text-gray-900";
 
-  // 箱储业务依据（预测结果 = 预计超时 / 预计不超时；已储存时长等收纳进关联参数表）
+  // 箱储业务依据（超限最大预测值 = 预计总储存时长；已储存时长等收纳进关联参数表）
   const st = forecast.storage;
   const stRes = st ? storageResultOf(st) : null;
-  const stCls =
-    stRes?.tone === "over" ? "text-red-600" : stRes?.tone === "safe" ? "text-green-600" : "text-gray-400";
 
   return (
     <div className="space-y-3">
-      {/* 顶部：缺陷 tab 切换（分段式）+ tab 旁牌号筛选 + 当前缺陷静态信息（工序 / 质量类别，随缺陷切换）；
+      {/* 顶部：缺陷 tab 切换（分段式）+ 牌号筛选 + 当前缺陷静态信息（工序 / 质量类别只读，随缺陷切换）一行排布；
           班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
           深链到未开放 tab 的缺陷（烟支刺破）时不点亮任何 tab，仅正常展示内容 */}
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
-              {FORECAST_DEFECT_OPTIONS.map((d) => (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => handleChangeCode(d.value)}
-                  className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
-                    code === d.value
-                      ? "bg-white font-medium text-primary-700 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <BrandFilter options={brands} value={curBrand} onChange={handleBrand} />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex w-fit items-center gap-1 rounded-lg bg-gray-100 p-1">
+            {FORECAST_DEFECT_OPTIONS.map((d) => (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => handleChangeCode(d.value)}
+                className={`rounded-md px-3.5 py-1.5 text-sm transition-colors ${
+                  code === d.value
+                    ? "bg-white font-medium text-primary-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
           </div>
+          <BrandFilter options={brands} value={curBrand} onChange={handleBrand} />
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <span>
               工序：<span className="font-medium text-gray-700">{defect.process}</span>
@@ -264,9 +260,9 @@ export function DefectForecastView() {
         </div>
       </Card>
 
-      {/* 预测概况：正文三区（左风险结论 / 中业务依据 / 右模型信息）约 1:1:1，无分隔线 */}
-      <Card title="预测概况" divider={false} padding={false}>
-        <div className={`grid gap-6 px-5 pb-5 pt-2 ${forecast.moisture || st ? "lg:grid-cols-3" : ""}`}>
+      {/* 预测概况（无标题行，紧凑三区：左风险结论 / 中业务依据 / 右模型信息）约 1:1:1 */}
+      <Card padding={false}>
+        <div className={`grid gap-6 px-5 py-4 ${forecast.moisture || st ? "lg:grid-cols-3" : ""}`}>
           {/* 左：风险结论（窗口最高等级大字 + 等级变化预测） */}
           <div>
             <p className="text-xs text-gray-400">
@@ -303,9 +299,31 @@ export function DefectForecastView() {
           )}
           {!forecast.moisture && st && (
             <div>
-              {/* 超限最大预测值（视觉重点）；允许储存截止时间收为一行灰色小字置于其下 */}
+              {/* 超限最大预测值 = 预计总储存时长（上限 + 预计超时）：超时 → 红色大字 + 浅黄底橙字「超时Nh」
+                  标签；不超时 → 深灰大字 + 绿色「剩余Nh」；截止时间收为一行灰色小字置于其下 */}
               <p className="text-xs text-gray-400">超限最大预测值</p>
-              <p className={`mt-2.5 text-lg font-semibold ${stCls}`}>{stRes?.text}</p>
+              {st.overHours !== undefined || st.marginHours !== undefined ? (
+                <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                  <span
+                    className={`text-2xl font-bold tabular-nums ${
+                      st.overHours !== undefined ? "text-red-600" : "text-gray-900"
+                    }`}
+                  >
+                    {st.overHours !== undefined ? st.limitHours + st.overHours : st.limitHours - st.marginHours!}h
+                  </span>
+                  {st.overHours !== undefined ? (
+                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-amber-50 text-orange-600">
+                      超时{st.overHours}h
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-green-50 text-green-600">
+                      剩余{st.marginHours}h
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-lg font-semibold text-gray-400">{stRes?.text}</p>
+              )}
               <p className="mt-2 text-xs text-gray-400">允许储存截止时间：{st.deadline}</p>
             </div>
           )}
