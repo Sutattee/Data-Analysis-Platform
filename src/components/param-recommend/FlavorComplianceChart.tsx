@@ -1,7 +1,8 @@
 "use client";
 
-// 右图 · 加香出口水分：达标情况（与左图同一组历史批次，不含未来点）
-// 蓝实线=实际值，超限点橙红并标注状态文字；橙虚线=目标线（dataKey 分段，标准换版处自然断开）；
+// 右图 · 加香出口水分：建议与达标情况（与左图同一组历史批次，不含未来点）
+// 蓝实线=实际值，超限点橙红并标注状态文字；绿实线+方点=建议值（开工时锁定的推荐版本，无推荐空缺不连线）；
+// 橙虚线=目标线（dataKey 分段，标准换版处自然断开）；
 // 浅绿 ReferenceArea=按连续同标准版本分段的合格区间；按生产时有效标准判定达标。
 // 图上摘要：达标 X/Y 批 · 达标率 Z%（Y=已有有效实际值且标准明确的批次，Y=0 不算率）。
 import {
@@ -27,6 +28,7 @@ import {
 interface Row {
   label: string;
   flavor: number | null;
+  advice: number | null; // 建议值（该批开工时锁定的推荐版本，无历史推荐为 null）
   goal: number | null; // 分段目标线（dataKey 驱动；标准缺失为 null）
   record: BatchRecord;
 }
@@ -63,6 +65,7 @@ export function FlavorComplianceChart({
     return {
       label: batchLabelOf(b.batch),
       flavor: b.flavorActual,
+      advice: b.dryingAdvice,
       goal: std ? std.goal : null,
       record: b,
     };
@@ -94,9 +97,10 @@ export function FlavorComplianceChart({
   }).length;
   const rateText = judged.length > 0 ? `达标率 ${Math.round((passCount / judged.length) * 100)}%` : "达标率 —";
 
-  // 纵轴：实际值 + 各段上下限自适应
+  // 纵轴：实际值 + 建议值 + 各段上下限自适应
   const values = [
     ...rows.map((r) => r.flavor).filter((v): v is number => v !== null),
+    ...rows.map((r) => r.advice).filter((v): v is number => v !== null),
     ...segments.flatMap((s) => [s.low, s.high]),
   ];
   const hasData = values.length > 0;
@@ -105,7 +109,7 @@ export function FlavorComplianceChart({
   const span = vMax - vMin || 1;
 
   return (
-    <Card title="加香出口水分：达标情况（%）">
+    <Card title="加香出口水分：建议与达标情况（%）">
       {rows.length === 0 ? (
         <p className="py-12 text-center text-sm text-gray-400">当前筛选下暂无历史批次</p>
       ) : !hasData ? (
@@ -151,6 +155,10 @@ export function FlavorComplianceChart({
                         <p className="mt-0.5 text-gray-600">
                           实际值：{b.flavorActual !== null ? `${fmt2(b.flavorActual)}%` : "待回传"}
                         </p>
+                        <p className="mt-0.5 text-gray-600">
+                          建议值：
+                          {b.dryingAdvice !== null ? `${fmt2(b.dryingAdvice)}%` : (b.adviceReason ?? "无有效推荐")}
+                        </p>
                         <p className="mt-0.5 text-gray-600">目标：{std ? `${fmt2(std.goal)}%` : "—"}</p>
                         <p className="mt-0.5 text-gray-600">
                           合格范围：{std ? `${fmt2(std.low)}%～${fmt2(std.high)}%` : "—"}
@@ -180,6 +188,41 @@ export function FlavorComplianceChart({
                     label={{ value: s.ver, position: "insideTop", fontSize: 9, fill: "#6b7280" }}
                   />
                 ))}
+                {/* 建议值：绿实线 + 方点（开工时锁定的推荐版本）；无历史推荐的批次空缺不连线 */}
+                <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
+                  dataKey="advice"
+                  stroke={GREEN}
+                  strokeWidth={2}
+                  connectNulls={false}
+
+                  dot={(props: { cx?: number; cy?: number; payload?: Row }) => {
+                    const v = props.payload?.advice;
+                    if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
+                      return <g key={props.payload?.label} />;
+                    }
+                    return (
+                      <g key={props.payload?.label}>
+                        <rect
+                          x={(props.cx ?? 0) - 3}
+                          y={(props.cy ?? 0) - 3}
+                          width={6}
+                          height={6}
+                          fill={GREEN}
+                          stroke="#fff"
+                          strokeWidth={1}
+                        />
+                        <circle
+                          cx={props.cx}
+                          cy={props.cy}
+                          r={10}
+                          fill="transparent"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => onRecordClick(props.payload!.record)}
+                        />
+                      </g>
+                    );
+                  }}
+                />
                 {/* 目标线：橙虚线（dataKey 分段，标准缺失处断开） */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="goal"
@@ -241,6 +284,10 @@ export function FlavorComplianceChart({
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5" style={{ backgroundColor: BLUE }} />
               实际值
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-0.5 w-5" style={{ backgroundColor: GREEN }} />
+              建议值
             </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5 border-t-2 border-dashed" style={{ borderTopColor: TARGET }} />
