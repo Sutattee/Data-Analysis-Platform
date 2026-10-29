@@ -125,7 +125,7 @@ export function StabilityForecastView() {
     const fmt = (v: number) => v.toFixed(metric.decimals);
     const rule = metric.rule;
     // 基准阈值 = 管控值边界（最轻级，与图上管控值线一致，如「上限≤2.00%」）；
-    // 超出量 = 越出侧边界的绝对差（带方向符号，% 指标以 pct 计，如 +0.35pct）；未越界 = -
+    // 超出量 = 越出侧边界的绝对差（方向词，% 指标以 pct 计，如 超上限0.35pct）；未越界 = -
     let baselineText = rec.baselineLabel;
     let delta: number | null = null;
     if (rule) {
@@ -150,8 +150,8 @@ export function StabilityForecastView() {
       objectName: machineText,
       valueLabel: `${info.measured ? "当前值" : "预测值"}${fmt(info.value)}${metric.unit}`,
       baselineLabel: baselineText,
-      deviationValue: delta === null ? "-" : `${delta >= 0 ? "+" : "-"}${fmt(Math.abs(delta))}${exceedUnitOf(metric.unit)}`,
-      batch: info.point?.batch ? `第 ${info.point.batch} 批` : undefined,
+      deviationValue: delta === null ? "-" : `${delta >= 0 ? "超上限" : "超下限"}${fmt(Math.abs(delta))}${exceedUnitOf(metric.unit)}`,
+      batch: info.point?.batch ? `第${info.point.batch}批` : undefined,
       shiftLabel: info.point?.shift, // 班次取点位上下文（批/班周期有、月/日周期无），不沿用原记录
       shift: info.point?.shiftGroup,
       brand: info.point?.brand,

@@ -74,7 +74,7 @@ export function StabilityAnomalyDrawer({
             <Field label="告警触发时间" value={record.triggerTime} />
             <Field label="告警值" value={record.valueLabel} />
             <Field label="基准阈值" value={record.baselineLabel} />
-            {/* 超出量：越出管控值边界的绝对差（% 指标以 pct 计，如 +0.35pct）；未越界 - */}
+            {/* 超出量：越出管控值边界的绝对差（方向词，% 指标以 pct 计，如 超上限0.35pct）；未越界 - */}
             <Field label="超出量" value={record.deviationValue} />
             {isForecast && <Field label="预测窗口" value={record.forecastWindow ?? "-"} />}
             {record.consecutiveShifts !== undefined && (

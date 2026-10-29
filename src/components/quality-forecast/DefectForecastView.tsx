@@ -191,7 +191,7 @@ export function DefectForecastView() {
       valueLabel,
       baselineLabel,
       deviationValue: deviation,
-      batch: `第 ${info.batch} 批`,
+      batch: `第${info.batch}批`,
       shiftLabel: forecast.context.shift,
       shift: forecast.context.shiftGroup,
       brand: forecast.context.brand,

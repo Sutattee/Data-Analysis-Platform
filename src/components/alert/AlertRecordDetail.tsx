@@ -230,7 +230,7 @@ export function AlertRecordDetail({
               <Field label="告警类型" value={TYPE_DISPLAY[record.type]} />
               <Field label="业务域" value={record.domain} />
               {/* 扩展字段按指标展示（批次/班组/牌号的支持组合因指标而异；机台（原告警对象）不展示）；
-                  批次值由数据层按类型生成：实测「第 2417 批」/ 预测「第 2418 批（3个批次后）」 */}
+                  批次值由数据层统一生成「第N批」（月度指标为「本月」/预计越界月份） */}
               {qualityDetailFieldsOf(record.metricName).map((f) => {
                 if (f === "machine") return null;
                 if (f === "batch") return <Field key={f} label="批次" value={record.batch} />;

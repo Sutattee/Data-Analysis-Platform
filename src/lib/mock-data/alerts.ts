@@ -145,10 +145,10 @@ const BASE_ALERT_RECORDS: AlertRecord[] = Array.from({ length: 56 }, (_, i) => {
     type === "当前异常"
       ? `基准值${obj.target.toFixed(1)}${obj.unit}`
       : `${obj.low ? "目标下限" : "目标上限"}${obj.target.toFixed(1)}${obj.unit}`;
-  // 偏离值（带方向与单位）与偏离率（带方向）：当前异常取全额偏离，预测风险取预计偏离（60%）
+  // 偏离值（方向词 + 绝对差 + 单位，% 记作 pct）与偏离率（带方向）：当前异常取全额偏离，预测风险取预计偏离（60%）
   const delta = type === "当前异常" ? gap : gap * 0.6;
   const sign = obj.low ? "-" : "+";
-  const deviationValue = `${sign}${delta.toFixed(2)}${obj.unit}`;
+  const deviationValue = `${obj.low ? "超下限" : "超上限"}${delta.toFixed(2)}${obj.unit === "%" ? "pct" : obj.unit}`;
   const deviationRate = `${sign}${((delta / obj.target) * 100).toFixed(1)}%`;
 
   // 标题
@@ -244,7 +244,7 @@ function buildProductionAlertRecords(): AlertRecord[] {
     const baselineLabel =
       type === "当前异常" ? `基准值${obj.target.toFixed(dec)}${obj.unit}` : `目标上限${obj.target.toFixed(dec)}${obj.unit}`;
     const delta = type === "当前异常" ? gap : gap * 0.6;
-    const deviationValue = `+${delta.toFixed(2)}${obj.unit}`;
+    const deviationValue = `超上限${delta.toFixed(2)}${obj.unit === "%" ? "pct" : obj.unit}`;
     const deviationRate = `+${((delta / obj.target) * 100).toFixed(1)}%`;
 
     const title =

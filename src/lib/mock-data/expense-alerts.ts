@@ -204,7 +204,8 @@ function buildOneExpenseRecord(n: (typeof EXPENSE_INDICATORS)[number]): AlertRec
     deviationLabel: `${sign}${dev}pct`,
     valueLabel: `当前偏差${sign}${dev}pct`,
     baselineLabel: "正常区间 -3pct～+3pct",
-    deviationValue: `${sign}${dev}pct`,
+    // 超出量：方向词 + 绝对差（区间型口径：正偏差超上限 / 负偏差超下限）
+    deviationValue: `${dev >= 0 ? "超上限" : "超下限"}${Math.abs(dev)}pct`,
     deviationRate: `${sign}${((Math.abs(dev) / PLAN_PROGRESS) * 100).toFixed(1)}%`,
     // 判定依据
     strategyName: `${n.name}执行进度偏差${level}策略`,

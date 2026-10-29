@@ -568,12 +568,13 @@ function buildStabilityAlertRecords(): AlertRecord[] {
     const delta = spec.value - base;
     const sign = delta >= 0 ? "+" : "-";
     const absDelta = Math.abs(delta);
-    const deviationValue = `${sign}${fmt(absDelta)}${metric.unit}`;
+    // 超出量：方向词 + 绝对差（% 指标单位记作 pct，如 超上限0.15pct / 超下限0.11pct）
+    const exceedUnit = metric.unit === "%" ? "pct" : metric.unit;
+    const deviationValue = `${delta >= 0 ? "超上限" : "超下限"}${fmt(absDelta)}${exceedUnit}`;
     const deviationRate = `${sign}${trimPct((absDelta / Math.abs(base)) * 100)}%`;
 
     // 策略快照的超出量（该级偏离比例区间下界相对基准换算的绝对量；% 指标单位记作 pct）
     const bandPct = Number(band.match(/\d+(?:\.\d+)?/)?.[0] ?? "0");
-    const exceedUnit = metric.unit === "%" ? "pct" : metric.unit;
     const exceedSuffix = bandPct > 0 ? ` 超出${trimPct(base * (bandPct / 100))}${exceedUnit}` : "";
 
     // 标题（不含告警对象；实测=已越界 / 预测=预计越界 / 飘移=连续N个周期越界）
@@ -584,7 +585,7 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         ? `${metric.name}${isUpper ? "持续上升，预计越过上限" : "持续下降，预计跌破下限"}`
         : `${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
 
-    // 预测风险：预计越界周期数（批次后缀如「第 2418 批（3个批次后）」）与预测窗口
+    // 预测风险：预计越界周期数（月度批次推算用）与预测窗口
     // （批周期与缺陷预测页同源口径「已排产批次」；日周期与稳定性预测页 SF05 同口径「未来已排产的22日」）
     const forecastShift = 2 + (i % 3); // 2~4 个统计周期后越界
     const windowUnit = cycleUnit === "批次" ? "已排产批次" : cycleUnit;
@@ -627,14 +628,13 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         ? `${fmt(spec.value - 0.15)}～${fmt(spec.value + 0.18)}${metric.unit}`
         : undefined,
       // 质量扩展（详情基本信息；字段按指标展示，见 qualityDetailFieldsOf）
-      // 批次：实测「第 N 批」/ 预测「第 N 批（M个周期后）」；月度指标实测「本月」、
-      // 预测为预计越界月份「9月（2个月后）」（触发月 + M 个月）；日周期后缀如「（3日后）」
+      // 批次：批/班/日周期统一「第N批」；月度指标实测「本月」、预测为预计越界月份（触发月 + M 个月）
       batch:
         metric.cycle === "每月"
           ? isForecast
-            ? `${((Number(triggerTime.slice(5, 7)) - 1 + forecastShift) % 12) + 1}月（${forecastShift}个月后）`
+            ? `${((Number(triggerTime.slice(5, 7)) - 1 + forecastShift) % 12) + 1}月`
             : "本月"
-          : `第 ${2417 + i} 批${isForecast ? `（${forecastShift}${cycleUnit === "日" ? "日" : `个${cycleUnit}`}后）` : ""}`,
+          : `第${2417 + i}批`,
       forecastWindow,
       shift: SHIFTS[i % 3],
       shiftLabel, // 班次（白班/夜班，批/班周期指标生成；月度指标不生成 → 详情不展示）
