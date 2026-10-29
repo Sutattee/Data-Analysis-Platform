@@ -2,7 +2,7 @@
 
 // 指标预测趋势图：历史实测实线 + 预测虚线 + 管控值线（橙色虚线，双侧型两条 + 区间底色）+ 等级升级标记
 // 管控值 = 等级规则最轻级边界（仅一条橙线标注数值，不逐等级画线）；首达预测最高等级的点重点标注
-// 纵轴为指标实际数值及单位；横轴按统计周期展示批号 / 月份 / 班次
+// 纵轴为指标实际数值及单位；横轴展示批号 / 月份（班周期指标同为批次刻度，班次信息在悬浮提示）
 import {
   CartesianGrid,
   Line,
@@ -163,16 +163,13 @@ export function MetricTrendChart({
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 24, right: 16, left: -8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          {/* 班周期刻度「10-6 白班」较长：斜排避免重叠；批 / 月周期保持水平 */}
           <XAxis
             dataKey="label"
             tick={{ fontSize: 10 }}
             stroke="#9ca3af"
             interval={0}
             minTickGap={20}
-            angle={metric.cycle === "班" ? -30 : 0}
-            textAnchor={metric.cycle === "班" ? "end" : "middle"}
-            height={metric.cycle === "班" ? 44 : 30}
+            height={30}
           />
           <YAxis
             domain={[vMin - span * 0.15, vMax + span * 0.15]}
@@ -385,7 +382,7 @@ export function MetricTrendChart({
         )}
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full border-2 border-blue-700 bg-white" />
-          基准{metric.cycle === "月" ? "月份" : metric.cycle === "批" ? "批次" : "班次"}
+          基准{metric.cycle === "月" ? "月份" : "批次"}
         </span>
         {hasUpgrades && (
           <span className="flex items-center gap-1">

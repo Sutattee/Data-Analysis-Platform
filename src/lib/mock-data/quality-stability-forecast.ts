@@ -203,18 +203,19 @@ function windowSizeOf(cycle: Cycle): number {
   return cycle === "月" ? 3 : 10;
 }
 
+// 窗口文案：批 / 班周期以已排产批次为窗口单位（班周期横轴同为批次刻度）；月周期为自然月
 export function windowTextOf(cycle: Cycle): string {
   const n = windowSizeOf(cycle);
-  return cycle === "批" ? `未来${n}个批次` : cycle === "月" ? `未来${n}个月` : `未来${n}个班次`;
+  return cycle === "月" ? `未来${n}个月` : `未来${n}个已排产批次`;
 }
 
 // ============ 预测结果 ============
 
 export interface TrendPoint {
-  label: string; // 横轴刻度：批号 / 月份 / 班次
+  label: string; // 横轴刻度：批号 / 月份（批 / 班周期均为批次刻度，月周期为月份）
   value: number; // 指标值
-  batch?: string; // 批号（批周期 = 横轴同源；班 / 月周期无 → Tooltip 不展示）
-  shift?: string; // 班次（批周期 = 该批次生产班次「10-13 白班」；班周期 = 横轴班次）
+  batch?: string; // 批号（批 / 班周期 = 横轴同源；月周期无 → Tooltip 不展示）
+  shift?: string; // 班次（批 / 班周期 = 该批次生产班次「10-6 白班」；月周期无）
   shiftGroup?: string; // 班组（甲 / 乙 / 丙班，按机台偏移轮换；综合曲线剔除）
   brand?: string; // 牌号（按机台偏移轮换；综合曲线剔除）
 }
@@ -341,38 +342,19 @@ const SEEDS: ForecastSeed[] = [
     values: [6840, 4.58], phis: [0.04, 0.02] },
 ];
 
-// ---- 横轴刻度（批号 / 月份 / 班次）----
+// ---- 横轴刻度（批号 / 月份）----
 
 const roundTo = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d;
 
-// 班次序列：10-6 白班 起，白班 / 夜班交替、每日两班（纯字符串推进，16 个 = 历史 6 + 基准 1 + 未来 10 去 1）
-function shiftLabels(): string[] {
-  const shifts = ["白班", "夜班"];
-  const out: string[] = [];
-  let day = 6;
-  let idx = 0;
-  for (let k = 0; k < 16; k += 1) {
-    out.push(`10-${day} ${shifts[idx]}`);
-    idx += 1;
-    if (idx > 1) {
-      idx = 0;
-      day += 1;
-    }
-  }
-  return out;
-}
-
+// 批 / 班周期统一批次刻度（班周期横轴不再用班次，班次信息保留在点位上下文）；
+// 月周期为自然月（基准 10 月，跨年顺延 1 月）
 function labelsOf(cycle: Cycle): { hist: string[]; future: string[] } {
-  if (cycle === "批") {
-    const hist = [2346, 2347, 2348, 2349, 2350, 2351].map(String);
-    const future = [2351, 2352, 2353, 2354, 2355, 2356, 2357, 2358, 2359, 2360, 2361].map(String);
-    return { hist, future };
-  }
   if (cycle === "月") {
     return { hist: ["5月", "6月", "7月", "8月", "9月", "10月"], future: ["10月", "11月", "12月", "1月"] };
   }
-  const all = shiftLabels();
-  return { hist: all.slice(0, 6), future: all.slice(5) }; // 末点 10/8乙 = 基准 = future 首点
+  const hist = [2346, 2347, 2348, 2349, 2350, 2351].map(String);
+  const future = [2351, 2352, 2353, 2354, 2355, 2356, 2357, 2358, 2359, 2360, 2361].map(String);
+  return { hist, future };
 }
 
 // ---- 序列生成（确定性平滑插值；base = 历史末点 = 预测首点，保证三方同口径）----
@@ -384,7 +366,7 @@ function hashOf(s: string): number {
   return h;
 }
 
-// 点位生产上下文（确定性）：批周期带批号 + 生产班次；班周期带班次（= 横轴）；月周期无；
+// 点位生产上下文（确定性）：批 / 班周期带批号（= 横轴刻度）+ 生产班次 + 班组 / 牌号；月周期无；
 // g = 全局点位序号（历史 0..5，预测首点与历史末点重合），h = 机台偏移
 function pointMeta(
   cycle: Cycle,
@@ -393,13 +375,6 @@ function pointMeta(
   h: number
 ): Pick<TrendPoint, "batch" | "shift" | "shiftGroup" | "brand"> {
   if (cycle === "月") return {};
-  if (cycle === "班") {
-    return {
-      shift: label,
-      shiftGroup: SHIFT_OPTIONS[(g + h) % SHIFT_OPTIONS.length],
-      brand: BRAND_OPTIONS[(g + h) % BRAND_OPTIONS.length],
-    };
-  }
   return {
     batch: label,
     shift: `10-${6 + Math.floor(g / 2)} ${g % 2 === 0 ? "白班" : "夜班"}`,
@@ -485,8 +460,9 @@ export function maxFutureLevelOf(f: StabilityForecast): AlertLevel | null {
 export type LevelChangeKind = "upgrade" | "hold" | "degrade" | "normal" | "unconfigured" | "unavailable";
 
 // 等级变化预测（按当前实测等级与窗口内预测最高等级判定）：
-// 升级 → 预计N个批次内/下一班次/未来N个月内升至X；同级维持 → 预计持续{等级}；
-// 降级 → 预计逐步降级；当前正常且窗口内均正常 → 窗口内正常；
+// 升级 → 首达预测最高等级点的「{批号}批次已触发{等级}」（月周期「26年12月已触发{等级}」）；
+// 同级维持 → 预计持续{等级}；降级（窗口内仍有等级，如 告警→关注）→ 同「已触发」口径；
+// 当前已越级且窗口内全部恢复正常 → 预计逐步降级；当前正常且窗口内均正常 → 窗口内正常；
 // 未配置规则 / 数据不足·预测失败 → 未配置等级规则 / 暂无法预测等级
 export function levelChangeOf(f: StabilityForecast): { kind: LevelChangeKind; text: string; step?: number; toLevel?: AlertLevel } {
   const metric = metricOf(f.code)!;
@@ -495,21 +471,32 @@ export function levelChangeOf(f: StabilityForecast): { kind: LevelChangeKind; te
   if (!rule) return { kind: "unconfigured", text: "未配置等级规则" };
   const cur = currentLevelOf(f);
   const max = maxFutureLevelOf(f);
+  // 窗口首达某等级点的触发表述：批 / 班周期用横轴批号（如 2355批次已触发告警）；
+  // 月周期按基准 2026-10 顺延自然月并跨年（如 26年12月已触发关注 / 27年1月已触发告警）
+  const hitTextOf = (lv: AlertLevel, step: number): string => {
+    if (metric.cycle === "月") {
+      const m = 10 + step;
+      const y = 26 + Math.floor((m - 1) / 12);
+      return `${y}年${((m - 1) % 12) + 1}月已触发${lv}`;
+    }
+    return `${f.future[step]?.label ?? ""}批次已触发${lv}`;
+  };
+  const stepOfMax = () =>
+    f.future.slice(1).findIndex((p) => severityOf(levelOfValue(p.value, rule)) === severityOf(max)) + 1; // 1 起：距基准的步数
   if (max !== null && severityOf(max) > severityOf(cur)) {
-    const step = f.future.slice(1).findIndex((p) => severityOf(levelOfValue(p.value, rule)) === severityOf(max)) + 1; // 1 起：距基准的步数
-    const text =
-      metric.cycle === "月"
-        ? `预计未来${step}个月内升至${max}`
-        : step === 1
-          ? `预计下一${metric.cycle === "批" ? "批次" : "班次"}升至${max}`
-          : `预计${step}${metric.cycle === "批" ? "个批次" : "个班次"}内升至${max}`;
-    return { kind: "upgrade", text, step, toLevel: max };
+    const step = stepOfMax();
+    return { kind: "upgrade", text: hitTextOf(max, step), step, toLevel: max };
   }
   if (cur !== null) {
-    // 当前已越级：未来最高等级未更高（同级或更低）；同级 = 预计持续告警，更低（含恢复正常）= 预计逐步降级
-    return max !== null && severityOf(max) === severityOf(cur)
-      ? { kind: "hold", text: `预计持续${cur}` }
-      : { kind: "degrade", text: "预计逐步降级" };
+    // 当前已越级：同级 = 预计持续{等级}；降至更低等级 = 该等级首达点「已触发」口径；全部恢复正常 = 预计逐步降级
+    if (max !== null && severityOf(max) === severityOf(cur)) {
+      return { kind: "hold", text: `预计持续${cur}` };
+    }
+    if (max !== null) {
+      const step = stepOfMax();
+      return { kind: "degrade", text: hitTextOf(max, step), step, toLevel: max };
+    }
+    return { kind: "degrade", text: "预计逐步降级" };
   }
   return { kind: "normal", text: "窗口内正常" };
 }
@@ -734,14 +721,14 @@ export function aiInterpretation(f: StabilityForecast, code: string, machine: st
   const confText = f.confidence !== null ? `，模型置信度${Math.round(f.confidence * 100)}%` : "";
   const change = levelChangeOf(f);
 
-  // 段1 预测概况：区分当前实测等级与预测最高等级（升级表述「预计……升至X」）
+  // 段1 预测概况：区分当前实测等级与预测最高等级（升级/降级表述「{批号}批次已触发X」）
   let overview: string;
   if (change.kind === "unconfigured") {
     overview = `${machine}${metric.name}未配置等级规则，暂无等级判断（最新实测${f.base}${metric.unit}${confText}）。`;
   } else {
     const status = statusOf(f);
     const curText = status === "—" ? "暂无法判定" : status;
-    // 升级/持续/降级直接引用等级变化预测短句（如 预计3个批次内升至告警 / 预计持续告警 / 预计逐步降级）
+    // 升级/持续/降级直接引用等级变化预测短句（如 2355批次已触发告警 / 预计持续告警 / 预计逐步降级）
     const changeText =
       change.kind === "upgrade" || change.kind === "hold" || change.kind === "degrade"
         ? change.text
