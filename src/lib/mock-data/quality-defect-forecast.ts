@@ -7,25 +7,92 @@
 // 本期仅展示最新一轮预测：预测基准时间（数据截止时刻）与预测更新时间（后端生成时刻）
 // 为固定常量，刷新页面不改变预测更新时间。
 
-// ===== 评分分级（0≤x<40 低风险 / 40≤x<70 中风险 / 70≤x≤100 高风险）=====
-export const MID_THRESHOLD = 40;
-export const HIGH_THRESHOLD = 70;
+import { LEVEL_COLOR, LEVEL_TEXT_CLS } from "@/lib/mock-data/quality-stability-forecast";
+import { LEVEL_PRIORITY } from "@/lib/mock-data/alerts";
+import type { AlertLevel } from "@/types";
+
+// ===== 评分分级（五级等级体系，与稳定性预测 / 告警中心口径一致）=====
+// 危险 ≥85 / 告警 ≥70 / 预警 ≥55 / 关注 ≥40 / 提示 ≥25 / 正常 <25；
+// 颜色复用告警等级色（LEVEL_COLOR / LEVEL_TEXT_CLS），「正常」仅为展示状态
+export const MID_THRESHOLD = 40; // 关注级下限（评分兜底模式趋势图阈值线）
+export const HIGH_THRESHOLD = 70; // 告警级下限（评分兜底模式趋势图阈值线）
+
+export type DefectLevel = AlertLevel | "正常";
+
+const LEVEL_MINS: { level: AlertLevel; min: number }[] = [
+  { level: "危险", min: 85 },
+  { level: "告警", min: 70 },
+  { level: "预警", min: 55 },
+  { level: "关注", min: 40 },
+  { level: "提示", min: 25 },
+];
 
 export interface RiskLevel {
-  label: string;
+  label: DefectLevel;
   color: string;
   badgeCls: string;
   textCls: string;
 }
 
+const LEVEL_BADGE_CLS: Record<AlertLevel, string> = {
+  提示: "bg-slate-100 text-slate-600 border-slate-200",
+  关注: "bg-yellow-50 text-yellow-600 border-yellow-100",
+  预警: "bg-orange-50 text-orange-600 border-orange-100",
+  告警: "bg-red-50 text-red-600 border-red-100",
+  危险: "bg-red-100 text-red-700 border-red-200",
+};
+
 export function levelOf(score: number): RiskLevel {
-  if (score >= HIGH_THRESHOLD) {
-    return { label: "高风险", color: "#ef4444", badgeCls: "bg-red-50 text-red-600 border-red-100", textCls: "text-red-600" };
+  const hit = LEVEL_MINS.find((r) => score >= r.min);
+  if (hit) {
+    return { label: hit.level, color: LEVEL_COLOR[hit.level], badgeCls: LEVEL_BADGE_CLS[hit.level], textCls: LEVEL_TEXT_CLS[hit.level] };
   }
-  if (score >= MID_THRESHOLD) {
-    return { label: "中风险", color: "#f97316", badgeCls: "bg-orange-50 text-orange-600 border-orange-100", textCls: "text-orange-600" };
+  return { label: "正常", color: "#16a34a", badgeCls: "bg-green-50 text-green-600 border-green-100", textCls: "text-green-600" };
+}
+
+// 等级序（正常 = 0，五级按严重度递增）：等级变化预测比较用
+export function levelRankOf(label: DefectLevel): number {
+  return label === "正常" ? 0 : LEVEL_PRIORITY[label];
+}
+
+// 等级名 → 文本色（正常绿色；五级复用告警等级配色）
+export function levelClsOf(label: DefectLevel): string {
+  return label === "正常" ? "text-green-600" : LEVEL_TEXT_CLS[label];
+}
+
+// ===== 等级变化预测（口径与稳定性预测页一致）=====
+// 当前 = 基准点（最新实测评分）等级，最高 = 窗口内（不含基准）各预测点最高等级；
+// 升级 / 降级（窗口内仍有等级）→ 首达该等级批次「{批号}批次已触发{等级}」；
+// 同级 → 预计持续{等级}；当前与窗口内均正常 → 窗口内正常；
+// 当前越级且窗口内全部恢复正常 → 预计逐步降级；数据不足 / 无有效时序（仅基准单点）→ 暂无法预测等级
+export type DefectLevelChangeKind = "upgrade" | "hold" | "degrade" | "normal" | "unavailable";
+
+export function levelChangeOf(f: DefectForecast): {
+  kind: DefectLevelChangeKind;
+  text: string;
+  batch?: string;
+  toLevel?: DefectLevel;
+} {
+  if (f.status === "insufficient") return { kind: "unavailable", text: "暂无法预测等级" };
+  const rest = f.future.slice(1);
+  if (rest.length === 0) return { kind: "unavailable", text: "暂无法预测等级" };
+  const cur = levelOf(f.future[0].score).label;
+  let maxScore = rest[0].score;
+  for (const p of rest) if (p.score > maxScore) maxScore = p.score;
+  const max = levelOf(maxScore).label;
+  const hitOf = (lv: DefectLevel) => rest.find((p) => levelOf(p.score).label === lv)!;
+  if (levelRankOf(max) > levelRankOf(cur)) {
+    const hit = hitOf(max);
+    return { kind: "upgrade", text: `${hit.batch}批次已触发${max}`, batch: hit.batch, toLevel: max };
   }
-  return { label: "低风险", color: "#eab308", badgeCls: "bg-yellow-50 text-yellow-600 border-yellow-100", textCls: "text-yellow-600" };
+  if (levelRankOf(max) === levelRankOf(cur)) {
+    return cur === "正常" ? { kind: "normal", text: "窗口内正常" } : { kind: "hold", text: `预计持续${cur}` };
+  }
+  if (max !== "正常") {
+    const hit = hitOf(max);
+    return { kind: "degrade", text: `${hit.batch}批次已触发${max}`, batch: hit.batch, toLevel: max };
+  }
+  return { kind: "degrade", text: "预计逐步降级" };
 }
 
 // ===== 时间模型（确定性固定值，与真实当前时间无关）=====
@@ -496,22 +563,6 @@ export function peakOf(f: DefectForecast): { score: number; batch: string; displ
   return { score: best.score, batch: best.batch, display: best.full };
 }
 
-// 高风险预测五种判定口径（规格 §7）：达阈值批次为有排产计划的具体批次；
-// 各口径仅表示模型评分与阈值的关系，不代表现场已发生缺陷或未来一定不会发生缺陷
-export type EtaKind = "reached" | "within" | "notReached" | "noSeries" | "unavailable";
-
-export function highRiskEta(f: DefectForecast): { kind: EtaKind; text: string } {
-  if (f.status === "insufficient") return { kind: "unavailable", text: "暂无法预测" };
-  const base = f.future[0];
-  // 基准评分已达阈值：按窗口峰值批次表述（预计 xx 批次达风险阈值）
-  if (base && base.score >= HIGH_THRESHOLD)
-    return { kind: "reached", text: `预计${peakOf(f)?.batch ?? base.batch}批次达风险阈值` };
-  if (f.future.length <= 1) return { kind: "noSeries", text: "暂无达阈值时间预测" };
-  const hit = f.future.slice(1).find((p) => p.score >= HIGH_THRESHOLD);
-  if (hit) return { kind: "within", text: `预计${hit.batch}批次达风险阈值` };
-  return { kind: "notReached", text: "未来未达风险阈值" };
-}
-
 // 预测窗口：按已排产批次数展示（未来批次数 = 预测点数 − 基准点）；数据不足不展示窗口
 export function windowTextOf(f: DefectForecast): string {
   if (f.status === "insufficient") return "—";
@@ -525,24 +576,15 @@ const CHECK_FOCUS: Record<DefectCode, string> = {
   XCCG: "建议核查计划投料、库存与卷包消耗是否匹配",
 };
 
-// 窗口内评分趋势（未达阈值时替代"达阈值批次"表述）：首末对比 ±3 分视为总体平稳
-function trendWordOf(f: DefectForecast): string {
-  const first = f.future[0]?.score ?? 0;
-  const last = f.future[f.future.length - 1]?.score ?? first;
-  if (last - first > 3) return "总体上升";
-  if (first - last > 3) return "总体下降";
-  return "总体平稳";
-}
-
 export function aiInterpretation(f: DefectForecast): string[] {
   if (f.status === "insufficient") return ["数据不足，无法生成解读"];
   const peak = peakOf(f);
   if (!peak) return ["数据不足，无法生成解读"];
   const lv = levelOf(peak.score);
-  const eta = highRiskEta(f);
+  const change = levelChangeOf(f);
 
   // 1. 风险概况：指标预测值 / 管控值 / 超出量（有业务依据时）→ 最高评分 / 等级
-  //    → 预计达阈值批次或窗口内趋势 → 有有效置信度时引用
+  //    → 等级变化预测（口径与卡片一致，如 2415批次已触发告警 / 预计持续关注）→ 有有效置信度时引用
   const basis: string[] = [];
   if (f.moisture) {
     basis.push(`预测成品水分 ${f.moisture.predicted}（管控值 ${f.moisture.range}，${f.moisture.overText}）`);
@@ -557,10 +599,9 @@ export function aiInterpretation(f: DefectForecast): string[] {
     if (total !== null)
       basis.push(`预计总储存时长 ${total}h（管控值 储存上限 ${f.storage.limitHours}h，${res.text}）`);
   }
-  const etaPart = eta.kind === "notReached" ? `窗口内评分${trendWordOf(f)}，${eta.text}` : eta.text;
   const s1 =
     (basis.length > 0 ? `${basis.join("，")}；` : "") +
-    `窗口最高风险评分 ${peak.score.toFixed(1)} 分（${peak.display}），等级${lv.label}，${etaPart}` +
+    `窗口最高风险评分 ${peak.score.toFixed(1)} 分（${peak.display}），等级${lv.label}，${change.text}` +
     (f.confidence !== undefined ? `，模型置信度 ${Math.round(f.confidence * 100)}%` : "") +
     "。";
 

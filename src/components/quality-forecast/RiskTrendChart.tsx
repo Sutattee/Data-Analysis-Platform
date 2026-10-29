@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import {
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   ReferenceArea,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -16,17 +16,19 @@ import {
 import {
   HIGH_THRESHOLD,
   MID_THRESHOLD,
-  UPDATED_AT,
   levelOf,
+  levelRankOf,
   type DefectForecast,
+  type DefectLevel,
 } from "@/lib/mock-data/quality-defect-forecast";
 
 // 风险预测趋势（规格 §8）：横轴批次号（历史已产批次 + 有排产计划的未来批次，以实际返回批次为准）；
 // 纵轴取业务预测值 —— 成品水分不合格 → 成品水分(%)、箱储存储时间超上限 → 储存时长(h)，
 // 烟支刺破（深链兜底）无业务值时退回风险评分轴；管控值上下限用橙色虚线（箱储仅有储存上限一条）。
 // 历史蓝色实线 + 预测蓝色虚线（首点 = 基准批次 = 预测起点），预测区浅蓝底 + 基准批次竖向参考线；
-// 曲线不带常规数据点（仅窗口最高风险红点与预测起点白心蓝边强调），不补造数据点（箱储出库后断线）。
-// 悬浮提示逐字段纵向排列：业务值 / 风险等级 / 评分 / 关联批次 / 牌号 / 班次 / 班组 / 预测时间；未知显示"—"。
+// 等级变化标记（白心 + 等级色描边 + 等级名标注）：升级点逐点标注、基准点评分触发等级时同样标注、
+// 首次达到窗口最高等级的点重点显示；曲线不带常规数据点，不补造数据点（箱储出库后断线）。
+// 悬浮提示与稳定性预测页同口径：实际值/预测值、超出量、告警等级、批次、牌号、班次、班组；未知显示"—"。
 
 type Mode = "moist" | "hours" | "score";
 
@@ -34,11 +36,9 @@ interface Row {
   batch: string;
   hist: number | null; // 历史值（业务值；评分兜底模式下为历史评分）
   future: number | null; // 预测值（评分兜底模式下为预测评分）
-  histScore?: number; // Tooltip 风险等级 / 评分用
+  histScore?: number; // 告警等级判定用
   futureScore?: number;
-  full?: string; // 完整批次表述
-  biz?: string; // 业务预测值（仅预测点携带）
-  planned?: boolean; // 未来信息来自排产/出库计划
+  full?: string; // 完整批次表述（悬浮「批次」字段）
 }
 
 interface DotProps {
@@ -47,11 +47,29 @@ interface DotProps {
   payload?: Row;
 }
 
-const MODE_CFG: Record<Mode, { unit: string; valueLabel: string; histLabel: string; names: [string, string] }> = {
-  moist: { unit: "%", valueLabel: "预测成品水分", histLabel: "成品水分", names: ["历史水分(%)", "预测水分(%)"] },
-  hours: { unit: "h", valueLabel: "预测储存时长", histLabel: "储存时长", names: ["历史储存时长(h)", "预测储存时长(h)"] },
-  score: { unit: "", valueLabel: "", histLabel: "", names: ["历史评分", "预测评分"] },
+const MODE_CFG: Record<Mode, { unit: string; names: [string, string] }> = {
+  moist: { unit: "%", names: ["历史水分(%)", "预测水分(%)"] },
+  hours: { unit: "h", names: ["历史储存时长(h)", "预测储存时长(h)"] },
+  score: { unit: "", names: ["历史评分", "预测评分"] },
 };
+
+// 业务值取值（评分兜底模式退回评分）
+function valOfPoint(
+  p: { moist?: number; hours?: number; score: number } | undefined,
+  mode: Mode
+): number | undefined {
+  if (!p) return undefined;
+  return p.moist ?? p.hours ?? (mode === "score" ? p.score : undefined);
+}
+
+// 等级变化标记：升级点（等级高于前一点）+ 触发等级的基准点；prominent = 首次达到窗口最高等级
+interface Mark {
+  batch: string;
+  value: number;
+  level: DefectLevel;
+  color: string;
+  prominent: boolean;
+}
 
 function TrendTooltip({
   active,
@@ -73,25 +91,39 @@ function TrendTooltip({
   const score = isFuture ? row.futureScore : row.histScore;
   const cfg = MODE_CFG[mode];
   const ctx = forecast.context;
-  const items: [string, string][] = [];
-  if (mode !== "score")
-    items.push([isFuture ? cfg.valueLabel : cfg.histLabel, `${value.toFixed(1)}${cfg.unit}`]);
-  items.push(["风险等级", score !== undefined ? levelOf(score).label : "—"]);
-  items.push(["评分", score !== undefined ? score.toFixed(1) : "—"]);
-  if (row.biz) items.push(["业务预测", row.biz]);
-  items.push(
-    ["关联批次", forecast.batch || "—"],
-    ["牌号", ctx.brand || "—"],
-    ["班次", ctx.shift || "—"],
-    ["班组", ctx.shiftGroup || "—"],
-    ["预测时间", UPDATED_AT],
-  );
+  const lv = score !== undefined ? levelOf(score) : null;
+  // 超出量：越出管控值边界的带方向差值（% 指标以 pct 计，如 +0.4pct / -0.3pct）；未越界显示 —
+  const m = forecast.moisture;
+  const st = forecast.storage;
+  let exceed: string | null = null;
+  if (mode === "moist" && m) {
+    if (value > m.hi) exceed = `+${(value - m.hi).toFixed(1)}pct`;
+    else if (value < m.lo) exceed = `-${(m.lo - value).toFixed(1)}pct`;
+  } else if (mode === "hours" && st && value > st.limitHours) {
+    exceed = `+${(value - st.limitHours).toFixed(1)}h`;
+  }
+  const items: { k: string; v: string; cls?: string; style?: { color: string } }[] = [
+    { k: isFuture ? "预测值" : "实际值", v: `${value.toFixed(1)}${cfg.unit}`, cls: "font-medium text-gray-800" },
+    { k: "超出量", v: exceed ?? "—", cls: exceed !== null ? "font-medium text-red-500" : "text-gray-400" },
+    {
+      k: "告警等级",
+      v: lv ? lv.label : "—",
+      cls: lv ? "font-medium" : "text-gray-400",
+      ...(lv ? { style: { color: lv.color } } : {}),
+    },
+    { k: "批次", v: row.full ?? "—" },
+    { k: "牌号", v: ctx.brand || "—" },
+    { k: "班次", v: ctx.shift || "—" },
+    { k: "班组", v: ctx.shiftGroup || "—" },
+  ];
   return (
     <div className="rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-lg">
-      {items.map(([k, v]) => (
-        <div key={k} className="flex gap-3 text-xs leading-5">
-          <span className="w-20 shrink-0 text-gray-400">{k}</span>
-          <span className={k === "评分" ? "font-medium text-gray-800" : "text-gray-700"}>{v}</span>
+      {items.map((it) => (
+        <div key={it.k} className="flex gap-3 text-xs leading-5">
+          <span className="w-16 shrink-0 text-gray-400">{it.k}</span>
+          <span className={`text-gray-700 ${it.cls ?? ""}`} style={it.style}>
+            {it.v}
+          </span>
         </div>
       ))}
     </div>
@@ -107,9 +139,8 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
       : "score";
   const cfg = MODE_CFG[mode];
 
-  const { data, baseLabel, endLabel, peakLabel } = useMemo(() => {
+  const { data, baseLabel, endLabel, marks } = useMemo(() => {
     // 历史与预测共用同一横轴：基准批次同时出现在两条曲线上保证衔接（数组去重，避免 Set 迭代受 target 限制）
-    const valOf = (p: { moist?: number; hours?: number } | undefined) => (p ? p.moist ?? p.hours : undefined);
     const labels: string[] = [];
     for (const p of f.hist) if (!labels.includes(p.batch)) labels.push(p.batch);
     for (const p of f.future) if (!labels.includes(p.batch)) labels.push(p.batch);
@@ -118,22 +149,48 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
       const u = f.future.find((p) => p.batch === batch);
       return {
         batch,
-        hist: valOf(h) ?? (mode === "score" ? (h?.score ?? null) : null),
-        future: valOf(u) ?? (mode === "score" ? (u?.score ?? null) : null),
+        hist: valOfPoint(h, mode) ?? null,
+        future: valOfPoint(u, mode) ?? null,
         histScore: h?.score,
         futureScore: u?.score,
         full: (u ?? h)?.full,
-        biz: u?.biz,
-        planned: u?.planned,
       };
     });
-    // 窗口最高风险点（多同分取最早）→ 红点重点标记
-    const peak = f.future.length > 0 ? f.future.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+    // 等级变化标记：future[i]（i≥1）等级高于前一点（首点对比基准点）即标注；
+    // 基准点评分触发等级（非正常）时同样标注；首次达到窗口最高等级的点重点显示
+    const mk: Mark[] = [];
+    const base = f.future[0];
+    if (base) {
+      const rest = f.future.slice(1);
+      const maxLv = rest.length > 0 ? levelOf(Math.max(...rest.map((p) => p.score))).label : null;
+      const firstMaxBatch =
+        maxLv !== null && maxLv !== "正常" ? rest.find((p) => levelOf(p.score).label === maxLv)?.batch : undefined;
+      if (levelOf(base.score).label !== "正常") {
+        mk.push({
+          batch: base.batch,
+          value: valOfPoint(base, mode) ?? base.score,
+          level: levelOf(base.score).label,
+          color: levelOf(base.score).color,
+          prominent: false,
+        });
+      }
+      let prev = levelOf(base.score).label;
+      for (const p of rest) {
+        const lv = levelOf(p.score).label;
+        if (levelRankOf(lv) > levelRankOf(prev)) {
+          const v = valOfPoint(p, mode);
+          if (v !== undefined) {
+            mk.push({ batch: p.batch, value: v, level: lv, color: levelOf(p.score).color, prominent: p.batch === firstMaxBatch });
+          }
+        }
+        prev = lv;
+      }
+    }
     return {
       data: rows,
       baseLabel: f.future[0]?.batch ?? f.hist[f.hist.length - 1]?.batch ?? "",
       endLabel: labels[labels.length - 1] ?? "",
-      peakLabel: peak?.batch,
+      marks: mk,
     };
   }, [f, mode]);
 
@@ -154,111 +211,155 @@ export function RiskTrendChart({ forecast: f }: { forecast: DefectForecast }) {
           ? [Math.min(...vals) - 4, Math.max(st.limitHours, ...vals) + 4]
           : [0, 100];
 
-  // 标记点判定：窗口最高风险点（红点强调）与预测起点（基准批次，白心蓝边）；纯视觉强调，无点击交互
-  const markOf = (batch?: string) =>
-    peakLabel && batch === peakLabel ? "peak" : batch === baseLabel ? "base" : undefined;
+  // 标记点查询表（batch → 标记）：数据点渲染与 hover 光晕取等级色
+  const markMap = new Map(marks.map((mk) => [mk.batch, mk]));
+  // 基准批次蓝圈（未触发等级时；触发等级由等级标记呈现）
   const futureDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
-    const mk = markOf(payload?.batch);
-    if (mk === "peak") return <circle cx={cx} cy={cy} r={5} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
-    if (mk === "base") return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
+    if (markMap.has(payload?.batch ?? "")) return null;
+    if (payload?.batch === baseLabel && Number.isFinite(cx) && Number.isFinite(cy)) {
+      return <circle cx={cx} cy={cy} r={4.5} fill="#fff" stroke="#2563eb" strokeWidth={2} />;
+    }
     return null;
   };
   const activeDot = (props: DotProps) => {
     const { cx, cy, payload } = props;
-    const color = markOf(payload?.batch) === "peak" ? "#ef4444" : "#2563eb";
+    const mk = markMap.get(payload?.batch ?? "");
+    const color = mk ? mk.color : "#2563eb";
     return <circle cx={cx} cy={cy} r={7} fill={color} fillOpacity={0.3} stroke={color} strokeWidth={1.5} />;
   };
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="batch" tick={{ fontSize: 11, fill: "#6b7280" }} interval={1} axisLine={{ stroke: "#e5e7eb" }} tickLine={false} />
-        <YAxis
-          domain={domain}
-          tick={{ fontSize: 11, fill: "#6b7280" }}
-          axisLine={false}
-          tickLine={false}
-          width={40}
-          unit={cfg.unit || undefined}
-        />
-        <Tooltip content={<TrendTooltip forecast={f} mode={mode} />} />
-        <Legend verticalAlign="bottom" height={24} iconSize={14} wrapperStyle={{ fontSize: 11, color: "#6b7280" }} />
-
-        {/* 预测区（基准批次 → 窗口末点）与基准批次竖向参考线（预测起点） */}
-        <ReferenceArea x1={baseLabel} x2={endLabel} fill="#eff6ff" />
-        <ReferenceLine
-          x={baseLabel}
-          stroke="#9ca3af"
-          strokeDasharray="3 3"
-          label={{ value: "基准批次", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
-        />
-
-        {/* 管控值参考线（橙色虚线）：成品水分允许上下限 / 箱储储存上限；评分兜底模式退回中/高风险阈值 */}
-        {mode === "moist" && m && (
-          <>
-            <ReferenceLine
-              y={m.hi}
-              stroke="#f97316"
-              strokeDasharray="6 4"
-              label={{ value: `上限 ${m.hi}%`, position: "insideTopRight", fontSize: 10, fill: "#f97316" }}
-            />
-            <ReferenceLine
-              y={m.lo}
-              stroke="#f97316"
-              strokeDasharray="6 4"
-              label={{ value: `下限 ${m.lo}%`, position: "insideBottomRight", fontSize: 10, fill: "#f97316" }}
-            />
-          </>
-        )}
-        {mode === "hours" && st && (
-          <ReferenceLine
-            y={st.limitHours}
-            stroke="#f97316"
-            strokeDasharray="6 4"
-            label={{ value: `储存上限 ${st.limitHours}h`, position: "insideTopRight", fontSize: 10, fill: "#f97316" }}
+    <div>
+      <ResponsiveContainer width="100%" height={272}>
+        <ComposedChart data={data} margin={{ top: 20, right: 12, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="batch" tick={{ fontSize: 11, fill: "#6b7280" }} interval={1} axisLine={{ stroke: "#e5e7eb" }} tickLine={false} />
+          <YAxis
+            domain={domain}
+            tick={{ fontSize: 11, fill: "#6b7280" }}
+            axisLine={false}
+            tickLine={false}
+            width={40}
+            unit={cfg.unit || undefined}
           />
-        )}
-        {mode === "score" && (
-          <>
-            <ReferenceLine
-              y={MID_THRESHOLD}
-              stroke="#f97316"
-              strokeDasharray="4 4"
-              label={{ value: `中风险阈值 ${MID_THRESHOLD}`, position: "insideTopLeft", fontSize: 10, fill: "#f97316" }}
-            />
-            <ReferenceLine
-              y={HIGH_THRESHOLD}
-              stroke="#ef4444"
-              strokeDasharray="4 4"
-              label={{ value: `高风险阈值 ${HIGH_THRESHOLD}`, position: "insideTopRight", fontSize: 10, fill: "#ef4444" }}
-            />
-          </>
-        )}
+          <Tooltip content={<TrendTooltip forecast={f} mode={mode} />} />
 
-        <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
-          type="monotone"
-          dataKey="hist"
-          name={cfg.names[0]}
-          stroke="#2563eb"
-          strokeWidth={2}
-          dot={false}
-          activeDot={false}
-          connectNulls={false}
-        />
-        <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
-          type="monotone"
-          dataKey="future"
-          name={cfg.names[1]}
-          stroke="#2563eb"
-          strokeWidth={2}
-          strokeDasharray="6 4"
-          dot={futureDot}
-          activeDot={activeDot}
-          connectNulls={false}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
+          {/* 预测区（基准批次 → 窗口末点）与基准批次竖向参考线（预测起点） */}
+          <ReferenceArea x1={baseLabel} x2={endLabel} fill="#eff6ff" />
+          <ReferenceLine
+            x={baseLabel}
+            stroke="#9ca3af"
+            strokeDasharray="3 3"
+            label={{ value: "基准批次", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
+          />
+
+          {/* 管控值参考线（橙色虚线）：成品水分允许上下限 / 箱储储存上限；评分兜底模式退回阈值线 */}
+          {mode === "moist" && m && (
+            <>
+              <ReferenceLine
+                y={m.hi}
+                stroke="#f97316"
+                strokeDasharray="6 4"
+                label={{ value: `上限 ${m.hi}%`, position: "insideTopRight", fontSize: 10, fill: "#f97316" }}
+              />
+              <ReferenceLine
+                y={m.lo}
+                stroke="#f97316"
+                strokeDasharray="6 4"
+                label={{ value: `下限 ${m.lo}%`, position: "insideBottomRight", fontSize: 10, fill: "#f97316" }}
+              />
+            </>
+          )}
+          {mode === "hours" && st && (
+            <ReferenceLine
+              y={st.limitHours}
+              stroke="#f97316"
+              strokeDasharray="6 4"
+              label={{ value: `储存上限 ${st.limitHours}h`, position: "insideTopRight", fontSize: 10, fill: "#f97316" }}
+            />
+          )}
+          {mode === "score" && (
+            <>
+              <ReferenceLine
+                y={MID_THRESHOLD}
+                stroke="#f97316"
+                strokeDasharray="4 4"
+                label={{ value: `关注阈值 ${MID_THRESHOLD}`, position: "insideTopLeft", fontSize: 10, fill: "#f97316" }}
+              />
+              <ReferenceLine
+                y={HIGH_THRESHOLD}
+                stroke="#ef4444"
+                strokeDasharray="4 4"
+                label={{ value: `告警阈值 ${HIGH_THRESHOLD}`, position: "insideTopRight", fontSize: 10, fill: "#ef4444" }}
+              />
+            </>
+          )}
+
+          {/* 等级变化标记：白心 + 等级色描边 + 等级名标注（升级点逐点标注，首达最高等级重点显示） */}
+          {marks.map((mk) => (
+            <ReferenceDot
+              key={`mk-${mk.batch}`}
+              x={mk.batch}
+              y={mk.value}
+              r={mk.prominent ? 6 : 4}
+              fill="#fff"
+              stroke={mk.color}
+              strokeWidth={mk.prominent ? 2 : 1.5}
+              label={{ value: mk.level, position: "top", fontSize: 10, fill: mk.color }}
+            />
+          ))}
+
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
+            type="monotone"
+            dataKey="hist"
+            name={cfg.names[0]}
+            stroke="#2563eb"
+            strokeWidth={2}
+            dot={false}
+            activeDot={false}
+            connectNulls={false}
+          />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
+            type="monotone"
+            dataKey="future"
+            name={cfg.names[1]}
+            stroke="#2563eb"
+            strokeWidth={2}
+            strokeDasharray="6 4"
+            dot={futureDot}
+            activeDot={activeDot}
+            connectNulls={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      {/* 图例（手写，替代 recharts Legend）：历史实测 / 预测趋势 / 管控值 / 基准批次 / 告警等级 */}
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-0.5 w-5 bg-primary-600" />
+          历史实测
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-0.5 w-5 border-t-2 border-dashed border-primary-600" />
+          预测趋势
+        </span>
+        {mode !== "score" && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-0.5 w-5 border-t-2 border-dashed border-orange-500" />
+            管控值
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-full border-2 border-blue-700 bg-white" />
+          基准批次
+        </span>
+        {marks.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-red-500 bg-white" />
+            告警等级
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

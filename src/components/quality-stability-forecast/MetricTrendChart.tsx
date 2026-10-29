@@ -336,20 +336,23 @@ export function MetricTrendChart({
                     {isHist ? "实际值" : "预测值"}：{value.toFixed(metric.decimals)}
                     {metric.unit}
                   </p>
-                  {exceed !== null && <p className="mt-0.5 font-medium text-red-500">超出量：{exceed}</p>}
-                  {rule &&
-                    (lv ? (
-                      <p className="mt-0.5 font-medium" style={{ color: LEVEL_COLOR[lv] }}>
-                        告警等级：{lv}
-                      </p>
-                    ) : (
-                      <p className="mt-0.5 text-green-600">告警等级：正常</p>
-                    ))}
-                  {pt?.batch && <p className="mt-0.5 text-gray-500">批次：第 {pt.batch} 批</p>}
-                  <p className="mt-0.5 text-gray-500">机台：{forecast.machine}</p>
-                  {pt?.shift && <p className="mt-0.5 text-gray-500">班次：{pt.shift}</p>}
-                  {pt?.shiftGroup && <p className="mt-0.5 text-gray-500">班组：{pt.shiftGroup}</p>}
-                  {pt?.brand && <p className="mt-0.5 text-gray-500">牌号：{pt.brand}</p>}
+                  {/* 信息未知显示 —（未越界 / 未配置规则 / 该周期无此字段） */}
+                  <p className={`mt-0.5 font-medium ${exceed !== null ? "text-red-500" : "text-gray-400"}`}>
+                    超出量：{exceed ?? "—"}
+                  </p>
+                  {lv ? (
+                    <p className="mt-0.5 font-medium" style={{ color: LEVEL_COLOR[lv] }}>
+                      告警等级：{lv}
+                    </p>
+                  ) : (
+                    <p className={`mt-0.5 font-medium ${rule ? "text-green-600" : "text-gray-400"}`}>
+                      告警等级：{rule ? "正常" : "—"}
+                    </p>
+                  )}
+                  <p className="mt-0.5 text-gray-500">批次：{pt?.batch ? `第 ${pt.batch} 批` : "—"}</p>
+                  <p className="mt-0.5 text-gray-500">牌号：{pt?.brand ?? "—"}</p>
+                  <p className="mt-0.5 text-gray-500">班次：{pt?.shift ?? "—"}</p>
+                  <p className="mt-0.5 text-gray-500">班组：{pt?.shiftGroup ?? "—"}</p>
                 </div>
               );
             }}

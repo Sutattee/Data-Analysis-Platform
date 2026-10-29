@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
+import { BrandFilter } from "@/components/forecast/BrandFilter";
 import { RiskTrendChart } from "./RiskTrendChart";
 import { RiskContributionChart, SourceBreakdownChart } from "./RiskSourceCharts";
 import {
@@ -19,7 +20,8 @@ import {
   defaultTargetOf,
   forecastDefectOf,
   forecastOf,
-  highRiskEta,
+  levelChangeOf,
+  levelClsOf,
   levelOf,
   peakOf,
   storageResultOf,
@@ -87,52 +89,6 @@ function Delayed({ delay, children }: { delay: number; children: ReactNode }) {
   return <>{children}</>;
 }
 
-// 牌号筛选（预测趋势图右上角）：不同牌号的预测趋势不同，切换即整轮切换
-function BrandFilter({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  if (options.length === 0) return null;
-  return (
-    <div className="relative">
-      {open && <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-400 hover:text-primary-600"
-      >
-        牌号：<span className="font-medium text-gray-800">{value}</span>
-        <span className="text-gray-400">▾</span>
-      </button>
-      {open && (
-        <div className="absolute right-0 z-30 mt-1 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
-          {options.map((b) => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => {
-                onChange(b);
-                setOpen(false);
-              }}
-              className={`block w-full px-3 py-1.5 text-left text-xs transition-colors hover:bg-primary-50 ${
-                b === value ? "bg-primary-50 font-medium text-primary-700" : "text-gray-600"
-              }`}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // 深链初始选中（?code=&object=&batch=，来自工作台「预测详情」）：code 取默认兜底，
 // object 按对象名匹配有效预测，batch 须命中该对象，任一无效则回退该缺陷的默认目标
 function deepTargetOf(params: URLSearchParams) {
@@ -171,7 +127,7 @@ export function DefectForecastView() {
   const forecast = forecastOf(code, objectKey, batch);
   const peak = peakOf(forecast);
   const lv = peak ? levelOf(peak.score) : null;
-  const eta = highRiskEta(forecast);
+  const change = levelChangeOf(forecast);
   const texts = aiInterpretation(forecast);
   // 流式时序：AI 解读三段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载贡献度 / 来源分布 / 参数表
   const sectionDelays: number[] = [];
@@ -202,15 +158,16 @@ export function DefectForecastView() {
     setInterpreting(false);
   }
 
-  // 高风险预测口径配色：已达/预计达阈值 红，单点无时序 灰，数据不足 浅灰
-  const etaCls =
-    eta.kind === "reached" || eta.kind === "within"
-      ? "text-red-600"
-      : eta.kind === "noSeries"
-        ? "text-gray-500"
-        : forecast.status === "insufficient"
-          ? "text-gray-400"
-          : "text-gray-900";
+  // 等级变化文案配色（与稳定性预测页同口径）：升级按目标等级 / 同级持续按当前等级 /
+  // 降级为好转（绿）/ 窗口内正常·暂无法预测 深灰
+  const changeCls =
+    change.kind === "upgrade" && change.toLevel !== undefined
+      ? levelClsOf(change.toLevel)
+      : change.kind === "hold" && lv
+        ? lv.textCls
+        : change.kind === "degrade"
+          ? "text-green-600"
+          : "text-gray-800";
 
   // 成品水分与允许范围对比标签（新口径：预测值 − 允许上限）：超上限浅橙底橙字 / 低于下限浅蓝底蓝字 / 范围内灰
   const overKind = forecast.moisture?.overKind;
@@ -268,10 +225,10 @@ export function DefectForecastView() {
         }
       >
         <div className={`grid gap-6 px-5 pb-5 pt-2 ${forecast.moisture || st ? "lg:grid-cols-2" : ""}`}>
-          {/* 左：风险结论（等级大字 + 进入高风险批次） */}
+          {/* 左：风险结论（窗口最高等级大字 + 等级变化预测） */}
           <div>
             <p className="text-xs text-gray-400">
-              {forecast.status === "ok" ? "未来最高风险" : "本轮预测"}
+              {forecast.status === "ok" ? `${windowTextOf(forecast)}最高等级` : "本轮预测"}
             </p>
             <div className="mt-2">
               {lv ? (
@@ -284,7 +241,7 @@ export function DefectForecastView() {
               )}
             </div>
             <div className="mt-2">
-              <span className={`text-sm font-medium ${etaCls}`}>{eta.text}</span>
+              <span className={`text-sm font-medium ${changeCls}`}>{change.text}</span>
             </div>
             {!peak && <p className="mt-1 text-xs text-gray-400">必需输入不足，本轮未生成预测</p>}
           </div>
@@ -425,7 +382,8 @@ export function DefectForecastView() {
             value={peak ? `${peak.score.toFixed(1)}分` : "—"}
             valueCls={lv ? lv.textCls : "text-gray-400"}
           />
-          <SummaryItem label="风险等级" value={lv ? lv.label : "—"} valueCls={lv ? lv.textCls : "text-gray-400"} />
+          <SummaryItem label="预测最高等级" value={lv ? lv.label : "—"} valueCls={lv ? lv.textCls : "text-gray-400"} />
+          <SummaryItem label="等级变化预测" value={change.text} valueCls={changeCls} />
           {forecast.confidence !== undefined && (
             <SummaryItem label="模型置信度" value={`${Math.round(forecast.confidence * 100)}%`} />
           )}

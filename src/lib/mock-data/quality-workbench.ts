@@ -13,7 +13,7 @@ import {
 } from "./defect-diagnosis-flow";
 import {
   forecastOf,
-  highRiskEta,
+  levelChangeOf as defectLevelChangeOf,
   peakOf,
   UPDATED_AT,
   type DefectCode,
@@ -254,14 +254,14 @@ function buildAttentions(): WorkbenchAttention[] {
 
   const f2 = forecastOf("YZCB", "ZJ17-04卷接机组", "P20261019-11");
   const peak = peakOf(f2);
-  const eta = highRiskEta(f2);
+  const change = defectLevelChangeOf(f2);
   list.push({
     key: "p2",
     kind: "缺陷预测",
     name: "烟支刺破风险评分",
     machine: "ZJ17-04卷接机组",
     statusText: "未触发告警",
-    summary: peak ? `预测窗口最高 ${peak.score.toFixed(1)} 分（${peak.display}），${eta.text}` : eta.text,
+    summary: peak ? `预测窗口最高 ${peak.score.toFixed(1)} 分（${peak.display}），${change.text}` : change.text,
     updatedLabel: UPDATED_AT.slice(-5),
     forecastHref: `/quality/forecast/defect?code=YZCB&object=${enc("ZJ17-04卷接机组")}&batch=${enc("P20261019-11")}`,
   });

@@ -592,6 +592,30 @@ export function peakOfForecast(f: StabilityForecast): ForecastPeak | null {
   return { value: minV, side: "下限", over: minV < t ? t - minV : undefined };
 }
 
+// ============ 牌号视角（趋势图右上角牌号筛选） ============
+
+// 牌号筛选选项：全部 + 平台牌号
+export const STABILITY_BRAND_OPTIONS = ["全部", ...BRAND_OPTIONS];
+
+// 牌号视角预测：以横轴刻度为键对历史 / 预测序列做确定性扰动（同一牌号在同一刻度的偏移稳定，
+// 基准点 = 历史末点 = 预测首点 三方同口径保持一致），批 / 班周期点位的牌号字段改写为所选牌号
+// （月 / 日周期按自然周期聚合，无数值字段不携带）；「全部」与数据不足 / 预测失败对象原样返回（不编造曲线）
+export function forecastWithBrand(f: StabilityForecast, brand: string): StabilityForecast {
+  if (brand === "全部" || f.insufficient || f.failed) return f;
+  const metric = metricOf(f.code)!;
+  const amp = Math.abs(f.base) * 0.05 + 0.02; // 扰动幅度 ≈ 基准值的 5%
+  const shiftOf = (label: string) =>
+    Math.sin((hashOf(`${brand}|${f.code}|${f.machine}|${label}`) / 9973) * Math.PI * 2) * amp;
+  const perturb = (p: TrendPoint): TrendPoint => ({
+    ...p,
+    value: roundTo(p.value + shiftOf(p.label), metric.decimals),
+    brand: metric.cycle === "批" || metric.cycle === "班" ? brand : undefined,
+  });
+  const hist = f.hist.map(perturb);
+  const future = f.future.map(perturb);
+  return { ...f, base: hist[hist.length - 1].value, hist, future };
+}
+
 // ============ 查询接口 ============
 
 // 机台标签等级：AlertLevel = 预测最高等级；"normal" = 预测正常；"none" = 无有效预测（未配置 / 数据不足 / 预测失败）
@@ -640,14 +664,17 @@ export function topMachineOf(code: string): string {
   return metricMachinesOf(code)[0]?.machine ?? "";
 }
 
-export function stabilityForecastOf(code: string, machine: string): StabilityForecast | undefined {
-  return FORECASTS.find((f) => f.code === code && f.machine === machine);
+// brand = 牌号视角（默认「全部」原始口径）；见 forecastWithBrand
+export function stabilityForecastOf(code: string, machine: string, brand = "全部"): StabilityForecast | undefined {
+  const f = FORECASTS.find((x) => x.code === code && x.machine === machine);
+  return f ? forecastWithBrand(f, brand) : undefined;
 }
 
 // 全部机台综合预测：有效机台（剔除数据不足 / 预测失败）逐点均值合成单条曲线；
 // 时间维度字段（批号 / 班次）保留、机台差异字段（班组 / 牌号）剔除；
-// 参数值与置信度取有效均值，更新时间取最新；无有效机台返回 undefined（视图走占位分支）
-export function combinedForecastOf(code: string): StabilityForecast | undefined {
+// 参数值与置信度取有效均值，更新时间取最新；无有效机台返回 undefined（视图走占位分支）；
+// brand = 牌号视角（默认「全部」原始口径），综合曲线同样按牌号扰动并给点位补牌号字段
+export function combinedForecastOf(code: string, brand = "全部"): StabilityForecast | undefined {
   const metric = metricOf(code);
   if (!metric) return undefined;
   const valid = FORECASTS.filter((f) => f.code === code && !f.insufficient && !f.failed);
@@ -674,16 +701,19 @@ export function combinedForecastOf(code: string): StabilityForecast | undefined 
       phi: Math.round(avg(valid.map((f) => f.params[i].phi)) * 100) / 100,
     };
   });
-  return {
-    code,
-    machine: "全部机台",
-    base: hist[hist.length - 1].value,
-    confidence: confs.length === 0 ? null : Math.round(avg(confs) * 100) / 100,
-    updatedAt: valid.reduce((m, f) => (f.updatedAt > m ? f.updatedAt : m), valid[0].updatedAt),
-    hist,
-    future,
-    params,
-  };
+  return forecastWithBrand(
+    {
+      code,
+      machine: "全部机台",
+      base: hist[hist.length - 1].value,
+      confidence: confs.length === 0 ? null : Math.round(avg(confs) * 100) / 100,
+      updatedAt: valid.reduce((m, f) => (f.updatedAt > m ? f.updatedAt : m), valid[0].updatedAt),
+      hist,
+      future,
+      params,
+    },
+    brand
+  );
 }
 
 // 无实测记录的组合用确定性模拟兜底（牌号 / 班次；批号与图表基准批次对齐，见 contextOf）

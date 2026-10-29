@@ -1,8 +1,9 @@
 "use client";
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
-// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：最大预测值 + 超上限·超下限 + 管控值，
-// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数）右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
+// 默认「全部」综合曲线）→ 预测概况（左未来结论 / 右窗口预测极值：预测值 + 超上限·超下限 + 管控值，
+// 辅助字段收进预测详情抽屉）→ 左列（预测趋势 + 来源工序参数，趋势图右上角牌号筛选切换牌号视角数据）
+// 右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
 // 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
@@ -12,12 +13,14 @@ import { Drawer } from "@/components/ui/Drawer";
 import { StreamText } from "@/components/ui/StreamText";
 import { WarningIcon } from "@/components/ui/WarningIcon";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
+import { BrandFilter } from "@/components/forecast/BrandFilter";
 import { SourceBreakdownChart } from "@/components/quality-forecast/RiskSourceCharts";
 import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 import { QUALITY_ALERT_METRICS } from "@/lib/mock-data/quality-alerts";
 import type { AlertRecord } from "@/types";
 import {
   LEVEL_TEXT_CLS,
+  STABILITY_BRAND_OPTIONS,
   STABILITY_METRICS,
   aiInterpretation,
   combinedForecastOf,
@@ -75,6 +78,8 @@ export function StabilityForecastView() {
   });
   const [code, setCode] = useState(initial.metric);
   const [machine, setMachine] = useState(initial.machine);
+  // 牌号筛选（趋势图右上角）：不同牌号的预测趋势与数据不同，切换即整轮重算
+  const [brand, setBrand] = useState("全部");
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
   // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 来源工序参数），点击按钮后流式生成
@@ -84,12 +89,19 @@ export function StabilityForecastView() {
 
   const metric = metricOf(code)!;
   const machineText = machine === "全部" ? "全部机台" : machine;
-  const forecast = machine === "全部" ? combinedForecastOf(code) : stabilityForecastOf(code, machine);
+  const forecast = machine === "全部" ? combinedForecastOf(code, brand) : stabilityForecastOf(code, machine, brand);
 
-  // 切换指标：机台重置为「全部」（深链机台随指标失效），全量联动；解读区收起回到按钮态
+  // 切换指标：机台 / 牌号重置为「全部」（深链机台随指标失效），全量联动；解读区收起回到按钮态
   function changeCode(v: string) {
     setCode(v);
     setMachine("全部");
+    setBrand("全部");
+    setInterpreting(false);
+  }
+
+  // 切换牌号：趋势图与全部派生数据（卡片 / 详情 / 解读）按牌号视角重算；解读区收起回到按钮态
+  function changeBrand(v: string) {
+    setBrand(v);
     setInterpreting(false);
   }
 
@@ -215,7 +227,7 @@ export function StabilityForecastView() {
   const contributions = contributionsOf(forecast);
   // 无规则时贡献与分布均进入空状态
   const breakdown = metric.rule ? sourceBreakdownOf(forecast) : [];
-  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：最大预测值 + 超上限·超下限超出量
+  // 窗口最不利预测极值（卡片右侧 / 预测详情抽屉共用）：预测值 + 超上限·超下限超出量
   const peak = peakOfForecast(forecast);
   const ai = aiInterpretation(forecast, code, machineText);
   // 流式时序：解读各段逐字（8ms/字，段间停顿 200ms）→ 打完后延迟挂载来源参数 / 风险来源 / 来源分布
@@ -300,9 +312,9 @@ export function StabilityForecastView() {
             </div>
           </div>
 
-          {/* 右：窗口预测极值（最大预测值深色大数字 + 超上限/超下限超出量 + 管控值小字） */}
+          {/* 右：窗口预测极值（预测值深色大数字 + 超上限/超下限超出量 + 管控值小字） */}
           <div>
-            <p className="text-xs text-gray-400">最大预测值</p>
+            <p className="text-xs text-gray-400">预测值</p>
             <div className="mt-2 flex flex-wrap items-baseline gap-1">
               <span className="text-2xl font-bold tabular-nums text-gray-900">
                 {peak ? peak.value.toFixed(metric.decimals) : "—"}
@@ -323,9 +335,12 @@ export function StabilityForecastView() {
       {/* 左右布局：左 = 预测趋势 + 来源工序参数；右 = AI 解读 + 风险来源 + 工序分布（紧凑一屏） */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
-          {/* 指标预测趋势 */}
+          {/* 指标预测趋势：右上角牌号筛选（全部 / 娇子 / 长城 / 宽窄），筛选后展示该牌号视角的趋势与数据 */}
           <Card>
-            <h3 className="mb-1 text-sm font-semibold text-gray-800">{metric.name}预测趋势</h3>
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-800">{metric.name}预测趋势</h3>
+              <BrandFilter options={STABILITY_BRAND_OPTIONS} value={brand} onChange={changeBrand} />
+            </div>
             <MetricTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 
