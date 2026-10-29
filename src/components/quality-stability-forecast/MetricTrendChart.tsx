@@ -1,7 +1,7 @@
 "use client";
 
 // 指标预测趋势图：历史实测实线 + 预测虚线 + 管控值线（橙色虚线，双侧型两条 + 区间底色）+ 等级升级标记
-// + 基准竖线（灰色虚线，标注「基准批次」/「基准日期」）；管控值 = 等级规则最轻级边界（仅一条橙线
+// + 基准竖线（灰色虚线，无文字标注）；管控值 = 等级规则最轻级边界（仅一条橙线
 // 标注数值，不逐等级画线）；首达预测最高等级的点重点标注；纵轴为指标实际数值及单位；
 // 横轴展示批号 / 月份 / 日期（班周期指标同为批次刻度，班次信息在悬浮提示）
 import {
@@ -166,12 +166,11 @@ export function MetricTrendChart({
           />
           {/* 预测区（基准 → 窗口末）浅色底 */}
           <ReferenceArea x1={baseLabel} x2={lastLabel} fill="#2563eb" fillOpacity={0.04} />
-          {/* 基准竖线：基准批次 / 基准日期（日周期）——历史与预测的分界，灰色虚线标注 */}
+          {/* 基准竖线（历史与预测的分界，灰色虚线，不带文字标注） */}
           <ReferenceLine
             x={baseLabel}
             stroke={BASELINE_COLOR}
             strokeDasharray="4 4"
-            label={{ value: metric.cycle === "日" ? "基准日期" : "基准批次", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
           />
           {/* 管控值线：最轻级边界一条橙色虚线（双侧型 = 上下两条 + 正常区间浅色底），标注管控值数值 */}
           {lightest && rule && rule.op === "between" && lightest.low !== undefined && lightest.high !== undefined && (

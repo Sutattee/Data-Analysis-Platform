@@ -305,13 +305,12 @@ export function RiskTrendChart({
           />
           <Tooltip content={<TrendTooltip forecast={f} mode={mode} />} />
 
-          {/* 预测区（基准批次 → 窗口末点）与基准批次竖向参考线（预测起点） */}
+          {/* 预测区（基准批次 → 窗口末点）与基准竖向参考线（预测起点，无文字标注） */}
           <ReferenceArea x1={baseLabel} x2={endLabel} fill="#eff6ff" />
           <ReferenceLine
             x={baseLabel}
             stroke="#9ca3af"
             strokeDasharray="3 3"
-            label={{ value: "基准批次", position: "insideTop", fontSize: 10, fill: "#6b7280" }}
           />
 
           {/* 管控值参考线（橙色虚线）：成品水分允许上下限 / 箱储储存上限；评分兜底模式退回阈值线 */}
@@ -393,7 +392,7 @@ export function RiskTrendChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      {/* 图例（手写，替代 recharts Legend）：历史实测 / 预测趋势 / 管控值 / 基准批次 / 告警等级 */}
+      {/* 图例（手写，替代 recharts Legend）：历史实测 / 预测趋势 / 管控值 / 告警等级 */}
       <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
         <span className="flex items-center gap-1">
           <span className="inline-block h-0.5 w-5 bg-primary-600" />
@@ -409,10 +408,6 @@ export function RiskTrendChart({
             管控值
           </span>
         )}
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full border-2 border-blue-700 bg-white" />
-          基准批次
-        </span>
         {marks.length > 0 && (
           <span className="flex items-center gap-1">
             <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-red-500 bg-white" />

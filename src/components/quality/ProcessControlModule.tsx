@@ -80,7 +80,7 @@ export function ProcessControlModule() {
                   >
                     {m.deviation}
                   </td>
-                  {/* 近期均值：值「｜」统计周期（近10批次 / 近3个月 / 近10班次） */}
+                  {/* 近期均值：值「｜」统计周期（近10批次 / 近30日） */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="text-gray-800">{m.recent}</span>
                     <span className="text-gray-300">｜</span>

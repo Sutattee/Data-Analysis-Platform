@@ -101,7 +101,7 @@ export interface ProcessMetric {
   latestNum: number; // 最新监测数值（与管控值比较，超标准标红）
   recent: string; // 近期均值展示
   recentNum: number; // 近期均值数值
-  recentNote: string; // 近期均值统计周期（近10批次 / 近3个月）
+  recentNote: string; // 近期均值统计周期（近10批次 / 近30日）
   deviation: string; // 超限比例展示（相对管控值；如 +20% / +15% / 0% / -，- = 待配置无基准）
   tolerance: string; // 管控值展示（如 ≤4.0% / ≤3次 / 12.50%～13.50% / 待配置）
   toleranceNum: number | null; // 上限型管控值数值（null = 非上限型或待配置）
@@ -180,7 +180,7 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     latestNum: 0,
     recent: "1次",
     recentNum: 1,
-    recentNote: "近3个月",
+    recentNote: "近30日",
     deviation: "0%",
     tolerance: "≤3次",
     toleranceNum: 3,
