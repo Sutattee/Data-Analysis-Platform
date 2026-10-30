@@ -989,6 +989,20 @@ export function batchTrend(records: DefectRecord[], batches: string[]): { batch:
   return batches.map((b) => ({ batch: b, count: byBatch.get(b) ?? 0 }));
 }
 
+// 窗口内日期列表（含两端，含无记录日；供时间口径趋势图横轴）
+export function daysInRange(range: { from: string; to: string }): string[] {
+  const out: string[] = [];
+  for (let d = range.from; d <= range.to; d = addDaysISO(d, 1)) out.push(d);
+  return out;
+}
+
+// 日粒度趋势：窗口内逐日缺陷条数（维度筛选后无记录的日期补 0，保持折线连续）
+export function dayTrend(records: DefectRecord[], days: string[]): { day: string; count: number }[] {
+  const byDay = new Map<string, number>();
+  for (const r of records) byDay.set(r.date, (byDay.get(r.date) ?? 0) + r.count);
+  return days.map((d) => ({ day: d, count: byDay.get(d) ?? 0 }));
+}
+
 // 热力图列取值（固定顺序，保证矩阵稳定；与筛选值同构，列头展示时再格式化）
 const HEAT_COLS: Record<HeatDim, string[]> = {
   grade: GRADE_OPTIONS,

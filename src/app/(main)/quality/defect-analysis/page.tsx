@@ -11,7 +11,9 @@ import { DefectDiagnosisDrawer } from "@/components/quality-defect/DefectDiagnos
 import {
   DEFECT_RECORDS,
   DEFAULT_DEFECT_FILTERS,
-  batchesInRange,
+  batchTrend,
+  dayTrend,
+  daysInRange,
   filterByBatches,
   filterByRange,
   filterDims,
@@ -55,11 +57,6 @@ export default function DefectAnalysisPage() {
 
   // 统计周期窗口（时间或批次形态）
   const win = useMemo(() => windowOf(filters.period), [filters.period]);
-  // 趋势图横轴批次列表（批次号升序；批次口径 = 窗口批次本身）
-  const batches = useMemo(
-    () => (win.mode === "batches" ? win.batches : batchesInRange(filterByRange(DEFECT_RECORDS, win.range))),
-    [win]
-  );
 
   // 指标卡 / 趋势图 / 明细表：完整筛选（周期 + 维度）
   const cur = useMemo(() => filterRecords(DEFECT_RECORDS, filters), [filters]);
@@ -72,6 +69,21 @@ export default function DefectAnalysisPage() {
     [filters, win]
   );
   const summary = useMemo(() => summarize(cur, prev), [cur, prev]);
+
+  // 趋势图点列：时间口径按日聚合（横轴日期 MM-DD，无记录日补 0），批次口径按批次聚合（横轴批次号）
+  const trend = useMemo(() => {
+    if (win.mode === "batches") {
+      return {
+        unit: "批次" as const,
+        points: batchTrend(cur, win.batches).map((t) => ({ label: t.batch, count: t.count })),
+      };
+    }
+    const days = daysInRange(win.range);
+    return {
+      unit: "日" as const,
+      points: dayTrend(cur, days).map((t) => ({ label: t.day.slice(5), count: t.count })),
+    };
+  }, [cur, win]);
 
   // 热力图：仅随统计周期变化，不随部位/类别等筛选
   const heatRecords = useMemo(
@@ -124,7 +136,7 @@ export default function DefectAnalysisPage() {
         <DefectSummaryCards summary={summary} />
 
         <div className="grid gap-3 xl:grid-cols-2">
-          <DefectTrendChart records={cur} batches={batches} total={summary.total} />
+          <DefectTrendChart points={trend.points} unit={trend.unit} total={summary.total} />
           <PartDimHeatmap records={heatRecords} selected={heatSel} onSelect={handleHeatSelect} />
         </div>
 
