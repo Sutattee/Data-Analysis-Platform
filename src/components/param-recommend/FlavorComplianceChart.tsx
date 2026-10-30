@@ -2,7 +2,7 @@
 
 // 右图 · 加香出口水分：实际与建议（与左图同一组历史批次，不含未来点）
 // 蓝实线=实际值；绿实线+方点=建议值（开工时锁定的推荐版本，无推荐空缺不连线）；
-// 实际值超上限/低于下限的批次点为橙红色（异常）；浅绿 ReferenceArea=按连续同标准版本分段的合格区间。
+// 实际值超上限/低于下限的批次点为橙红色（异常）；浅绿 ReferenceArea=按连续同标准版本分段的合格区间（无版本标注）。
 import {
   CartesianGrid,
   Line,
@@ -30,14 +30,13 @@ interface Row {
   record: BatchRecord;
 }
 
-/** 连续同标准版本段（用于分段绘制合格区间与版本标注） */
+/** 连续同标准版本段（用于分段绘制合格区间） */
 interface Segment {
   key: string;
   x1: string;
   x2: string;
   low: number;
   high: number;
-  ver: string;
 }
 
 const BLUE = "#2563eb";
@@ -65,7 +64,7 @@ export function FlavorComplianceChart({
 
   // 连续同标准段（标准缺失批不参与成段）
   const segments: Segment[] = [];
-  let cur: { key: string; ver: string; low: number; high: number; x1: string; x2: string } | null = null;
+  let cur: { key: string; low: number; high: number; x1: string; x2: string } | null = null;
   for (const r of rows) {
     const std = stdOf(r.record.brand, (r.record.startAt ?? r.record.planStart).slice(0, 10));
     const key = std ? `${r.record.brand}|${std.ver}` : null;
@@ -73,7 +72,7 @@ export function FlavorComplianceChart({
       cur.x2 = r.label;
     } else {
       if (cur) segments.push(cur);
-      cur = std && key ? { key, ver: std.ver, low: std.low, high: std.high, x1: r.label, x2: r.label } : null;
+      cur = std && key ? { key, low: std.low, high: std.high, x1: r.label, x2: r.label } : null;
     }
   }
   if (cur) segments.push(cur);
@@ -143,7 +142,7 @@ export function FlavorComplianceChart({
                     );
                   }}
                 />
-                {/* 分段合格区间：浅绿底 + 版本标注（标准换版处分段） */}
+                {/* 分段合格区间：浅绿底（标准换版处分段，无版本标注） */}
                 {segments.map((s) => (
                   <ReferenceArea
                     key={`${s.key}-${s.x1}`}
@@ -153,7 +152,6 @@ export function FlavorComplianceChart({
                     y2={s.high}
                     fill={GREEN}
                     fillOpacity={0.08}
-                    label={{ value: s.ver, position: "insideTop", fontSize: 9, fill: "#6b7280" }}
                   />
                 ))}
                 {/* 建议值：绿实线 + 方点（开工时锁定的推荐版本）；无历史推荐的批次空缺不连线 */}

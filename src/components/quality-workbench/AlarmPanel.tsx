@@ -123,7 +123,7 @@ export function AlarmPanel({
                       </button>
                     )}
                     <button
-                      className={`qw-button${a.level === "危险" ? " primary" : ""}`}
+                      className="qw-button primary"
                       onClick={() => router.push(a.handleHref)}
                     >
                       处理告警
