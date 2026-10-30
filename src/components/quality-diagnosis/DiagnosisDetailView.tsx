@@ -85,15 +85,9 @@ export function DiagnosisDetailView() {
         {judgeBadgeOf(task)}
       </div>
 
-      {/* 紧凑摘要：基础信息单行（机台/箱储对象 · 批次 · 牌号 · 班组 · 检验时间 · 缺陷类别 · 工序）+ 浅蓝条异常表现 */}
+      {/* 紧凑摘要：基础信息单行（批次 · 牌号 · 班组 · 检验时间 · 缺陷类别 · 工序，不含机台/箱储对象）+ 浅蓝条异常表现 */}
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-xs text-gray-400">
-          <span>
-            {isStorage ? "箱储对象" : "机台"}{" "}
-            <span className="text-gray-500">
-              {isStorage ? `${task.storage!.object}（${task.storage!.objectCode}）` : task.occurrence.machine}
-            </span>
-          </span>
           <span>
             批次 <span className="text-gray-500">{isStorage ? task.storage!.batch : task.occurrence.batch}</span>
           </span>

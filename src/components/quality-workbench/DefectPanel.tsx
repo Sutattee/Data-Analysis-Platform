@@ -45,9 +45,7 @@ export function DefectPanel({
                   </span>
                 )}
               </h3>
-              <div className="qw-defect-context">
-                {d.machine} · 批次 {d.batch}
-              </div>
+              <div className="qw-defect-context">批次 {d.batch}</div>
               <div className="qw-defect-context">
                 {d.brand} · {d.shift} · {d.date} {d.time}
               </div>

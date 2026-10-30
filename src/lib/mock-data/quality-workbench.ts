@@ -170,7 +170,6 @@ export function sortAlarms(alarms: WorkbenchAlarm[], key: AlarmSortKey): Workben
 export interface WorkbenchDefect {
   taskId: string;
   name: string;
-  machine: string;
   batch: string;
   brand: string;
   shift: string;
@@ -197,8 +196,7 @@ function buildDefects(): WorkbenchDefect[] {
       return {
         taskId: t.id,
         name: t.occurrence.name,
-        // 箱储任务对象/批次以 MES 为准（与缺陷诊断页同口径：1#储丝柜（CG-01）· YS-xxxx）
-        machine: t.storage ? `${t.storage.object}（${t.storage.objectCode}）` : t.occurrence.machine,
+        // 箱储任务批次以 MES 为准（YS-xxxx，与缺陷诊断页同口径）
         batch: t.storage ? t.storage.batch : t.occurrence.batch,
         brand: t.occurrence.brand,
         shift: t.occurrence.shift,

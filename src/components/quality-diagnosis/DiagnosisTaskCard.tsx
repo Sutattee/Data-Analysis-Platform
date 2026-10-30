@@ -21,7 +21,7 @@ export function judgeBadgeOf(t: DiagTask) {
 
 const num = (n: number) => n.toLocaleString("en-US");
 
-// 任务卡片（紧凑）：标题+处理状态 → 对象/批次、牌号/班组/时间（灰色小字）→ 异常表现（黑色常规）
+// 任务卡片（紧凑）：标题+处理状态 → 批次、牌号/班组/时间（灰色小字，不含机台/箱储对象）→ 异常表现（黑色常规）
 // → 诊断摘要（一行截断）→ 单主按钮；卡片其他区域无跳转
 export function DiagnosisTaskCard({ task, onOpen }: { task: DiagTask; onOpen: (t: DiagTask) => void }) {
   const rate = defectRateOf(task);
@@ -44,12 +44,10 @@ export function DiagnosisTaskCard({ task, onOpen }: { task: DiagTask; onOpen: (t
         {judgeBadgeOf(task)}
       </div>
 
-      {/* 对象信息：灰色小字两行 */}
+      {/* 批次/牌号信息：灰色小字两行（机台/箱储对象不展示） */}
       <div className="text-xs leading-5 text-gray-400">
         <div className="truncate">
-          {isStorage ? `${task.storage!.object}（${task.storage!.objectCode}）` : task.occurrence.machine}
-          {" · 批次 "}
-          {isStorage ? task.storage!.batch : task.occurrence.batch}
+          批次 {isStorage ? task.storage!.batch : task.occurrence.batch}
         </div>
         <div className="truncate">
           {task.occurrence.brand} · {task.occurrence.shift} · {task.occurrence.date} {task.occurrence.time}
