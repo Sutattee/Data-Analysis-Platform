@@ -1,7 +1,7 @@
 "use client";
 
 // 下一批次推荐卡：已生成时左中右三栏 —— 左：💧 标签 + 大号建议值（数字从 0 增长动效）+ 允许范围区间位置横条；
-// 中：模型置信度 / 有效批次 / 历史批次范围（模型计算采用的近 10 个有效批次）；右：牌号产线 / 下一批次。三栏间距高度对齐。
+// 中：模型置信度 / 模型版本 / 历史批次范围（模型计算采用的近 10 个有效批次）；右：牌号产线 / 下一批次 / 工单号。三栏间距高度对齐。
 // 已生成不展示状态标签；数据不足 / 暂无待生产仅文字说明；超出工艺范围 / 生成失败保留状态标签与原因文案；
 // 重算期间（updating）仅降透明度提示，不展示文字标签。
 import { Card } from "@/components/ui/Card";
@@ -99,7 +99,7 @@ export function RecommendCard({
                   })()}
                 </div>
 
-                {/* 中栏 模型信息：置信度 / 有效批次 / 历史批次范围 */}
+                {/* 中栏 模型信息：置信度 / 模型版本 / 历史批次范围 */}
                 <div className="flex flex-1 flex-col justify-center gap-4 lg:border-r lg:border-gray-100 lg:px-6">
                   <InfoField
                     label="模型置信度"
@@ -111,20 +111,28 @@ export function RecommendCard({
                       )
                     }
                   />
-                  <InfoField label="有效批次" value={valid.length > 0 ? `${valid.length} 批` : "-"} />
+                  <InfoField
+                    label="模型版本"
+                    value={<span className="font-medium text-gray-800">{rec.modelVer}</span>}
+                  />
                   <InfoField
                     label="历史批次范围"
-                    value={valid.length > 0 ? `${valid[0].batch}~${valid[valid.length - 1].batch}` : "-"}
+                    value={
+                      valid.length > 0
+                        ? `${valid[0].batch}~${valid[valid.length - 1].batch}（近${valid.length}批）`
+                        : "-"
+                    }
                   />
                 </div>
 
-                {/* 右栏 批次信息：牌号产线 / 下一批次 */}
+                {/* 右栏 批次信息：牌号产线 / 下一批次 / 工单号 */}
                 <div className="flex flex-1 flex-col justify-center gap-4 lg:pl-6">
                   <InfoField
                     label="牌号 / 产线"
                     value={rec.batch ? `${rec.batch.brand} / ${rec.batch.line}` : "-"}
                   />
                   <InfoField label="下一批次" value={rec.batch ? rec.batch.batch : "-"} />
+                  <InfoField label="工单号" value={rec.batch ? rec.batch.workOrder : "-"} />
                 </div>
               </div>
             );

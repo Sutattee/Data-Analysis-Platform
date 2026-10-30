@@ -53,7 +53,7 @@ export function ParamRecommendView() {
         <h1 className="text-xl font-bold text-gray-900">工艺参数推荐</h1>
       </div>
 
-      {/* 筛选栏：产线 Tab + 牌号 + 历史范围 */}
+      {/* 筛选栏：产线 Tab + 牌号 */}
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div>
@@ -82,11 +82,6 @@ export function ParamRecommendView() {
           <div className="w-44">
             <p className="mb-1.5 text-xs text-gray-500">牌号</p>
             <SearchSelect options={brandOptions} value={brand} onChange={setBrand} placeholder="选择牌号" />
-          </div>
-          {/* 历史范围：仅支持最近 20 个批次（固定展示，不可选择） */}
-          <div>
-            <p className="mb-1.5 text-xs text-gray-500">历史范围</p>
-            <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">近 20 批</p>
           </div>
         </div>
       </Card>
