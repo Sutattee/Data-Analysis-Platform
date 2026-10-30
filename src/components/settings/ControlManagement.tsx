@@ -1,7 +1,7 @@
 "use client";
 
-// 管控值管理（指标值管理 · 管控值页签）：统一维护三类管控值
-// 顶部筛选（指标分类 / 指标名称 / 启停状态）+「新增」主按钮；列表支持直接启停、编辑、变更记录；
+// 管控值管理（指标值管理 · 管控值页签）：统一维护各指标管控值
+// 顶部筛选（指标名称 / 启停状态）+「新增」主按钮；列表支持直接启停、编辑；
 // 默认按最近更新时间倒序，分页展示
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
@@ -9,15 +9,13 @@ import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import { ControlFormDrawer } from "@/components/settings/ControlFormDrawer";
-import { ControlHistoryDrawer } from "@/components/settings/ControlHistoryDrawer";
 import {
-  CATEGORY_LABEL,
   controlMetricOf,
   controlText,
   listControlConfigs,
   toggleControlEnabled,
 } from "@/lib/mock-data/metric-controls";
-import type { ControlCategory, MetricControlConfig } from "@/types";
+import type { MetricControlConfig } from "@/types";
 
 function formatNow(): string {
   const d = new Date();
@@ -33,23 +31,20 @@ const PAGE_SIZE = 10;
 export function ControlManagement({ user }: { user: string }) {
   const toast = useToast();
   const [tick, setTick] = useState(0); // store 变更后刷新列表
-  const [fCategory, setFCategory] = useState<ControlCategory | "">("");
   const [fName, setFName] = useState("");
   const [fEnabled, setFEnabled] = useState<"" | "1" | "0">("");
   const [page, setPage] = useState(1);
   const [formBase, setFormBase] = useState<MetricControlConfig | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [historyTarget, setHistoryTarget] = useState<MetricControlConfig | null>(null);
 
   const list = useMemo(
     () =>
       listControlConfigs({
-        category: fCategory,
         nameKw: fName,
         enabled: fEnabled === "" ? undefined : fEnabled === "1",
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fCategory, fName, fEnabled, tick]
+    [fName, fEnabled, tick]
   );
 
   // 页码校正（筛选结果变少时回落到最后一页）
@@ -81,19 +76,6 @@ export function ControlManagement({ user }: { user: string }) {
       {/* 筛选区 + 新增按钮 */}
       <Card padding>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            className={selectCls}
-            value={fCategory}
-            onChange={(e) => applyFilter(() => setFCategory(e.target.value as ControlCategory | ""))}
-            title="按指标分类筛选"
-          >
-            <option value="">全部分类</option>
-            {(Object.keys(CATEGORY_LABEL) as ControlCategory[]).map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABEL[c]}
-              </option>
-            ))}
-          </select>
           <input
             className={`${selectCls} w-48`}
             value={fName}
@@ -129,7 +111,6 @@ export function ControlManagement({ user }: { user: string }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className={th}>指标分类</th>
                 <th className={th}>指标名称</th>
                 <th className={th}>管控条件</th>
                 <th className={th}>单位</th>
@@ -142,7 +123,7 @@ export function ControlManagement({ user }: { user: string }) {
             <tbody className="divide-y divide-gray-50">
               {paged.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
                     当前筛选条件下暂无管控值配置
                   </td>
                 </tr>
@@ -151,7 +132,6 @@ export function ControlManagement({ user }: { user: string }) {
                   const def = controlMetricOf(c.metricId);
                   return (
                     <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">{CATEGORY_LABEL[c.category]}</td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-800">{c.metricName}</td>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
                         {controlText({ ...c, decimals: def?.decimals ?? 2, unit: c.unit })}
@@ -189,12 +169,6 @@ export function ControlManagement({ user }: { user: string }) {
                           >
                             编辑
                           </button>
-                          <button
-                            onClick={() => setHistoryTarget(c)}
-                            className="rounded px-1.5 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50"
-                          >
-                            变更记录
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -217,9 +191,6 @@ export function ControlManagement({ user }: { user: string }) {
         user={user}
         onSaved={() => setTick((t) => t + 1)}
       />
-
-      {/* 变更记录抽屉 */}
-      <ControlHistoryDrawer config={historyTarget} open={historyTarget !== null} onClose={() => setHistoryTarget(null)} />
     </>
   );
 }

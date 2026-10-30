@@ -496,31 +496,26 @@ export interface MetricValueRecord {
 }
 
 // ========== 管控值管理（指标值管理 · 管控值页签） ==========
-// 指标分类：过程管控指标 / 缺陷部位缺陷率 / 缺陷指标
-export type ControlCategory = "process" | "defectPart" | "defect";
-
 // 判断方向（在控条件："between" = 处于允许区间，含上下边界）
 export type ControlDir = "<" | "≤" | ">" | "≥" | "=" | "between";
 
 // 数值口径（校验规则：percent 0~100 / count 非负整数 / duration 非负数）
 export type ControlValueKind = "percent" | "count" | "duration";
 
-// 管控指标目录（预置，按分类展示；新增表单的可选指标来源）
+// 管控指标目录（预置；新增表单的可选指标来源）
 export interface ControlMetricDef {
   id: string;                 // cm-001 递增
-  category: ControlCategory;  // 所属分类
   name: string;               // 指标名称
   unit: string;               // 计量单位（随指标带出，不可修改）
   decimals: number;           // 数值精度（小数位）
   valueKind: ControlValueKind;// 数值口径（决定校验规则）
-  defaultDir: ControlDir;     // 默认判断方向（缺陷率 ≤ / 优质品率 ≥ / 水分允许范围 between）
+  defaultDir: ControlDir;     // 默认判断方向（偏差·次数·时长 ≤ / 优质品率 ≥ / 水分允许范围 between）
 }
 
 // 管控值配置（每个指标仅一条配置，停用后仍占用、不可重复新增）
 export interface MetricControlConfig {
   id: string;                 // mc-001 递增
   metricId: string;           // 关联目录指标
-  category: ControlCategory;  // 指标分类（快照）
   metricName: string;         // 指标名称（快照）
   unit: string;               // 单位（快照）
   dir: ControlDir;            // 判断方向
