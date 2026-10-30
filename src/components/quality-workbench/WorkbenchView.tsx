@@ -13,7 +13,7 @@ type PanelKey = "alarms" | "defects" | "predictions";
 /** 三步新手引导（PRD §6.9）：目标面板 id + 文案 */
 const GUIDE_STEPS: { target: PanelKey; text: string }[] = [
   { target: "alarms", text: "先查看分配给你的告警，进入详情核查原因、记录措施并处理。" },
-  { target: "defects", text: "已检出的缺陷在这里继续智能诊断，完成现场核查与人工判定。" },
+  { target: "defects", text: "已检出的缺陷在这里进行智能诊断，辅助现场核查与人工判定。" },
   { target: "predictions", text: "无待处理关联告警的预测在这里持续关注；需要分析时，从“推荐开展”发起。" },
 ];
 
