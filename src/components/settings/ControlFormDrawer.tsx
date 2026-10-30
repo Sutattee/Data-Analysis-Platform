@@ -163,11 +163,7 @@ export function ControlFormDrawer({
   }
 
   // 指标候选：预置指标目录全量展示（重复配置在保存时校验拦截）
-  const metricOptions = controlMetricCatalog().map((m) => ({
-    value: m.id,
-    label: m.name,
-    hint: `单位：${m.unit}`,
-  }));
+  const metricOptions = controlMetricCatalog().map((m) => ({ value: m.id, label: m.name }));
 
   return (
     <Drawer
