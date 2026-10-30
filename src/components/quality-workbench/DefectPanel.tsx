@@ -43,10 +43,17 @@ export function DefectPanel({
               <div className="qw-defect-context">
                 {d.brand} · {d.shift} · {d.date} {d.time}
               </div>
-              <div className="qw-sample-values">
-                缺陷数 {d.count} ｜ 抽检数 {d.sampled} ｜ 缺陷率{" "}
-                {d.rate === null ? "—" : `${d.rate.toFixed(2)}%`}
-              </div>
+              {/* 数值行：箱储任务不适用抽检口径，改展示储存时长（与缺陷诊断页同口径） */}
+              {d.storage ? (
+                <div className="qw-sample-values">
+                  储存时长 {d.storage.stored} ｜ 上限 {d.storage.limit} ｜ 超限 {d.storage.over}
+                </div>
+              ) : (
+                <div className="qw-sample-values">
+                  缺陷数 {d.count} ｜ 抽检数 {d.sampled} ｜ 缺陷率{" "}
+                  {d.rate === null ? "—" : `${d.rate.toFixed(2)}%`}
+                </div>
+              )}
               {/* 操作按钮统一「智能诊断」：未诊断进入即自动启动；已有初判进入智能诊断环节查看结果 */}
               <div className="qw-defect-actions">
                 <button className="qw-button primary" onClick={() => router.push(d.href)}>

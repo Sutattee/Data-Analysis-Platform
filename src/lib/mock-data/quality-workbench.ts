@@ -10,6 +10,7 @@ import {
   listTasks,
   primaryActionOf,
   type DiagTask,
+  type StorageInfo,
 } from "./defect-diagnosis-flow";
 import {
   forecastOf,
@@ -177,12 +178,13 @@ export interface WorkbenchDefect {
   count: number;
   sampled: number;
   rate: number | null; // 缺陷率 %
+  storage?: StorageInfo; // 箱储任务的对象信息（批次/对象取自 MES，数值行改储存时长口径）
   status: string; // 未诊断 / 待判定 / …
   href: string; // 智能诊断 → 诊断详情页（未诊断自动启动）
 }
 
-/** 工作台固定关注的两条缺陷任务（对应需求示例 d1=dr-005 未诊断、d2=dr-009 已有初判待判定） */
-const DEFECT_TASK_IDS = ["dr-005", "dr-009"];
+/** 工作台固定关注的两条缺陷任务（对应需求示例 d1=dr-005 未诊断、d2=dr-012 箱储超限待判定） */
+const DEFECT_TASK_IDS = ["dr-005", "dr-012"];
 
 function buildDefects(): WorkbenchDefect[] {
   const tasks = listTasks();
@@ -193,8 +195,9 @@ function buildDefects(): WorkbenchDefect[] {
       return {
         taskId: t.id,
         name: t.occurrence.name,
-        machine: t.occurrence.machine,
-        batch: t.occurrence.batch,
+        // 箱储任务对象/批次以 MES 为准（与缺陷诊断页同口径：1#储丝柜（CG-01）· YS-xxxx）
+        machine: t.storage ? `${t.storage.object}（${t.storage.objectCode}）` : t.occurrence.machine,
+        batch: t.storage ? t.storage.batch : t.occurrence.batch,
         brand: t.occurrence.brand,
         shift: t.occurrence.shift,
         date: t.occurrence.date.slice(5),
@@ -202,6 +205,7 @@ function buildDefects(): WorkbenchDefect[] {
         count: t.occurrence.count,
         sampled: t.occurrence.sampled,
         rate: defectRateOf(t),
+        storage: t.storage,
         status: t.status,
         href: `/quality/diagnosis/defect/${t.id}${action.query}`,
       };
