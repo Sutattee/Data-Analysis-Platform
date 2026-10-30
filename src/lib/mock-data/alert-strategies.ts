@@ -171,11 +171,11 @@ export function formatCondition(c: AlertCondition): string {
     return `${c.metric} ${c.operator} ${c.baselineType} ${c.baselineValue}小时${dev}`;
   }
   // 工艺质量口径：条件文案带超出量（绝对量，% 指标单位记作 pct；
-  // 如 松散回潮非稳态指数 ≥ 上限4% 超出1pct，与告警记录判定依据同口径；
+  // 如 松散回潮非稳态指数 ≥ 上限 4% 超出量1pct，与告警记录判定依据同口径；
   //   连续同向偏离不在条件文案中体现，由「连续同向偏离」独立字段展示）
   if (QUALITY_ALERT_METRIC_NAMES.has(c.metric)) {
     const unit = metricDefOf(c.metric)?.unit ?? "";
-    const dev = c.deviation ? ` 超出 ${c.deviation}${unit === "%" ? "pct" : unit}` : "";
+    const dev = c.deviation ? ` 超出量${c.deviation}${unit === "%" ? "pct" : unit}` : "";
     if (c.forecastRange) {
       return `${c.metric} 未来${c.forecastRange}预测值 ${c.operator} ${c.baselineType} ${c.baselineValue}${joinUnit(unit)}${dev}`;
     }
