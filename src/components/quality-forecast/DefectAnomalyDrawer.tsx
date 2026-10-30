@@ -5,6 +5,7 @@
 // 数值字段（等级 / 告警值 / 基准阈值 / 超出量 / 批次 / 班次 / 班组 / 牌号 / 工序）由视图按点击点位的
 // 实际数值覆写，与点位保持一致；首行为缺陷名称；「原因与处置建议」合并展示
 // （原因 → 处置建议两段），AI 原因标注「原因由 AI 分析数据自动生成」；
+// 人工补录内容独立成节展示（记录带 manualCause 时；AI 生成原因保持原位不受影响）；
 // 判定依据（策略名蓝色可点击跳告警策略详情；触发条件与超出量合并展示）；
 // 底部「查看告警详情」跳告警记录详情页。
 import { useRouter } from "next/navigation";
@@ -92,6 +93,16 @@ export function DefectAnomalyDrawer({
             </p>
             {hasCause && <p className="mt-2 text-xs text-gray-400">原因由 AI 分析数据自动生成</p>}
           </div>
+
+          {/* 人工补录（记录带补录内容时展示；独立于 AI 生成原因，语义与告警记录详情页一致） */}
+          {record.manualCause && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold text-gray-500">人工补录</h4>
+              <p className="whitespace-pre-line break-words text-sm leading-relaxed text-gray-700">
+                {record.manualCause}
+              </p>
+            </div>
+          )}
 
           {/* 判定依据（策略名蓝色可点击跳告警策略详情；触发条件与超出量合并为同一字段） */}
           <div>

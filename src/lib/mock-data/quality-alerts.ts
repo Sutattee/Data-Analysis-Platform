@@ -350,6 +350,7 @@ interface RecordSpec {
   value: number;          // 告警值（实测=当前值 / 预测=预计值）
   shifts?: number;        // 连续同向偏离周期数（飘移类：标题/条件带「连续N个批次」，对应飘移预警策略）
   shiftBaseline?: number; // 飘移策略触发线（条件快照的基准值，如 SF04 飘移预警 = 0.50；缺省用统一基准）
+  manualCause?: string;   // 人工补录内容（详情「没帮助」后补录的演示种子；独立于 AI 生成原因展示）
 }
 
 const SPECS: RecordSpec[] = [
@@ -372,7 +373,11 @@ const SPECS: RecordSpec[] = [
   // 烘丝机出口水分偏差 · 飘移示例（连续 3 个批次 > 上限 0.50% 触发，产生危险级记录；对应 QAS-010）
   { m: 3, machine: "5#烘丝机", level: "危险", value: 0.58, shifts: 3, shiftBaseline: 0.5 },
   // 成品水分标准偏差 · 飘移示例（连续 5 个批次 > 上限 2.20% 触发，产生危险级记录；危险等级按排序规则置顶）
-  { m: 1, machine: "3#松散回潮机", level: "危险", value: 2.35, shifts: 5, shiftBaseline: 2.2 },
+  {
+    m: 1, machine: "3#松散回潮机", level: "危险", value: 2.35, shifts: 5, shiftBaseline: 2.2,
+    manualCause:
+      "经现场核查为松散回潮加水流量计漂移导致水分控制偏差，已校准流量计并按工艺标准调整加水参数，后续两个批次标准偏差已回落至2.10%以下。",
+  },
   // 加香出口水分不达标次数（每日）
   { m: 4, machine: "2#加香机", level: "危险", value: 8 },
   { m: 4, machine: "1#加香机", level: "告警", forecast: true, value: 5 },
@@ -398,8 +403,12 @@ const SPECS: RecordSpec[] = [
   { m: 11, machine: "全厂", level: "预警", value: 97.5 },
   { m: 11, machine: "全厂", level: "关注", value: 97.8 },
   // 成品水分标准偏差 · 预测危险示例（预测值 2.52 越过危险线 2.40；尾部追加 = 触发时间最新，
-  // 危险级 + 最新 → 非飘移组第一，排列表第三）
-  { m: 1, machine: "3#松散回潮机", level: "危险", forecast: true, value: 2.52 },
+  // 危险级 + 最新 → 非飘移组第一，排列表第三；带人工补录演示）
+  {
+    m: 1, machine: "3#松散回潮机", level: "危险", forecast: true, value: 2.52,
+    manualCause:
+      "当班确认为烘丝蒸汽压力阶段性波动导致出口水分抬升，已切换备用蒸汽支路并加密在线水分检测频次，最新两批实测值已回落至2.05%左右。",
+  },
 ];
 
 // 确定性时间（与 alerts.ts 同一基准日，步进与基础 311 / 辅料 407 / 费用 293 错开）
@@ -454,6 +463,7 @@ interface DefectRecordSpec {
   suggestion: string;
   receiver: string;
   modelVersion: string;
+  manualCause?: string; // 人工补录内容（演示种子；独立于 AI 生成原因展示）
 }
 
 const DEFECT_MODEL_VERSION = "缺陷风险滚动预测模型 v2.3";
@@ -508,6 +518,7 @@ const DEFECT_SPECS: DefectRecordSpec[] = [
     suggestion: "建议核查计划投料、当前库存与卷包消耗进度是否匹配，尽快落实该批次出库计划。",
     receiver: "刘洋",
     modelVersion: "箱储工艺标准 v1.6（储存时长上限 72小时）",
+    manualCause: "已与生产计划确认：该批次安排明日早班优先出库投料，箱储环境温湿度记录复核正常，无霉变风险。",
   },
 ];
 
@@ -542,6 +553,7 @@ function buildDefectAlertRecords(): AlertRecord[] {
     causeSummary: spec.causeSummary,
     causeType: "AI生成" as const,
     suggestion: spec.suggestion,
+    manualCause: spec.manualCause,
     // 责任与处理情况（本轮预测刚发布，均未处理；通知方式 = 企业微信）
     receiver: spec.receiver,
     notifyMethods: ["企业微信"],
@@ -655,6 +667,7 @@ function buildStabilityAlertRecords(): AlertRecord[] {
           ? RESULT_CAUSES[causeIdx](metric.name)
           : PROCESS_CAUSES[causeIdx](metric.name),
       causeType: noCause ? undefined : i % 2 === 0 ? "AI生成" : "人工补录",
+      manualCause: spec.manualCause,
       suggestion: isResult
         ? RESULT_SUGGESTIONS[i % RESULT_SUGGESTIONS.length](metric.name)
         : PROCESS_SUGGESTIONS[i % PROCESS_SUGGESTIONS.length](metric.name),
