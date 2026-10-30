@@ -1,6 +1,6 @@
 "use client";
 
-// 实测趋势图：横轴按周期形态（批次号 / 日期+班型 / 月份），单条折线不分机台；
+// 实测趋势图：横轴按周期形态（批次号 / 日期+班型 / 日期 / 月份），单条折线不分机台；
 // 每个横轴单元取该单元内时间最新一条监测记录（点着色 / 点击抽屉基于该具体记录），
 // 点按告警等级着色，命中等级的点可点击滑出异常详情抽屉；
 // 管控值为单限一条虚线 / 区间两条虚线 + 浅色底。
@@ -22,7 +22,7 @@ import { processOfDetail, type MonitorRecord, type ProcessDetailMetric } from "@
 const LINE_COLOR = "#2563eb"; // 实测折线主色
 
 interface TrendRow {
-  label: string; // 横轴刻度：批次号 / 班次（日期+班型）/ 月份
+  label: string; // 横轴刻度：批次号 / 班次（日期+班型）/ 日期（MM-DD）/ 月份
   time: string; // 排序键（该单元所取记录的生产时间）
   value: number; // 折线取值（该单元所取记录的实测值）
   rec: MonitorRecord; // 该单元内时间最新的一条监测记录
@@ -176,6 +176,8 @@ export function MeasuredTrendChart({
                     </p>
                     {metric.cycle === "月" ? (
                       <p className="mt-0.5 text-gray-500">月份：{row.label}</p>
+                    ) : metric.cycle === "日" ? (
+                      <p className="mt-0.5 text-gray-500">日期：{r.cycleLabel}</p>
                     ) : (
                       <p className="mt-0.5 text-gray-500">批次：{r.batch}</p>
                     )}

@@ -22,8 +22,8 @@ import { LatestSummaryCard } from "./LatestSummaryCard";
 import { MeasuredTrendChart } from "./MeasuredTrendChart";
 import { ProcessDetailFilters, type DetailFilterState } from "./ProcessDetailFilters";
 
-// 按指标周期形态取初始统计周期：批/班 = 近30单元，月 = 近3个月
-function initRangeMode(cycle: "批" | "班" | "月" | undefined): DetailFilterState["rangeMode"] {
+// 按指标周期形态取初始统计周期：批/班/日 = 近30单元，月 = 近3个月
+function initRangeMode(cycle: "批" | "班" | "日" | "月" | undefined): DetailFilterState["rangeMode"] {
   return cycle === "月" ? "last3" : "last30";
 }
 

@@ -24,7 +24,7 @@ export const DATA_AS_OF = "2026-08-17 16:00"; // 页面「数据截至时间」
 
 /* ---------------- 指标定义 ---------------- */
 
-export type DetailCycle = "批" | "班" | "月";
+export type DetailCycle = "批" | "班" | "日" | "月";
 export type DetailDim = "batch" | "machine" | "shift" | "brand" | "material" | "env" | "spec";
 export type CompareDim = "brand" | "machine" | "shift";
 
@@ -95,7 +95,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF04",
   },
   {
-    id: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "月",
+    id: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "日",
     dims: ["batch", "machine", "brand"],
     compareDims: ["brand", "machine"],
     machines: ["1#加香机", "2#加香机", "3#加香机"],
@@ -108,7 +108,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF05",
   },
   {
-    id: "SF06", name: "非细支单支重量偏差", unit: "%", decimals: 2, cycle: "班",
+    id: "SF06", name: "非细支单支重量偏差", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
     compareDims: ["brand", "machine", "shift"],
     machines: ["1#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
@@ -121,7 +121,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF06",
   },
   {
-    id: "SF07", name: "烟支单支克重偏差（毫克）", unit: "mg", decimals: 1, cycle: "班",
+    id: "SF07", name: "烟支单支克重偏差（毫克）", unit: "mg", decimals: 1, cycle: "批",
     dims: ["machine", "brand"],
     compareDims: ["brand", "machine"],
     machines: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
@@ -134,7 +134,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF07",
   },
   {
-    id: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "班",
+    id: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
     compareDims: ["brand", "machine", "shift"],
     machines: ["2#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
@@ -147,7 +147,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF08",
   },
   {
-    id: "SF09", name: "中支烟硬度变异系数", unit: "%", decimals: 2, cycle: "班",
+    id: "SF09", name: "中支烟硬度变异系数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
     compareDims: ["brand", "machine", "shift"],
     machines: ["2#卷接包机组", "3#卷接包机组", "4#卷接包机组"],
@@ -223,9 +223,9 @@ export const ENV_HUM_OPTIONS: { text: string; range: [number, number] }[] = [
 export interface MonitorRecord {
   id: string;
   time: string; // 生产时间 YYYY-MM-DD HH:mm
-  label: string; // 横轴刻度：批次号 / 班次（日期+班型）/ 月份
-  cycleLabel: string; // 摘要口径：批次XXXX / 日期 班型 班组 / 月份
-  batch: string; // 批次号（月度指标 = 当月关联末批次）
+  label: string; // 横轴刻度：批次号 / 班次（日期+班型）/ 日期（MM-DD）/ 月份
+  cycleLabel: string; // 摘要口径：批次XXXX / 日期 班型 班组 / 日期 / 月份
+  batch: string; // 批次号（月度指标 = 当月关联末批次；日指标 = 当日关联批次）
   shiftType?: string; // 班型（白班/夜班，仅班次指标）
   shiftGroup?: string; // 班组（甲班/乙班/丙班；批指标 = 生产该批的班组）
   machine: string;
@@ -372,14 +372,15 @@ function buildRecords(m: ProcessDetailMetric): MonitorRecord[] {
       return;
     }
     const isShift = m.cycle === "班";
-    // 班指标每日一条共 60（06-19 ~ 08-17，保证「近60班次」有足量统计单元）；批指标 22 批
-    const count = isShift ? 60 : 22;
+    const isDay = m.cycle === "日";
+    // 班/日指标每日一条共 60（06-19 ~ 08-17，保证「近60班次/近60日」有足量统计单元）；批指标 22 批
+    const count = isShift || isDay ? 60 : 22;
     const recs: MonitorRecord[] = [];
     for (let i = 0; i < count; i += 1) {
       const h = hash(`${m.id}|${machine}|${i}`);
-      // 日期铺满窗口且不越过数据截至日 08-17：班指标 60 日（day = i-30 → 06-19 起）、
+      // 日期铺满窗口且不越过数据截至日 08-17：班/日指标 60 日（day = i-30 → 06-19 起）、
       // 批指标 22 批均匀铺满近 30 日（07-19 起 0~29 天）
-      const day = isShift ? i - 30 : Math.round((i * 29) / (count - 1));
+      const day = isShift || isDay ? i - 30 : Math.round((i * 29) / (count - 1));
       const date = dateAt(day);
       const ymd = date.replaceAll("-", "");
       const night = isShift && h % 2 === 1; // 班型轮换
@@ -396,8 +397,12 @@ function buildRecords(m: ProcessDetailMetric): MonitorRecord[] {
       const v = levelValue(m, machine, brand, shiftGroup, h);
       const value = Math.round(v * 10 ** m.decimals) / 10 ** m.decimals;
       const { level, overPct } = derive(value, m);
-      const label = isShift ? `${date.slice(5)} ${night ? "夜班" : "白班"}` : batch;
-      const cycleLabel = isShift ? `${date.slice(5)} ${night ? "夜班" : "白班"} ${shiftGroup}` : `批次${batch}`;
+      const label = isShift ? `${date.slice(5)} ${night ? "夜班" : "白班"}` : isDay ? date.slice(5) : batch;
+      const cycleLabel = isShift
+        ? `${date.slice(5)} ${night ? "夜班" : "白班"} ${shiftGroup}`
+        : isDay
+          ? date
+          : `批次${batch}`;
       recs.push({
         id: `${m.id}-${machine}-${i}`,
         time,
@@ -455,9 +460,9 @@ export function recordsOfDetail(id: string): MonitorRecord[] {
   }
 }
 
-// SF05 最新月份口径校准：1#加香机 2026-08 = 0 次（与总览 pm-5「0次｜本月」一致）
+// SF05 最新日口径校准：1#加香机 08-17 = 0 次（与总览 pm-5「0次」一致）
 {
-  const sf05 = recordsOfDetail("SF05").find((r) => r.machine === "1#加香机" && r.label === "2026-08");
+  const sf05 = recordsOfDetail("SF05").find((r) => r.machine === "1#加香机" && r.label === "08-17");
   if (sf05) {
     sf05.value = 0;
     sf05.level = null;

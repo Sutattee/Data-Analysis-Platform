@@ -75,7 +75,14 @@ export function DimensionCompareCard({ metric, records }: { metric: ProcessDetai
   const active = tabs.includes(dim) ? dim : (tabs[0] ?? "brand");
   const rows = aggregate(metric, records, active);
   const pendingConfig = metric.rule === null;
-  const avgNote = metric.cycle === "批" ? "批次结果均值" : metric.cycle === "班" ? "班次结果均值" : "月度均值";
+  const avgNote =
+    metric.cycle === "批"
+      ? "批次结果均值"
+      : metric.cycle === "班"
+        ? "班次结果均值"
+        : metric.cycle === "日"
+          ? "日均值"
+          : "月度均值";
 
   return (
     <Card

@@ -1,9 +1,9 @@
 "use client";
 
 // 查询条件区：指标单选（切换由主视图统一清不适配条件并跳转）、统计周期（按周期分
-// 形态：批=近10/20/30批次，班=近10/20/30班次，月=近1/2/3个月，按统计单元数取最近
+// 形态：批=近N批次，班=近N班次，日=近N日，月=近1/2/3个月，按统计单元数取最近
 // N 个单元）、牌号/机台/班组多选、更多条件（材料+环境温湿度，仅支持的指标展示）。
-// 查询 = 应用输入态；重置 = 恢复初始条件（均由主视图处理）。
+// 指标选项仅展示指标名称（不带单位与统计周期）。查询 = 应用输入态；重置 = 恢复初始条件（均由主视图处理）。
 import { SearchMultiSelect } from "@/components/alert/SearchMultiSelect";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
 import { Button } from "@/components/ui/Button";
@@ -55,7 +55,9 @@ export function ProcessDetailFilters({
       ? [1, 2, 3, 4, 5, 6].map((n) => ({ v: `last${n}`, t: `近${n}个月` }))
       : metric.cycle === "班"
         ? unitOptions("班次")
-        : unitOptions("批次");
+        : metric.cycle === "日"
+          ? unitOptions("日")
+          : unitOptions("批次");
 
   return (
     <div className="space-y-3">
@@ -67,7 +69,6 @@ export function ProcessDetailFilters({
               options={PROCESS_DETAIL_METRICS.map((m) => ({
                 value: m.id,
                 label: m.name,
-                hint: `${m.unit}｜${m.cycle}`,
               }))}
               value={metric.id}
               onChange={onMetricChange}

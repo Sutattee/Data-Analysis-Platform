@@ -11,18 +11,19 @@ import { DefectDiagnosisDrawer } from "@/components/quality-defect/DefectDiagnos
 import {
   DEFECT_RECORDS,
   DEFAULT_DEFECT_FILTERS,
-  batchWindow,
-  filterByBatches,
+  batchesInRange,
+  filterByRange,
   filterDims,
   filterRecords,
-  prevBatchWindow,
+  periodRangeOf,
+  prevRangeOf,
   summarize,
   type DefectFilters,
   type DefectRecord,
 } from "@/lib/mock-data/quality-defect";
 
 // 缺陷分析：从总览「查看全部」进入，不在左侧导航中；
-// 顶部导航标签「总览 | 缺陷分析」。统计周期（近 N 个批次）控制全部图表，
+// 顶部导航标签「总览 | 缺陷分析」。统计周期（时间窗口：近1/2/3个月或自定义日期范围）控制全部图表，
 // 其余筛选控制指标卡/趋势图/明细表，热力图仅随周期变化。
 export default function DefectAnalysisPage() {
   const [filters, setFilters] = useState<DefectFilters>(DEFAULT_DEFECT_FILTERS);
@@ -31,22 +32,27 @@ export default function DefectAnalysisPage() {
   // 保存判定后触发重渲染（缺陷明细表「缺陷状态」列渲染时实时读取会话内判定）
   const [, bumpRev] = useState(0);
 
-  // 统计周期：最近 N 个批次（批次号升序）
-  const batches = useMemo(() => batchWindow(filters.period), [filters.period]);
+  // 统计周期：时间窗口（近1/2/3个月或自定义日期范围）
+  const range = useMemo(() => periodRangeOf(filters.period), [filters.period]);
+  // 窗口内批次列表（批次号升序，供趋势图横轴）
+  const batches = useMemo(
+    () => batchesInRange(filterByRange(DEFECT_RECORDS, range)),
+    [range]
+  );
 
   // 指标卡 / 趋势图 / 明细表：完整筛选（周期 + 维度）
   const cur = useMemo(() => filterRecords(DEFECT_RECORDS, filters), [filters]);
-  // 环比：同维度条件的上一等长批次窗口
+  // 环比：同维度条件的上一等长时间窗口
   const prev = useMemo(
-    () => filterByBatches(filterDims(DEFECT_RECORDS, filters), prevBatchWindow(filters.period)),
+    () => filterByRange(filterDims(DEFECT_RECORDS, filters), prevRangeOf(filters.period)),
     [filters]
   );
   const summary = useMemo(() => summarize(cur, prev), [cur, prev]);
 
   // 热力图：仅随统计周期变化，不随部位/类别等筛选
   const heatRecords = useMemo(
-    () => filterByBatches(DEFECT_RECORDS, batches),
-    [batches]
+    () => filterByRange(DEFECT_RECORDS, range),
+    [range]
   );
 
   // 手动改筛选时清除热力图选中态

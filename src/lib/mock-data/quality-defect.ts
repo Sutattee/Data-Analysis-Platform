@@ -29,9 +29,13 @@ export function addMonthsISO(iso: string, n: number): string {
   return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, lastDay)).padStart(2, "0")}`;
 }
 
-// 统计周期（月窗口，诊断记录页查询用）：近 N 个月（含锚点当日），如近1月 = 2026-08-24 ~ 2026-09-23
+// 统计周期（月窗口）：近 N 个月（含锚点当日），如近1月 = 2026-08-24 ~ 2026-09-23
 export function periodRange(months: 1 | 2 | 3): { from: string; to: string } {
   return { from: addDaysISO(addMonthsISO(ANCHOR, -months), 1), to: ANCHOR };
+}
+
+export function diffDaysISO(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 }
 
 // ============ 缺陷档案（代码 → 标准名称/部位/类别/工序/责任岗位/AI 原因） ============
@@ -851,8 +855,13 @@ export const DEFECT_RECORDS: DefectRecord[] = [...RECENT_1M, ...RECENT_2M_PREV, 
 
 // ============ 筛选与聚合 ============
 
+// 统计周期（时间窗口）：预设近 N 个月 / 自定义日期范围（含两端）
+export type DefectPeriod =
+  | { kind: "preset"; months: 1 | 2 | 3 }
+  | { kind: "custom"; from: string; to: string };
+
 export interface DefectFilters {
-  period: 10 | 20 | 30; // 近 N 个批次（统计周期）
+  period: DefectPeriod; // 统计周期（时间窗口）
   part: string; // "all" = 全部
   grade: string;
   brand: string;
@@ -861,7 +870,7 @@ export interface DefectFilters {
 }
 
 export const DEFAULT_DEFECT_FILTERS: DefectFilters = {
-  period: 10,
+  period: { kind: "preset", months: 1 },
   part: "all",
   grade: "all",
   brand: "all",
@@ -869,30 +878,31 @@ export const DEFAULT_DEFECT_FILTERS: DefectFilters = {
   shift: "all",
 };
 
-// ===== 批次窗口（统计周期按批次）=====
-// 批次时间序：批次 = 检验日期 + 机台（同批次同日期），按日期降序、同日按批次号降序 → 最近批次在前
-function sortedBatches(records: DefectRecord[] = DEFECT_RECORDS): string[] {
-  const byBatch = new Map<string, string>();
-  for (const r of records) if (!byBatch.has(r.batch)) byBatch.set(r.batch, r.date);
-  return Array.from(byBatch.entries())
-    .sort((a, b) => b[1].localeCompare(a[1]) || Number(b[0]) - Number(a[0]))
-    .map(([b]) => b);
+// ===== 时间窗口（统计周期按日期）=====
+
+// 统计周期 → 日期窗口：预设用锚点回推 N 个月；自定义直接取给定范围
+export function periodRangeOf(period: DefectPeriod): { from: string; to: string } {
+  return period.kind === "preset" ? periodRange(period.months) : { from: period.from, to: period.to };
 }
 
-// 统计周期：最近 N 个批次（窗口内按批次号升序，供图表从左到右展示）
-export function batchWindow(n: number): string[] {
-  return sortedBatches().slice(0, n).sort((a, b) => Number(a) - Number(b));
+// 环比上一期窗口：预设 = 再往前推等长 N 个月；自定义 = 等长前一段
+export function prevRangeOf(period: DefectPeriod): { from: string; to: string } {
+  if (period.kind === "preset") {
+    const { from } = periodRange(period.months);
+    return { from: addDaysISO(addMonthsISO(from, -period.months), 1), to: addMonthsISO(from, -period.months) };
+  }
+  const days = diffDaysISO(period.from, period.to) + 1;
+  return { from: addDaysISO(period.from, -days), to: addDaysISO(period.from, -1) };
 }
 
-// 环比上一期：第 N+1 ~ 2N 个批次（与当前窗口等长的前一窗口）
-export function prevBatchWindow(n: number): string[] {
-  return sortedBatches().slice(n, n * 2).sort((a, b) => Number(a) - Number(b));
+// 按日期窗过滤（含两端）
+export function filterByRange(records: DefectRecord[], range: { from: string; to: string }): DefectRecord[] {
+  return records.filter((r) => r.date >= range.from && r.date <= range.to);
 }
 
-// 按批次窗过滤（热力图：仅统计周期）
-export function filterByBatches(records: DefectRecord[], batches: string[]): DefectRecord[] {
-  const set = new Set(batches);
-  return records.filter((r) => set.has(r.batch));
+// 窗口内批次列表（批次号升序，供趋势图从左到右展示）
+export function batchesInRange(records: DefectRecord[]): string[] {
+  return Array.from(new Set(records.map((r) => r.batch))).sort((a, b) => Number(a) - Number(b));
 }
 
 // 维度过滤（不含时间窗）：环比对比窗口复用同一维度条件
@@ -907,9 +917,9 @@ export function filterDims(records: DefectRecord[], f: DefectFilters): DefectRec
   );
 }
 
-// 完整筛选：统计周期（近 N 个批次）+ 部位/类别/牌号/机台/班组
+// 完整筛选：统计周期（时间窗口）+ 部位/类别/牌号/机台/班组
 export function filterRecords(records: DefectRecord[], f: DefectFilters): DefectRecord[] {
-  return filterByBatches(filterDims(records, f), batchWindow(f.period));
+  return filterByRange(filterDims(records, f), periodRangeOf(f.period));
 }
 
 // 指标卡汇总：缺陷总数 / 抽检 / 缺陷率 / 基准 / 偏差 / 环比
