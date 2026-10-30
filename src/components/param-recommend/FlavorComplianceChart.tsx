@@ -2,7 +2,7 @@
 
 // 右图 · 加香出口水分：实际与建议（与左图同一组历史批次，不含未来点）
 // 蓝实线=实际值；绿实线+方点=建议值（开工时锁定的推荐版本，无推荐空缺不连线）；
-// 浅绿 ReferenceArea=按连续同标准版本分段的合格区间（悬停展示各批合格范围）。
+// 实际值超上限/低于下限的批次点为橙红色（异常）；浅绿 ReferenceArea=按连续同标准版本分段的合格区间。
 import {
   CartesianGrid,
   Line,
@@ -42,6 +42,7 @@ interface Segment {
 
 const BLUE = "#2563eb";
 const GREEN = "#16a34a";
+const ORANGE = "#ea580c";
 
 export function FlavorComplianceChart({
   line,
@@ -190,7 +191,7 @@ export function FlavorComplianceChart({
                     );
                   }}
                 />
-                {/* 实际值：蓝实线；标准缺失灰点；待回传无点不连线 */}
+                {/* 实际值：蓝实线；超上限/低于下限异常点橙红；标准缺失灰点；待回传无点不连线 */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="flavor"
                   stroke={BLUE}
@@ -203,7 +204,8 @@ export function FlavorComplianceChart({
                       return <g key={props.payload?.label} />;
                     }
                     const b = props.payload!.record;
-                    const fill = resultOf(b) === "标准缺失" ? "#9ca3af" : BLUE;
+                    const result = resultOf(b);
+                    const fill = result === "标准缺失" ? "#9ca3af" : result === "未达标" ? ORANGE : BLUE;
                     return (
                       <g key={props.payload?.label}>
                         <circle cx={props.cx} cy={props.cy} r={3} fill={fill} stroke="#fff" strokeWidth={1} />
@@ -235,6 +237,10 @@ export function FlavorComplianceChart({
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-5 rounded-sm" style={{ backgroundColor: "rgba(22,163,74,0.15)" }} />
               合格区间
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: ORANGE }} />
+              异常
             </span>
           </div>
         </>

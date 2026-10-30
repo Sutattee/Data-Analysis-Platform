@@ -22,7 +22,7 @@ export function ParamRecommendView() {
   const [lineName, setLineName] = useState("产线A");
   const [brand, setBrand] = useState("娇子");
   const [updating, setUpdating] = useState(false);
-  const [drawerTarget, setDrawerTarget] = useState<BatchRecord | "next" | null>(null);
+  const [drawerTarget, setDrawerTarget] = useState<BatchRecord | null>(null);
 
   const line = lineOf(lineName);
   const rec = useMemo(() => nextRecommendationOf(lineName), [lineName]);
@@ -92,7 +92,7 @@ export function ParamRecommendView() {
       </Card>
 
       {/* 下一批次推荐 */}
-      <RecommendCard rec={rec} updating={updating} onShowBasis={() => setDrawerTarget("next")} />
+      <RecommendCard rec={rec} updating={updating} />
 
       {/* 左右双图：窄屏上下排列 */}
       <div className="grid gap-4 xl:grid-cols-2">
@@ -104,8 +104,8 @@ export function ParamRecommendView() {
       <RecommendRecords line={lineName} brand={brand} rec={rec} onDetail={setDrawerTarget} />
       */}
 
-      {/* 推荐依据 / 批次详情抽屉 */}
-      <RecommendDrawer target={drawerTarget} rec={rec} onClose={() => setDrawerTarget(null)} />
+      {/* 批次详情抽屉（图表点位点击） */}
+      <RecommendDrawer target={drawerTarget} onClose={() => setDrawerTarget(null)} />
     </div>
   );
 }
