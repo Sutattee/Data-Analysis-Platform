@@ -508,6 +508,28 @@ export function relatedParamsOf(metricId: string, rec: MonitorRecord): RelatedPa
   });
 }
 
+// 连续同向越管控值的统计单元数（异常点抽屉「连续同向偏离」）：从点击单元向前数，
+// 直到遇到未越界或反向越界的单元；每单元取该 label 最新记录的越界方向（1=超上限，-1=低于下限）
+export function consecutiveExceedOf(metricId: string, target: MonitorRecord): number {
+  const m = metricOfDetail(metricId);
+  if (!m) return 0;
+  const { upper, lower } = m.control;
+  if (upper === undefined && lower === undefined) return 0;
+  const units = new Map<string, { time: string; dir: number }>();
+  for (const r of recordsOfDetail(metricId)) {
+    const dir = upper !== undefined && r.value > upper ? 1 : lower !== undefined && r.value < lower ? -1 : 0;
+    const prev = units.get(r.label);
+    if (!prev || r.time > prev.time) units.set(r.label, { time: r.time, dir });
+  }
+  const seq = Array.from(units.entries()).sort((a, b) => (a[1].time < b[1].time ? -1 : 1));
+  const idx = seq.findIndex(([l]) => l === target.label);
+  if (idx < 0 || seq[idx][1].dir === 0) return 0;
+  const dir = seq[idx][1].dir;
+  let count = 0;
+  for (let i = idx; i >= 0 && seq[i][1].dir === dir; i--) count++;
+  return count;
+}
+
 // 异常原因（模拟 AI 归因文案，支持人工修正）
 export function causeOfDetail(metricId: string): string {
   const m = metricOfDetail(metricId);
