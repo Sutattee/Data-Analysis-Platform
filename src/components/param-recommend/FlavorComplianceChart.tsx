@@ -190,7 +190,7 @@ export function FlavorComplianceChart({
                     );
                   }}
                 />
-                {/* 实际值：蓝实线；待核对空心琥珀；标准缺失灰点；待回传无点不连线 */}
+                {/* 实际值：蓝实线；标准缺失灰点；待回传无点不连线 */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="flavor"
                   stroke={BLUE}
@@ -203,17 +203,10 @@ export function FlavorComplianceChart({
                       return <g key={props.payload?.label} />;
                     }
                     const b = props.payload!.record;
-                    const result = resultOf(b);
-                    const unknownStd = result === "标准缺失";
-                    const checking = result === "待核对";
-                    const fill = unknownStd ? "#9ca3af" : BLUE;
+                    const fill = resultOf(b) === "标准缺失" ? "#9ca3af" : BLUE;
                     return (
                       <g key={props.payload?.label}>
-                        {checking ? (
-                          <circle cx={props.cx} cy={props.cy} r={4} fill="#fff" stroke="#d97706" strokeWidth={2} />
-                        ) : (
-                          <circle cx={props.cx} cy={props.cy} r={3} fill={fill} stroke="#fff" strokeWidth={1} />
-                        )}
+                        <circle cx={props.cx} cy={props.cy} r={3} fill={fill} stroke="#fff" strokeWidth={1} />
                         <circle
                           cx={props.cx}
                           cy={props.cy}
