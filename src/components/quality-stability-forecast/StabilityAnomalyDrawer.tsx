@@ -5,11 +5,13 @@
 // （等级/告警值/基准阈值/超出量/批次/班次/班组/牌号等）由视图按点击点位的实际数值覆写，与点位
 // 保持一致；无数值字段不展示；预测风险型展示预测窗口，飘移类展示连续同向偏离；
 // 「原因与处置建议」合并展示（原因 → 处置建议两段），AI 原因标注「原因由 AI 分析数据自动生成」；
+// 判定依据三字段（策略名蓝色可点击跳告警策略详情 / 触发条件去除超出量片段 / 超出量）；
 // 底部「查看告警详情」跳告警记录详情页。
 import { useRouter } from "next/navigation";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
+import { alertStrategyIdFor, conditionBodyOf } from "@/lib/mock-data/alert-strategies";
 import { TYPE_DISPLAY } from "@/lib/mock-data/quality-alerts";
 import type { AlertRecord } from "@/types";
 
@@ -41,6 +43,8 @@ export function StabilityAnomalyDrawer({
   const router = useRouter();
   const isForecast = record?.type === "预测风险";
   const hasCause = !!record?.causeSummary?.trim();
+  // 判定依据策略跳转：档案名精确匹配 → 条件指标兜底 → null 纯文本不跳转
+  const strategyId = record ? alertStrategyIdFor(record.strategyName, record.metricName) : null;
 
   return (
     <Drawer
@@ -94,10 +98,27 @@ export function StabilityAnomalyDrawer({
             {hasCause && <p className="mt-2 text-xs text-gray-400">原因由 AI 分析数据自动生成</p>}
           </div>
 
-          {/* 判定依据 */}
+          {/* 判定依据（三字段：策略名蓝色可点击跳告警策略详情；触发条件去除超出量片段，超出量独立展示） */}
           <div>
             <h4 className="mb-2 text-xs font-semibold text-gray-500">判定依据</h4>
-            <p className="break-words text-sm text-gray-800">{`${record.strategyName}｜${record.triggerCondition}`}</p>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-gray-400">告警策略名称</span>
+                {strategyId ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/quality/alert/management/${strategyId}/edit`)}
+                    className="break-words text-left text-sm text-primary-600 transition-colors hover:text-primary-700"
+                  >
+                    {record.strategyName}
+                  </button>
+                ) : (
+                  <span className="break-words text-sm text-gray-800">{record.strategyName}</span>
+                )}
+              </div>
+              <Field label="触发条件" value={conditionBodyOf(record.triggerCondition)} />
+              <Field label="超出量" value={record.deviationValue} />
+            </div>
           </div>
         </div>
       )}

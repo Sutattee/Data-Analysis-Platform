@@ -1468,6 +1468,25 @@ export function getAlertStrategies(): AlertStrategy[] {
 export function getAlertStrategy(id: string): AlertStrategy | undefined {
   return store.find((s) => s.id === id);
 }
+
+// 异常详情抽屉「判定依据」辅助：按记录的策略快照名解析档案策略 id——先按策略名精确匹配，
+// 未命中按条件指标兜底（如「成品水分标准偏差风险预警策略」→ 含该指标条件的 QAS-002）；
+// 均未命中返回 null（策略名以纯文本展示，不提供跳转）
+export function alertStrategyIdFor(strategyName: string, metricName: string): string | null {
+  const list = getAlertStrategies();
+  return (
+    list.find((s) => s.name === strategyName)?.id ??
+    list.find((s) => s.conditions.some((c) => c.metric === metricName))?.id ??
+    null
+  );
+}
+
+// 触发条件展示文案：去除策略快照条件中的「超出量」片段（超出量作为独立字段展示）。
+// 如「成品水分标准偏差 ≥ 上限2.00% 超出0.1pct」→「成品水分标准偏差 ≥ 上限2.00%」；
+// 双条件「≥上限12.8% 超出0.5pct 或 ＜下限12.2% 超出0.5pct」两段超出量均去除
+export function conditionBodyOf(triggerCondition: string): string {
+  return triggerCondition.replace(/ ?超出\d+(?:\.\d+)?\S*/g, "");
+}
 export function addAlertStrategy(s: AlertStrategy): void {
   store = [s, ...store];
 }
