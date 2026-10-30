@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import {
   defectRateOf,
+  gradeLabelOf,
   isDiagnosed,
   primaryActionOf,
   summaryOf,
@@ -30,11 +31,16 @@ export function DiagnosisTaskCard({ task, onOpen }: { task: DiagTask; onOpen: (t
 
   return (
     <div className="flex flex-col gap-2.5 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
-      {/* 标题行：名称 + 处理状态 */}
+      {/* 标题行：名称 + 缺陷类别标签 + 处理状态 */}
       <div className="flex items-center justify-between gap-2">
-        <h3 className="truncate text-sm font-semibold text-gray-900" title={task.occurrence.name}>
-          {task.occurrence.name}
-        </h3>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="truncate text-sm font-semibold text-gray-900" title={task.occurrence.name}>
+            {task.occurrence.name}
+          </h3>
+          <span className="shrink-0 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+            {gradeLabelOf(task)}
+          </span>
+        </div>
         {judgeBadgeOf(task)}
       </div>
 

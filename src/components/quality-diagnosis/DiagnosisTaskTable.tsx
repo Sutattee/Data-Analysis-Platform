@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { diagCatalogOf } from "@/lib/mock-data/quality-defect";
 import {
   defectRateOf,
+  gradeLabelOf,
   isDiagnosed,
   primaryActionOf,
   type DiagTask,
@@ -64,7 +65,13 @@ export function DiagnosisTaskTable({
               const isStorage = !!t.storage;
               return (
                 <tr key={t.id} className="group transition-colors hover:bg-gray-50">
-                  <td className={`${td} font-medium text-gray-700`}>{t.occurrence.name}</td>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    {t.occurrence.name}
+                    {/* 缺陷类别标签（A类 / B类 / C/D类） */}
+                    <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-normal text-gray-500">
+                      {gradeLabelOf(t)}
+                    </span>
+                  </td>
                   <td className={`${td} text-gray-600`}>{isStorage ? dash : t.occurrence.machine}</td>
                   <td className={`${td} text-gray-600`}>{t.storage ? `${t.storage.object}（${t.storage.objectCode}）` : dash}</td>
                   <td className={`${td} text-gray-600`}>{t.storage ? t.storage.batch : t.occurrence.batch}</td>

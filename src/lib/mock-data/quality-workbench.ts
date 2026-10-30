@@ -7,6 +7,7 @@ import { LEVEL_RANK, TYPE_DISPLAY } from "./quality-alerts";
 import { ALERT_RECORDS, applyHandledOverride } from "./alerts";
 import {
   defectRateOf,
+  gradeLabelOf,
   listTasks,
   primaryActionOf,
   type DiagTask,
@@ -179,6 +180,7 @@ export interface WorkbenchDefect {
   sampled: number;
   rate: number | null; // 缺陷率 %
   storage?: StorageInfo; // 箱储任务的对象信息（批次/对象取自 MES，数值行改储存时长口径）
+  gradeLabel?: string; // 缺陷类别标签（A类 / B类 / C/D类，名称后展示）
   status: string; // 未诊断 / 待判定 / …
   href: string; // 智能诊断 → 诊断详情页（未诊断自动启动）
 }
@@ -206,6 +208,7 @@ function buildDefects(): WorkbenchDefect[] {
         sampled: t.occurrence.sampled,
         rate: defectRateOf(t),
         storage: t.storage,
+        gradeLabel: gradeLabelOf(t),
         status: t.status,
         href: `/quality/diagnosis/defect/${t.id}${action.query}`,
       };

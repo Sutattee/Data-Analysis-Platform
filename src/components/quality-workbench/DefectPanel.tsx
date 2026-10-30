@@ -36,7 +36,15 @@ export function DefectPanel({
               <div className="qw-row-top">
                 <span className="qw-badge defect">待诊断</span>
               </div>
-              <h3>{d.name}</h3>
+              {/* 名称后跟缺陷类别标签（A类 / B类 / C/D类） */}
+              <h3>
+                {d.name}
+                {d.gradeLabel && (
+                  <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-normal text-gray-500">
+                    {d.gradeLabel}
+                  </span>
+                )}
+              </h3>
               <div className="qw-defect-context">
                 {d.machine} · 批次 {d.batch}
               </div>
