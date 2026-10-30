@@ -178,7 +178,7 @@ export function recordsOf(line: string, brand: string): BatchRecord[] {
   return BATCHES.filter((b) => b.line === line && !b.cancelled && (brand === "全部" || b.brand === brand));
 }
 
-/** 模型有效历史口径：已开工未取消、烘丝与加香实际值完整、物料关联已确认（待核对不计入） */
+/** 模型有效历史口径：已开工未取消、烘丝与加香检测值完整、物料关联已确认（待核对不计入） */
 export function validHistoryOf(line: string, brand: string): BatchRecord[] {
   return BATCHES.filter(
     (b) =>

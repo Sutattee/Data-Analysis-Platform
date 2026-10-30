@@ -98,7 +98,7 @@ export function RecommendRecords({
       toast("当前筛选下无可导出的记录", "warning");
       return;
     }
-    const header = ["批次", "牌号", "工单号", "生产时间", "烘丝建议值(%)", "建议版本", "烘丝实际值(%)", "绝对差(pct)", "加香实际值(%)", "物料关联", "结果状态"];
+    const header = ["批次", "牌号", "工单号", "生产时间", "烘丝建议值(%)", "建议版本", "烘丝检测值(%)", "绝对差(pct)", "加香检测值(%)", "物料关联", "结果状态"];
     const body = filtered.map((b) => {
       const advice =
         !b.started && rec.status === "已生成" && rec.value !== undefined
@@ -215,9 +215,9 @@ export function RecommendRecords({
                   <th className={thCls}>批次 / 牌号</th>
                   <th className={thCls}>生产时间</th>
                   <th className={thCls}>烘丝建议值（%）</th>
-                  <th className={thCls}>烘丝实际值（%）</th>
+                  <th className={thCls}>烘丝检测值（%）</th>
                   <th className={thCls}>绝对差（pct）</th>
-                  <th className={thCls}>加香实际值（%）</th>
+                  <th className={thCls}>加香检测值（%）</th>
                   <th className={thCls}>结果状态</th>
                   <th className={thCls}>操作</th>
                 </tr>

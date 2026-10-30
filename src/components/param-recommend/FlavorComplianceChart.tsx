@@ -1,8 +1,8 @@
 "use client";
 
 // 右图 · 加香出口水分：实际与建议（与左图同一组历史批次，不含未来点）
-// 蓝实线=实际值；绿实线+方点=建议值（开工时锁定的推荐版本，无推荐空缺不连线）；
-// 实际值超上限/低于下限的批次点为橙红色（异常）；浅绿 ReferenceArea=按连续同标准版本分段的合格区间（无版本标注）。
+// 蓝实线=检测值；绿实线+方点=建议值（开工时锁定的推荐版本，无推荐空缺不连线）；
+// 检测值超上限/低于下限的批次点为橙红色（异常）；浅绿 ReferenceArea=按连续同标准版本分段的合格区间（无版本标注）。
 import {
   CartesianGrid,
   Line,
@@ -77,7 +77,7 @@ export function FlavorComplianceChart({
   }
   if (cur) segments.push(cur);
 
-  // 纵轴：实际值 + 建议值 + 各段上下限自适应
+  // 纵轴：检测值 + 建议值 + 各段上下限自适应
   const values = [
     ...rows.map((r) => r.flavor).filter((v): v is number => v !== null),
     ...rows.map((r) => r.advice).filter((v): v is number => v !== null),
@@ -129,7 +129,7 @@ export function FlavorComplianceChart({
                           生产时间：{b.startAt ?? `${b.planStart}（计划）`}
                         </p>
                         <p className="mt-0.5 text-gray-600">
-                          实际值：{b.flavorActual !== null ? `${fmt2(b.flavorActual)}%` : "待回传"}
+                          检测值：{b.flavorActual !== null ? `${fmt2(b.flavorActual)}%` : "待回传"}
                         </p>
                         <p className="mt-0.5 text-gray-600">
                           建议值：
@@ -189,7 +189,7 @@ export function FlavorComplianceChart({
                     );
                   }}
                 />
-                {/* 实际值：蓝实线；超上限/低于下限异常点橙红；标准缺失灰点；待回传无点不连线 */}
+                {/* 检测值：蓝实线；超上限/低于下限异常点橙红；标准缺失灰点；待回传无点不连线 */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="flavor"
                   stroke={BLUE}
@@ -226,7 +226,7 @@ export function FlavorComplianceChart({
           <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5" style={{ backgroundColor: BLUE }} />
-              实际值
+              检测值
             </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5" style={{ backgroundColor: GREEN }} />

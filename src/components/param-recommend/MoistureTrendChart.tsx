@@ -1,7 +1,7 @@
 "use client";
 
-// 左图 · 成品水分趋势（单折线，仅展示近 N 批次的实际值）
-// 蓝实线+圆点=实际值；缺失（待回传）不填 0、不跨缺失点连线；点击历史批次点打开对应记录详情。
+// 左图 · 成品水分趋势（单折线，仅展示近 N 批次的检测值）
+// 蓝实线+圆点=检测值；缺失（待回传）不填 0、不跨缺失点连线；点击历史批次点打开对应记录详情。
 import {
   CartesianGrid,
   Line,
@@ -45,7 +45,7 @@ export function MoistureTrendChart({
     record: b,
   }));
 
-  // 纵轴：实际值自适应，两侧留 0.25 裕量，非零起点
+  // 纵轴：检测值自适应，两侧留 0.25 裕量，非零起点
   const values = rows.map((r) => r.actual).filter((v): v is number => v !== null);
   const hasData = rows.length > 0 && values.length > 0;
   const yMin = hasData ? Math.min(...values) - 0.25 : 0;
@@ -91,13 +91,13 @@ export function MoistureTrendChart({
                           生产时间：{b.startAt ?? `${b.planStart}（计划）`}
                         </p>
                         <p className="mt-0.5 text-gray-600">
-                          实际值：{b.dryingActual !== null ? `${fmt2(b.dryingActual)}%` : "待回传"}
+                          检测值：{b.dryingActual !== null ? `${fmt2(b.dryingActual)}%` : "待回传"}
                         </p>
                       </div>
                     );
                   }}
                 />
-                {/* 实际值：蓝实线 + 圆点；待回传批次无点不连线；点热区点击打开记录详情 */}
+                {/* 检测值：蓝实线 + 圆点；待回传批次无点不连线；点热区点击打开记录详情 */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="actual"
                   stroke={BLUE}
@@ -131,7 +131,7 @@ export function MoistureTrendChart({
           <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5" style={{ backgroundColor: BLUE }} />
-              实际值
+              检测值
             </span>
           </div>
         </>

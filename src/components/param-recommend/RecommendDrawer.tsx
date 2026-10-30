@@ -87,10 +87,10 @@ export function RecommendDrawer({
           </Section>
 
           <Section title="实际回填">
-            <Field label="烘丝出口水分实际值" value={batch.dryingActual !== null ? `${fmt2(batch.dryingActual)}%` : "待回传"} />
+            <Field label="烘丝出口水分检测值" value={batch.dryingActual !== null ? `${fmt2(batch.dryingActual)}%` : "待回传"} />
             <Field label="绝对差" value={absDiffOf(batch) !== null ? `${fmt2(absDiffOf(batch))} pct` : "-"} />
             <Field
-              label="加香出口水分实际值"
+              label="加香出口水分检测值"
               value={
                 batch.flavorActual !== null ? (
                   <span>
@@ -107,7 +107,7 @@ export function RecommendDrawer({
           </Section>
 
           <p className="text-xs leading-relaxed text-gray-400">
-            说明：绝对差 = |实际值 − 建议值|，表示两者接近程度，不能作为模型预测误差或准确率；仅凭实际值接近建议值，也不能判断现场已采用推荐。
+            说明：绝对差 = |检测值 − 建议值|，表示两者接近程度，不能作为模型预测误差或准确率；仅凭检测值接近建议值，也不能判断现场已采用推荐。
           </p>
         </div>
       )}
