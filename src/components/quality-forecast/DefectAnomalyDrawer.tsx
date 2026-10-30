@@ -5,13 +5,13 @@
 // 数值字段（等级 / 告警值 / 基准阈值 / 超出量 / 批次 / 班次 / 班组 / 牌号 / 工序）由视图按点击点位的
 // 实际数值覆写，与点位保持一致；首行为缺陷名称；「原因与处置建议」合并展示
 // （原因 → 处置建议两段），AI 原因标注「原因由 AI 分析数据自动生成」；
-// 判定依据三字段（策略名蓝色可点击跳告警策略详情 / 触发条件去除超出量片段 / 超出量）；
+// 判定依据（策略名蓝色可点击跳告警策略详情；触发条件与超出量合并展示）；
 // 底部「查看告警详情」跳告警记录详情页。
 import { useRouter } from "next/navigation";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
-import { alertStrategyIdFor, conditionBodyOf } from "@/lib/mock-data/alert-strategies";
+import { alertStrategyIdFor, conditionWithExceed } from "@/lib/mock-data/alert-strategies";
 import { TYPE_DISPLAY } from "@/lib/mock-data/quality-alerts";
 import type { AlertRecord } from "@/types";
 
@@ -93,7 +93,7 @@ export function DefectAnomalyDrawer({
             {hasCause && <p className="mt-2 text-xs text-gray-400">原因由 AI 分析数据自动生成</p>}
           </div>
 
-          {/* 判定依据（三字段：策略名蓝色可点击跳告警策略详情；触发条件去除超出量片段，超出量独立展示） */}
+          {/* 判定依据（策略名蓝色可点击跳告警策略详情；触发条件与超出量合并为同一字段） */}
           <div>
             <h4 className="mb-2 text-xs font-semibold text-gray-500">判定依据</h4>
             <div className="space-y-3">
@@ -111,8 +111,10 @@ export function DefectAnomalyDrawer({
                   <span className="break-words text-sm text-gray-800">{record.strategyName}</span>
                 )}
               </div>
-              <Field label="触发条件" value={conditionBodyOf(record.triggerCondition)} />
-              <Field label="超出量" value={record.deviationValue} />
+              <Field
+                label="触发条件"
+                value={conditionWithExceed(record.triggerCondition, record.deviationValue)}
+              />
             </div>
           </div>
         </div>

@@ -1481,11 +1481,18 @@ export function alertStrategyIdFor(strategyName: string, metricName: string): st
   );
 }
 
-// 触发条件展示文案：去除策略快照条件中的「超出量」片段（超出量作为独立字段展示）。
+// 触发条件展示文案：去除策略快照条件中的「超出量」片段（超出量改以记录实际值随条件合并展示）。
 // 如「成品水分标准偏差 ≥ 上限2.00% 超出0.1pct」→「成品水分标准偏差 ≥ 上限2.00%」；
 // 双条件「≥上限12.8% 超出0.5pct 或 ＜下限12.2% 超出0.5pct」两段超出量均去除
 export function conditionBodyOf(triggerCondition: string): string {
   return triggerCondition.replace(/ ?超出\d+(?:\.\d+)?\S*/g, "");
+}
+
+// 触发条件合并展示：条件文本去除超出量片段后，与记录超出量数值（去方向词前缀）拼为一段，
+// 如「成品水分标准偏差 > 上限2.20%  超出量0.5pct」；超出量无有效值时仅展示条件
+export function conditionWithExceed(triggerCondition: string, deviationValue: string): string {
+  const exceed = deviationValue.replace(/^超(?:上限|下限)/, "");
+  return exceed && exceed !== "-" ? `${conditionBodyOf(triggerCondition)}  超出量${exceed}` : conditionBodyOf(triggerCondition);
 }
 export function addAlertStrategy(s: AlertStrategy): void {
   store = [s, ...store];
