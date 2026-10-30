@@ -2,10 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CircleQuestionMark, Sparkles } from "lucide-react";
-import {
-  buildWorkbenchSnapshot,
-  WORKBENCH_UPDATED_AT,
-} from "@/lib/mock-data/quality-workbench";
+import { buildWorkbenchSnapshot } from "@/lib/mock-data/quality-workbench";
 import { AlarmPanel } from "./AlarmPanel";
 import { DefectPanel } from "./DefectPanel";
 import { RecommendPanel } from "./RecommendPanel";
@@ -88,7 +85,6 @@ export function WorkbenchView() {
             <h1>工艺质量工作台</h1>
             <div className="qw-subtitle">
               <span>我的待办 · 已授权责任范围</span>
-              <span>数据截至 {WORKBENCH_UPDATED_AT}</span>
             </div>
           </div>
           <div className="qw-heading-actions">
