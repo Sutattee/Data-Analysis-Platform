@@ -80,8 +80,8 @@ export function ControlManagement({ user }: { user: string }) {
             className={`${selectCls} w-48`}
             value={fName}
             onChange={(e) => applyFilter(() => setFName(e.target.value))}
-            placeholder="指标名称关键词"
-            title="按指标名称关键词筛选"
+            placeholder="搜索指标名称"
+            title="按指标名称搜索"
           />
           <select
             className={selectCls}
