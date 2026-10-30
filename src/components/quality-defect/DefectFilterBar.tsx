@@ -8,6 +8,7 @@ import {
   BRAND_OPTIONS,
   MACHINE_OPTIONS,
   SHIFT_OPTIONS,
+  BATCH_COUNT_OPTIONS,
   periodRange,
   type DefectFilters,
   type DefectPeriod,
@@ -16,8 +17,8 @@ import {
 const selCls =
   "px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white outline-none transition-all focus:ring-2 focus:ring-primary-500 focus:border-transparent";
 
-// 缺陷分析筛选区：统计周期（时间窗口：近1/2/3个月或自定义日期范围，控制全部图表）+
-// 部位/类别/牌号/机台/班组（控制指标卡、趋势图、明细表；热力图不跟随）+ 重置
+// 缺陷分析筛选区：统计周期（时间窗口：近1/2/3个月或自定义日期范围；或批次窗口：近1/10/…/60批次，
+// 控制全部图表）+ 部位/类别/牌号/机台/班组（控制指标卡、趋势图、明细表；热力图不跟随）+ 重置
 export function DefectFilterBar({
   value,
   onChange,
@@ -27,7 +28,12 @@ export function DefectFilterBar({
   onChange: (f: DefectFilters) => void;
   onReset: () => void;
 }) {
-  const periodKey = value.period.kind === "preset" ? `m${value.period.months}` : "custom";
+  const periodKey =
+    value.period.kind === "preset"
+      ? `m${value.period.months}`
+      : value.period.kind === "batches"
+        ? `b${value.period.count}`
+        : "custom";
   const custom = value.period.kind === "custom" ? value.period : null;
 
   function changePeriodKind(key: string) {
@@ -38,9 +44,11 @@ export function DefectFilterBar({
           ? { kind: "preset", months: 2 }
           : key === "m3"
             ? { kind: "preset", months: 3 }
-            : value.period.kind === "custom"
-              ? value.period
-              : { kind: "custom", ...periodRange(1) }; // 切自定义时默认带出近1个月范围
+            : key.startsWith("b")
+              ? { kind: "batches", count: Number(key.slice(1)) }
+              : value.period.kind === "custom"
+                ? value.period
+                : { kind: "custom", ...periodRange(1) }; // 切自定义时默认带出近1个月范围
     onChange({ ...value, period });
   }
 
@@ -50,10 +58,19 @@ export function DefectFilterBar({
         <label className="flex items-center gap-1.5">
           <span className="text-xs text-gray-500">统计周期</span>
           <select value={periodKey} onChange={(e) => changePeriodKind(e.target.value)} className={selCls}>
-            <option value="m1">近1个月</option>
-            <option value="m2">近2个月</option>
-            <option value="m3">近3个月</option>
-            <option value="custom">自定义</option>
+            <optgroup label="按时间">
+              <option value="m1">近1个月</option>
+              <option value="m2">近2个月</option>
+              <option value="m3">近3个月</option>
+              <option value="custom">自定义</option>
+            </optgroup>
+            <optgroup label="按批次">
+              {BATCH_COUNT_OPTIONS.map((n) => (
+                <option key={n} value={`b${n}`}>
+                  近{n}批次
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         {custom && (

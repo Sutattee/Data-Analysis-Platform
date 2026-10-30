@@ -12,19 +12,40 @@ import {
   DEFECT_RECORDS,
   DEFAULT_DEFECT_FILTERS,
   batchesInRange,
+  filterByBatches,
   filterByRange,
   filterDims,
   filterRecords,
+  latestBatchesOf,
   periodRangeOf,
+  prevBatchesOf,
   prevRangeOf,
   summarize,
   type DefectFilters,
+  type DefectPeriod,
   type DefectRecord,
 } from "@/lib/mock-data/quality-defect";
 
+// 统计周期窗口：时间形态（日期范围）或批次形态（最近 N 批次号，含环比用上一期批次）
+type PeriodWindow =
+  | { mode: "time"; range: { from: string; to: string }; prevRange: { from: string; to: string } }
+  | { mode: "batches"; batches: string[]; prevBatches: string[] };
+
+// 批次窗口基于全量数据流的批次序（与时间窗的全量时间轴同构），维度筛选不影响窗口边界
+function windowOf(period: DefectPeriod): PeriodWindow {
+  if (period.kind === "batches") {
+    return {
+      mode: "batches",
+      batches: latestBatchesOf(DEFECT_RECORDS, period.count),
+      prevBatches: prevBatchesOf(DEFECT_RECORDS, period.count),
+    };
+  }
+  return { mode: "time", range: periodRangeOf(period), prevRange: prevRangeOf(period) };
+}
+
 // 缺陷分析：从总览「查看全部」进入，不在左侧导航中；
-// 顶部导航标签「总览 | 缺陷分析」。统计周期（时间窗口：近1/2/3个月或自定义日期范围）控制全部图表，
-// 其余筛选控制指标卡/趋势图/明细表，热力图仅随周期变化。
+// 顶部导航标签「总览 | 缺陷分析」。统计周期（时间窗口：近1/2/3个月或自定义日期范围；或批次窗口：
+// 近1/10/20/30/40/50/60批次）控制全部图表，其余筛选控制指标卡/趋势图/明细表，热力图仅随周期变化。
 export default function DefectAnalysisPage() {
   const [filters, setFilters] = useState<DefectFilters>(DEFAULT_DEFECT_FILTERS);
   const [heatSel, setHeatSel] = useState<HeatSelection | null>(null);
@@ -32,27 +53,30 @@ export default function DefectAnalysisPage() {
   // 保存判定后触发重渲染（缺陷明细表「缺陷状态」列渲染时实时读取会话内判定）
   const [, bumpRev] = useState(0);
 
-  // 统计周期：时间窗口（近1/2/3个月或自定义日期范围）
-  const range = useMemo(() => periodRangeOf(filters.period), [filters.period]);
-  // 窗口内批次列表（批次号升序，供趋势图横轴）
+  // 统计周期窗口（时间或批次形态）
+  const win = useMemo(() => windowOf(filters.period), [filters.period]);
+  // 趋势图横轴批次列表（批次号升序；批次口径 = 窗口批次本身）
   const batches = useMemo(
-    () => batchesInRange(filterByRange(DEFECT_RECORDS, range)),
-    [range]
+    () => (win.mode === "batches" ? win.batches : batchesInRange(filterByRange(DEFECT_RECORDS, win.range))),
+    [win]
   );
 
   // 指标卡 / 趋势图 / 明细表：完整筛选（周期 + 维度）
   const cur = useMemo(() => filterRecords(DEFECT_RECORDS, filters), [filters]);
-  // 环比：同维度条件的上一等长时间窗口
+  // 环比：同维度条件的上一等长窗口（时间前移一段或再往前 N 个批次）
   const prev = useMemo(
-    () => filterByRange(filterDims(DEFECT_RECORDS, filters), prevRangeOf(filters.period)),
-    [filters]
+    () =>
+      win.mode === "batches"
+        ? filterByBatches(filterDims(DEFECT_RECORDS, filters), win.prevBatches)
+        : filterByRange(filterDims(DEFECT_RECORDS, filters), win.prevRange),
+    [filters, win]
   );
   const summary = useMemo(() => summarize(cur, prev), [cur, prev]);
 
   // 热力图：仅随统计周期变化，不随部位/类别等筛选
   const heatRecords = useMemo(
-    () => filterByRange(DEFECT_RECORDS, range),
-    [range]
+    () => (win.mode === "batches" ? filterByBatches(DEFECT_RECORDS, win.batches) : filterByRange(DEFECT_RECORDS, win.range)),
+    [win]
   );
 
   // 手动改筛选时清除热力图选中态
