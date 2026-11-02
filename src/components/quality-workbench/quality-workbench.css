@@ -29,7 +29,6 @@
 #quality-workbench-final .qw-sidebar-note{padding:0 10px;font-size:11px;color:var(--qw-muted)}
 #quality-workbench-final .qw-main{padding:22px;min-width:0}
 #quality-workbench-final .qw-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:17px}
-#quality-workbench-final .qw-eyebrow{font-size:11px;color:var(--qw-blue);letter-spacing:1.5px;margin-bottom:3px}
 #quality-workbench-final .qw-subtitle{font-size:12px;color:var(--qw-muted);margin-top:5px;display:flex;gap:9px;flex-wrap:wrap}
 #quality-workbench-final .qw-heading-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding-top:4px}
 #quality-workbench-final .qw-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--qw-line);background:var(--qw-surface);padding:6px 10px;border-radius:6px;font-size:12px;white-space:nowrap;min-height:31px}

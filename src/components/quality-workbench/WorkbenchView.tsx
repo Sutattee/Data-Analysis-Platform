@@ -78,10 +78,9 @@ export function WorkbenchView() {
   return (
     <div id="quality-workbench-final">
       <div className="qw-main">
-        {/* 页面头部：眉题 + 标题 + 责任范围/数据时间 + 新手引导入口 */}
+        {/* 页面头部：标题 + 责任范围 + 新手引导入口 */}
         <div className="qw-heading">
           <div>
-            <div className="qw-eyebrow">QUALITY WORKSPACE</div>
             <h1>工艺质量工作台</h1>
             <div className="qw-subtitle">
               <span>我的待办 · 已授权责任范围</span>
