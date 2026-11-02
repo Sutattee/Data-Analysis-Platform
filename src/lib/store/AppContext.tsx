@@ -171,6 +171,19 @@ const initialState: AppState = {
   loading: true, // 初始为 true，从 localStorage 加载完成后设为 false
 };
 
+// 登录页已隐藏（代码保留）：本地无已保存用户时以默认账号自动登录，直接进入系统；
+// /login 路由与 login() 验证逻辑均保留，需要时经 /login 或恢复此开关回到登录流程
+const AUTO_LOGIN_USER: User = {
+  id: "u1",
+  username: DEFAULT_USER.username,
+  password: "",
+  phone: DEFAULT_USER.phone,
+  role: DEFAULT_USER.role,
+  nickname: DEFAULT_USER.nickname,
+  alias: DEFAULT_USER.alias,
+  email: DEFAULT_USER.email,
+};
+
 // ========== Actions ==========
 type Action =
   | { type: "LOGIN"; payload: User }
@@ -254,17 +267,18 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // 从 localStorage 加载状态
+  // 从 localStorage 加载状态（登录页已隐藏：无已保存用户时自动登录默认账号）
   useEffect(() => {
     const savedUser = getLocal<User | null>("app_user", null);
     const savedFavorites = getLocal<QaMessage[]>("app_favorites", []);
     const savedHistory = getLocal<QaMessage[]>("app_history", []);
     const savedVisits = getLocal<RecentVisit[]>("app_recent_visits", DEFAULT_RECENT_VISITS);
+    const user = savedUser ?? AUTO_LOGIN_USER;
     dispatch({
       type: "LOAD_STATE",
       payload: {
-        user: savedUser,
-        isLoggedIn: !!savedUser,
+        user,
+        isLoggedIn: !!user,
         favorites: savedFavorites,
         history: savedHistory,
         recentVisits: savedVisits,
