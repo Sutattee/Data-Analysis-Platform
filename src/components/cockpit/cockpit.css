@@ -245,9 +245,6 @@
 /* bar-mark 须显式块化：span 默认 inline，width/height 对 inline 无效，
    不加 display:block 时填充条（含占比宽度与颜色）完全渲染不出来 */
 .cockpit .bar-mark { display: block; height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
-/* 条形按实际值分档着色：<95% 橙色警示（未达标区，92.0%~94.9% 共6台）、=100% 绿色达标 */
-.cockpit .bar-mark.warning { background: linear-gradient(90deg, #d18a4e, #ffc575); }
-.cockpit .bar-mark.good { background: linear-gradient(90deg, #2fa583, #65e7bf); }
 /* 面板行悬浮提示暂不展示（机台完成率/工艺质量/辅料消耗）：
    .no-tips 挂在面板 section 上，row-tip 代码保留、仅隐藏展示 */
 .cockpit .panel.no-tips .row-tip { display: none !important; }
