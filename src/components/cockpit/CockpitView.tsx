@@ -2,8 +2,8 @@
 
 // 管理驾驶舱主视图：1920×1080 设计坐标画布，外层视口等比缩放（min(视口宽/1920, 视口高/1080)）居中；
 // 内部三列布局（左450 / 中948 / 右450），各滚动窗独立滚动；第三行 56px 为右下悬浮按钮安全区。
-// 缩放实现：.cockpit-viewport grid 居中一个 1920×1080 的盒子，绕自身中心 scale（覆盖
-// theme.css 默认的 transform-origin: top left），画布在视口中始终保持居中。
+// 缩放实现：画布绝对定位在视口中心（CSS top/left 50%），内联 transform 先 translate(-50%,-50%)
+// 把画布中心对准视口中心，再绕自身中心 scale —— 任意窗口尺寸下画布始终完整居中展示。
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { COCKPIT_HEADER, COCKPIT_STAT } from "@/lib/mock-data/cockpit";
@@ -44,7 +44,7 @@ export function CockpitView() {
     <div className="cockpit-viewport" ref={viewportRef}>
       <div
         className="cockpit screen"
-        style={{ transform: `scale(${scale})`, transformOrigin: "center" }}
+        style={{ transform: `translate(-50%, -50%) scale(${scale})`, transformOrigin: "center" }}
       >
         <header className="tech-header">
           <span className="header-left">

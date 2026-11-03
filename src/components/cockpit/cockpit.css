@@ -273,14 +273,22 @@
 
 /* ===== 正式页面补充样式 ===== */
 
-/* 等比缩放外层：占满视口、深蓝底、画布居中（transform-origin center 由内联样式覆盖） */
+/* 等比缩放外层：占满视口、深蓝底（等比适配产生的留边与背景同色，视觉上仍是满屏） */
 .cockpit-viewport {
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #07132c;
-  display: grid;
-  place-items: center;
+}
+
+/* 画布锚定视口中心：绝对定位 50%/50% + 内联 transform 的 translate(-50%,-50%)。
+   不能用 grid/flex 居中——子项比视口大时，网格轨道向末侧溢出，画布会锚在左上角
+   导致缩放后“左上留白、右下被裁”；绝对定位百分比偏移相对视口，超大画布也能精确居中 */
+.cockpit-viewport > .cockpit.screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
 }
 
 /* 条形行（16机组完成率 / 缺陷Top5）：名称 + 轨道 + 数值 */
