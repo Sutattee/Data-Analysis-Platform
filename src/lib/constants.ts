@@ -25,6 +25,7 @@ const ENERGY_NAV: NavItem[] = [
 // 一级导航（顶部横向）
 export const PRIMARY_NAV: NavItem[] = [
   { label: "首页",       href: "/home",         icon: "🏠" },
+  { label: "管理驾驶舱", href: "/cockpit",      icon: "🛰️" },
   { label: "费用预算执行", href: "/expense", icon: "💰", children: [
     { label: "费用总览", href: "/expense/overview", icon: "📊" },
     { label: "费用分析", href: "/expense/analysis", icon: "📈", children: [
@@ -39,7 +40,6 @@ export const PRIMARY_NAV: NavItem[] = [
     ]},
     { label: "智能问数", href: "/expense/qa", icon: "💬" },
   ], matchPrefixes: ["/expense"] },
-  { label: "智能驾驶舱", href: "/cockpit",      icon: "🛰️" },
   { label: "生产管理",   href: "/production",   icon: "🏭", children: [
     { label: "设备运行效率", href: "/production/equipment-efficiency", icon: "⚙️" },
     { label: "辅料消耗", href: "/production/materials", icon: "🧵" },

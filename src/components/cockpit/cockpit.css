@@ -1,0 +1,390 @@
+/* 管理驾驶舱：可复用视觉素材（源自 cockpit-ui-assets/theme.css）。完整页面布局以配套PRD为准。
+   正式页面补充样式见文件末尾（条形行、悬浮提示、异常列表、AI 助手滑出层等）。 */
+
+.cockpit {
+  --bg: #07132c;
+  --panel: #10284a;
+  --panel-deep: #0b1b38;
+  --text: #ecf5ff;
+  --heading: #f1f7ff;
+  --muted: #a0b8d6;
+  --cyan: #55dbff;
+  --blue: #448fff;
+  --green: #65e7bf;
+  --warning: #ffc575;
+  --alarm: #ff7d90;
+  --danger: #e94e6d;
+  --prediction: #b7b2ff;
+  --border: #2b507c;
+  color-scheme: dark;
+  color: var(--text);
+  font: 16px/1.4 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse at 50% 0%, #18467b55, transparent 47%),
+    radial-gradient(ellipse at 49% 100%, #1153a528, transparent 48%),
+    linear-gradient(#7bc4ff05 1px, transparent 1px),
+    linear-gradient(90deg, #7bc4ff05 1px, transparent 1px), var(--bg);
+  background-size: auto, auto, 38px 38px, 38px 38px, auto;
+}
+.cockpit *, .cockpit *::before, .cockpit *::after { box-sizing: border-box; }
+.cockpit h1, .cockpit h2, .cockpit h3, .cockpit h4 {
+  color: var(--heading) !important;
+  -webkit-text-fill-color: var(--heading) !important;
+  font-family: inherit;
+  font-weight: 500;
+  margin: 0;
+}
+.cockpit button, .cockpit select { font: inherit; color: inherit; }
+.cockpit button { cursor: pointer; }
+.cockpit [hidden] { display: none !important; }
+.cockpit .number { font-variant-numeric: tabular-nums; }
+.cockpit .muted { color: var(--muted); }
+.cockpit .good { color: var(--green); }
+.cockpit .warning { color: var(--warning); }
+.cockpit .prediction { color: var(--prediction); }
+
+/* 1920×1080设计坐标。外层容器负责等比缩放，内部滚动区保持独立。 */
+.cockpit.screen {
+  position: relative;
+  isolation: isolate;
+  width: 1920px;
+  height: 1080px;
+  padding: 20px;
+  display: grid;
+  grid-template-rows: 120px 832px 56px;
+  gap: 16px;
+  overflow: hidden;
+  transform-origin: top left;
+}
+.cockpit .screen-main {
+  display: grid;
+  grid-template-columns: 450px 948px 450px;
+  gap: 16px;
+  min-height: 0;
+}
+.cockpit .column { display: grid; gap: 16px; min-height: 0; min-width: 0; }
+.cockpit .column.left { grid-template-rows: 260px 340px 200px; }
+.cockpit .column.center { grid-template-rows: 230px 285px 285px; }
+.cockpit .column.right { grid-template-rows: 488px 328px; }
+
+/* 主标题：SVG只承载装饰，业务标题始终使用HTML文字。 */
+.cockpit .tech-header {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+  background: url("assets/header-tech.svg") center bottom / 100% 100% no-repeat;
+}
+.cockpit .tech-header h1 {
+  position: relative;
+  z-index: 1;
+  font-size: 50px;
+  line-height: 1.25;
+  letter-spacing: .1em;
+  text-shadow: 0 0 10px #a1dfff55, 0 0 32px #359cff66;
+  white-space: nowrap;
+}
+.cockpit .header-left, .cockpit .header-right {
+  position: absolute;
+  top: 18px;
+  color: #c7def6;
+  font-size: 16px;
+}
+.cockpit .header-left { left: 16px; }
+.cockpit .header-right { right: 16px; }
+.cockpit .header-left a { color: inherit; text-decoration: none; }
+.cockpit .header-left a:hover { color: #e6f4ff; }
+
+/* 卡片：与metric-frame.svg视觉等价，二者二选一。 */
+.cockpit .metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 0;
+}
+.cockpit .metric {
+  position: relative;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid #2b547d;
+  background: linear-gradient(120deg, #12365b99, #102349);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-decoration: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cockpit .metric:hover { border-color: #55dbff99; box-shadow: 0 0 14px #459dff33; }
+.cockpit .metric::before, .cockpit .metric::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 9px;
+  border-style: solid;
+  border-color: var(--cyan);
+  pointer-events: none;
+}
+.cockpit .metric::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.cockpit .metric::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+.cockpit .metric.attention {
+  background: linear-gradient(120deg, #31304e99, #132446);
+  border-color: #9d785b66;
+}
+.cockpit .metric.attention:hover { border-color: #ffc575aa; box-shadow: 0 0 14px #ffc57522; }
+.cockpit .metric-name { color: var(--heading); font-size: 17px; line-height: 1.3; }
+.cockpit .metric-name.long { font-size: 16px; }
+.cockpit .metric-value { color: var(--cyan); font-size: 44px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.cockpit .metric-value small { color: #c4d6e9; font-size: 16px; font-weight: 400; margin-left: 5px; }
+.cockpit .metric.attention .metric-value { color: var(--warning); }
+.cockpit .metric-context { color: var(--muted); font-size: 14px; line-height: 1.3; }
+.cockpit .metric-context strong { font-weight: 500; }
+
+/* 面板：与panel-frame.svg视觉等价，优先CSS以避免拉伸边框。 */
+.cockpit .panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #10284a, #0b1b38);
+  box-shadow: inset 0 0 22px #153d6d22;
+}
+.cockpit .panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 45%;
+  height: 2px;
+  background: linear-gradient(90deg, #72ddff, #3998e8, transparent);
+  pointer-events: none;
+}
+.cockpit .panel::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 20px;
+  height: 20px;
+  border-right: 2px solid #5799cf;
+  border-bottom: 2px solid #5799cf;
+  pointer-events: none;
+}
+.cockpit .panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  line-height: 1.3;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #355a7c99;
+}
+.cockpit .panel-heading::before { content: ""; width: 3px; height: 1em; background: var(--cyan); box-shadow: 0 0 8px #55dbff55; }
+.cockpit .panel-heading .panel-extra { margin-left: auto; font-size: 14px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.cockpit .panel-body { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; }
+.cockpit .scroll-window {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4285be #102744;
+  scrollbar-gutter: stable;
+}
+.cockpit .scroll-window::-webkit-scrollbar { width: 5px; }
+.cockpit .scroll-window::-webkit-scrollbar-track { background: #102744; }
+.cockpit .scroll-window::-webkit-scrollbar-thumb { background: #4285be; border-radius: 3px; }
+.cockpit table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
+.cockpit th { position: sticky; top: 0; z-index: 1; background: #102440; text-align: left; color: #c5ddf5; font-weight: 400; }
+.cockpit th, .cockpit td { padding: 8px 0; border-bottom: 1px solid #34547566; line-height: 1.45; }
+.cockpit td:not(:first-child), .cockpit th:not(:first-child) { text-align: right; }
+.cockpit th { padding-left: 4px; padding-right: 4px; }
+.cockpit td { padding-left: 4px; padding-right: 4px; }
+.cockpit td:first-child, .cockpit th:first-child { text-align: left; }
+.cockpit .tabs { display: flex; gap: 18px; border-bottom: 1px solid #29486877; margin-bottom: 8px; }
+.cockpit .tab { position: relative; border: 0; background: transparent; color: var(--muted); font-size: 14px; padding: 4px 0 8px; }
+.cockpit .tab[aria-selected="true"] { color: var(--cyan); }
+.cockpit .tab[aria-selected="true"]::after { content: ""; height: 2px; position: absolute; bottom: -1px; left: 0; right: 0; background: var(--cyan); }
+
+/* 小型环形图：--value表示百分数；剩余份额不等于缺陷率。 */
+.cockpit .yield-pair { display: grid; grid-template-columns: repeat(2, 1fr); justify-items: center; gap: 16px; }
+.cockpit .yield-item { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; }
+.cockpit .yield-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color, var(--cyan)) 0 calc(var(--value) * 1%), #284566 calc(var(--value) * 1%) 100%);
+  box-shadow: 0 0 16px #4ac6ff15;
+}
+.cockpit .yield-ring::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: #102440; }
+.cockpit .yield-value { position: relative; color: #f0f8ff; font-size: 25px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.025em; }
+.cockpit .yield-value small { font-size: 13px; margin-left: 1px; font-weight: 400; }
+.cockpit .yield-item figcaption { color: #e8f4ff; font-size: 14px; }
+
+.cockpit .level { display: inline-flex; padding: 1px 6px; border: 1px solid currentColor; font-size: 14px; line-height: 1.4; }
+.cockpit .level.warning { color: var(--warning); background: #ffc5750a; }
+.cockpit .level.alarm { color: var(--alarm); background: #ff7d900a; }
+.cockpit .level.danger { color: var(--danger); background: #e94e6d12; }
+.cockpit .risk-type { color: #b9d2ea; font-size: 14px; margin-left: 8px; }
+.cockpit .risk-type.prediction { color: var(--prediction); }
+.cockpit .bar-track { height: 10px; background: #24466c99; }
+.cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
+
+/* 右下悬浮按钮与浮层。bottom/right相对整个screen定位。 */
+.cockpit .insight-trigger {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 148px;
+  height: 48px;
+  padding: 8px 18px;
+  border: 1px solid #7beaff;
+  border-radius: 3px;
+  background: linear-gradient(120deg, #1c5daa, #1e4b99 55%, #315ac2);
+  color: #f1fbff;
+  box-shadow: 0 0 16px #2c9cff66, inset 0 0 12px #72dfff22;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: .08em;
+  z-index: 30;
+}
+.cockpit .insight-trigger:hover { background: linear-gradient(120deg, #2470be, #285bb1 55%, #416dd4); }
+.cockpit .insight-trigger.secondary { right: 188px; }
+.cockpit .insight-panel { position: absolute; right: 20px; bottom: 82px; z-index: 35; width: 480px; max-width: calc(100% - 40px); padding: 20px; background: linear-gradient(135deg, #16365a, #0e203d); border: 1px solid #5fbbf7; box-shadow: 0 12px 40px #0008, 0 0 24px #459dff33; }
+.cockpit .insight-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #3e6b94; margin-bottom: 12px; }
+.cockpit .insight-heading h3 { font-size: 22px; }
+.cockpit .insight-close { width: 30px; height: 30px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 22px; line-height: 1; }
+.cockpit .insight-copy { color: #c7dcf0; font-size: 16px; line-height: 1.7; }
+.cockpit .icon { width: 20px; height: 20px; display: inline-block; }
+
+/* ===== 正式页面补充样式 ===== */
+
+/* 等比缩放外层：占满视口、深蓝底、画布居中（transform-origin center 由内联样式覆盖） */
+.cockpit-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #07132c;
+  display: grid;
+  place-items: center;
+}
+
+/* 条形行（16机组完成率 / 缺陷Top5）：名称 + 轨道 + 数值 */
+.cockpit .bar-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.cockpit .bar-row + .bar-row { border-top: 1px solid #24466c33; }
+.cockpit .bar-row:hover .bar-mark { filter: brightness(1.25); }
+.cockpit .bar-row.wide { grid-template-columns: 128px minmax(0, 1fr) 96px; }
+.cockpit .bar-name { color: #cfe2f5; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cockpit .bar-num { color: var(--cyan); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.cockpit .bar-num em { font-style: normal; color: var(--muted); font-size: 11px; margin-left: 3px; }
+
+/* 悬浮提示：挂在 .has-tip 行/图上，悬停展开（工序偏离说明、未完成日期、辅料差距、批次信息） */
+.cockpit .has-tip { position: relative; }
+.cockpit .row-tip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 190px;
+  max-width: 330px;
+  padding: 8px 10px;
+  background: #16365a;
+  border: 1px solid #5fbbf7;
+  color: #d7ecff;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: left;
+  box-shadow: 0 8px 24px #0009;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.cockpit .has-tip:hover .row-tip { opacity: 1; visibility: visible; }
+.cockpit .row-tip.warning { color: var(--warning); }
+.cockpit .row-tip.good { color: var(--green); }
+.cockpit .row-tip .tip-label { color: var(--muted); margin-right: 6px; }
+.cockpit .yield-item .row-tip { left: 50%; right: auto; transform: translateX(-50%); top: calc(100% + 6px); text-align: center; white-space: nowrap; }
+
+/* 过程管控表：整行可点下钻稳定性分析 */
+.cockpit tr.row-link { cursor: pointer; }
+.cockpit tr.row-link:hover td { background: #16365a55; }
+.cockpit td.warning { color: var(--warning); }
+
+/* 全厂重点异常：汇总行 + 筛选页签 + 列表 */
+.cockpit .anomaly-summary { display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.cockpit .anomaly-summary b { color: #e6f2ff; font-weight: 500; font-size: 15px; }
+.cockpit .anomaly-summary .cnt { margin-left: 4px; }
+.cockpit .anomaly-summary .cnt.danger { color: var(--danger); }
+.cockpit .anomaly-summary .cnt.alarm { color: var(--alarm); }
+.cockpit .anomaly-summary .cnt.warning { color: var(--warning); }
+.cockpit .anomaly-item { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit; padding: 9px 4px; border-bottom: 1px solid #34547566; }
+.cockpit .anomaly-item:last-child { border-bottom: 0; }
+.cockpit .anomaly-item:hover { background: #16365a33; }
+.cockpit .anomaly-top { display: flex; align-items: center; margin-bottom: 5px; }
+.cockpit .anomaly-title { color: #e6f2ff; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; text-align: left; }
+.cockpit .anomaly-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.cockpit .anomaly-meta .domain { border: 1px solid #46749a55; padding: 0 5px; font-size: 11px; white-space: nowrap; }
+
+/* 趋势图：图例与脚注 */
+.cockpit .chart-box { position: relative; flex: 1; min-height: 0; }
+.cockpit .chart-legend { display: flex; align-items: center; gap: 18px; padding-top: 4px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+.cockpit .legend-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cockpit .legend-key i { display: inline-block; width: 24px; height: 0; }
+.cockpit .legend-key.solid i { border-top: 2px solid #55dbff; }
+.cockpit .legend-key.dashed i { border-top: 2px dashed #ffc575; }
+.cockpit .legend-key.dotted i { border-top: 2px dotted #9bb1d0; }
+.cockpit .legend-key.dotline i { border-top: 1px dotted #9bb1d0; }
+.cockpit .chart-footnote { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.cockpit .chart-tip { min-width: 170px; padding: 8px 10px; background: #16365aee; border: 1px solid #5fbbf7; color: #d7ecff; font-size: 12px; line-height: 1.8; text-align: left; }
+.cockpit .chart-tip .tip-row { display: flex; justify-content: space-between; gap: 16px; }
+.cockpit .chart-tip .tip-row span:first-child { color: var(--muted); }
+.cockpit .chart-tip .tip-title { color: #eaf6ff; margin-bottom: 2px; }
+
+/* AI 助手：右侧滑出深色壳 + 浅色对话面（复用 ChatPanel） */
+.cockpit .assistant-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: 460px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(160deg, #10284a, #0b1b38);
+  border-left: 1px solid #55dbff88;
+  box-shadow: -18px 0 40px #000a, 0 0 24px #459dff22;
+}
+.cockpit .assistant-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #355a7c99; }
+.cockpit .assistant-head h3 { font-size: 16px; margin-right: auto; }
+.cockpit .assistant-btn { border: 1px solid #46749a66; background: transparent; color: #cfe4f8; font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+.cockpit .assistant-btn:hover, .cockpit .assistant-btn[aria-pressed="true"] { color: var(--cyan); border-color: #55dbff88; }
+.cockpit .assistant-close { width: 28px; height: 28px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 18px; line-height: 1; }
+.cockpit .assistant-body { position: relative; flex: 1; min-height: 0; background: #fff; }
+
+/* 键盘可达性 */
+.cockpit button:focus-visible, .cockpit a:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }

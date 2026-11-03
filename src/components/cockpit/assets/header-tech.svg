@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="120" viewBox="0 0 1920 120" fill="none" role="img" aria-label="管理驾驶舱标题科技线条装饰">
+  <defs>
+    <linearGradient id="rail" x1="0" y1="0" x2="1920" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#1D68BF" stop-opacity="0"/><stop offset=".2" stop-color="#398EFF"/><stop offset=".5" stop-color="#B7F8FF"/><stop offset=".8" stop-color="#398EFF"/><stop offset="1" stop-color="#1D68BF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="plate" x1="960" y1="64" x2="960" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#1E60AA" stop-opacity=".55"/><stop offset="1" stop-color="#1D4C98" stop-opacity=".16"/></linearGradient>
+    <filter id="glow" x="-30%" y="-150%" width="160%" height="400%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path d="M45 83H470L494 103H716M1204 103H1426L1450 83H1875" stroke="#3C81CB" stroke-width="2"/>
+  <path d="M96 68H470L497 94H706M1214 94H1423L1450 68H1824" stroke="#4A9AFF" stroke-width="3" filter="url(#glow)"/>
+  <path d="M476 69L500 92M1444 69L1420 92" stroke="#74F0FF" stroke-width="5" filter="url(#glow)"/>
+  <path d="M290 76L284 85M307 76L301 85M324 76L318 85M341 76L335 85M358 76L352 85M375 76L369 85M392 76L386 85M409 76L403 85M1511 76L1517 85M1528 76L1534 85M1545 76L1551 85M1562 76L1568 85M1579 76L1585 85M1596 76L1602 85M1613 76L1619 85M1630 76L1636 85" stroke="#6ADFFF" stroke-width="4" opacity=".8"/>
+  <path d="M650 93H704L724 111H1196L1216 93H1270L1236 119H684L650 93Z" fill="url(#plate)"/>
+  <path d="M672 96L700 116H1220L1248 96" stroke="#58B7EE" stroke-width="1.5"/>
+  <path d="M54 119H1866" stroke="url(#rail)" stroke-width="2" filter="url(#glow)"/>
+  <path d="M740 113H1180" stroke="#7CEFFF" stroke-width="3" filter="url(#glow)"/>
+  <path d="M934 108L939 113L934 118L929 113Z" fill="#79EDFF" opacity=".5"/><path d="M960 108L965 113L960 118L955 113Z" fill="#A4F8FF" filter="url(#glow)"/><path d="M986 108L991 113L986 118L981 113Z" fill="#79EDFF" opacity=".5"/>
+  <path d="M36 50H42M52 50H58M68 50H74M1846 50H1852M1862 50H1868M1878 50H1884" stroke="#4D91E8" stroke-width="5" opacity=".7"/>
+</svg>
