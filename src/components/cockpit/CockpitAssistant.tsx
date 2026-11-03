@@ -1,30 +1,25 @@
 "use client";
 
-// 驾驶舱 AI 助手：右下角悬浮按钮 + 右侧滑出深色壳对话窗（浅色对话面复用 ChatPanel）。
-// 受控组件：open/onOpen/onClose 由 CockpitView 管理，与「智能解读」滑出面板互斥展开。
+// 驾驶舱 AI 助手：右下角圆形头像悬浮球（与其他板块同款 AnalystAvatar，面板打开时隐藏）+
+// 右侧滑出深色壳对话窗（浅色对话面复用 ChatPanel）。
+// 面板头部提供「智能解读」功能按钮：点击即以新会话自动发送固定指令，Agent 立即执行
+// （思考中 → 执行过程 → 输出全厂KPI解读报告，报告文案见 mock-data/cockpit.ts）。
 // 会话管理照 energy-overview/AiAssistant.tsx：首次打开后面板常驻挂载（收起不销毁会话）、
 // chatKey 重挂（新建会话/继续历史）、面板内历史记录/收藏覆盖视图；Escape 收起面板。
 import { useEffect, useState } from "react";
-import { Bot } from "lucide-react";
 import { ChatPanel } from "@/components/qa/ChatPanel";
+import { AnalystAvatar } from "@/components/qa/AnalystAvatar";
 import { useApp } from "@/lib/store/AppContext";
 import { formatDate } from "@/lib/utils";
-import { COCKPIT_AI_QUESTIONS } from "@/lib/mock-data/cockpit";
+import { COCKPIT_AI_QUESTIONS, COCKPIT_INSIGHT_COMMAND } from "@/lib/mock-data/cockpit";
 
 // 驾驶舱场景欢迎语（深色壳 + 浅色对话面）
 const WELCOME_TEXT =
-  "您好，我是管理驾驶舱AI助手。可直接询问本月全厂产质耗KPI、重点异常与预算执行情况。";
+  "您好，我是管理驾驶舱AI助手。可直接询问本月全厂产质耗KPI、重点异常与预算执行情况，或点击上方「智能解读」一键生成分析报告。";
 
-export function CockpitAssistant({
-  open,
-  onOpen,
-  onClose,
-}: {
-  open: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-}) {
+export function CockpitAssistant() {
   const { state, toggleFavorite } = useApp();
+  const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false); // 首次打开后面板常驻挂载（收起不销毁会话）
   const [chatKey, setChatKey] = useState(0); // 递增以重挂 ChatPanel（新建会话/继续历史）
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
@@ -36,15 +31,15 @@ export function CockpitAssistant({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") setOpen(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   function handleOpen() {
+    setOpen(true);
     setEverOpened(true);
-    onOpen();
   }
 
   // 新建会话：清空当前对话重新开始
@@ -68,22 +63,30 @@ export function CockpitAssistant({
     setHistoryOpen(false);
   }
 
+  // 智能解读：以新会话自动发送固定指令，Agent 立即执行并输出解读报告
+  function handleRunInsight() {
+    handleContinueHistory(COCKPIT_INSIGHT_COMMAND);
+    setFavoritesOpen(false);
+  }
+
   const historyQuestions = state.history.filter((m) => m.role === "user");
   const favorites = state.favorites;
   const chatHidden = historyOpen || favoritesOpen;
 
   return (
     <>
-      {/* 右下角悬浮按钮（最右位，智能解读按钮在其左侧） */}
-      <button
-        type="button"
-        className="insight-trigger"
-        aria-expanded={open}
-        aria-controls="cockpit-assistant"
-        onClick={handleOpen}
-      >
-        <Bot size={18} aria-hidden /> AI 助手
-      </button>
+      {/* 右下角圆形头像悬浮球（面板打开时隐藏，与其他板块 AI 助手一致） */}
+      {!open && (
+        <button
+          type="button"
+          className="ai-fab"
+          title="AI 助手"
+          aria-label="打开 AI 助手"
+          onClick={handleOpen}
+        >
+          <AnalystAvatar />
+        </button>
+      )}
 
       {everOpened && (
         <aside
@@ -92,11 +95,19 @@ export function CockpitAssistant({
           aria-label="驾驶舱AI助手"
           hidden={!open}
         >
-          {/* 深色标题栏：标题 + 历史/收藏/新建会话 + 收起 */}
+          {/* 深色标题栏：标题 + 智能解读 + 历史/收藏/新建会话 + 收起 */}
           <div className="assistant-head">
             <h3 onClick={handleBackToChat} style={{ cursor: "pointer" }} title="返回对话">
               智能问数助手
             </h3>
+            <button
+              type="button"
+              className="assistant-btn insight-action"
+              onClick={handleRunInsight}
+              title="自动发送指令，一键生成驾驶舱解读报告"
+            >
+              ✦ 智能解读
+            </button>
             <button
               type="button"
               className="assistant-btn"
@@ -122,7 +133,7 @@ export function CockpitAssistant({
             <button type="button" className="assistant-btn" onClick={handleNewSession}>
               新建会话
             </button>
-            <button type="button" className="assistant-close" onClick={onClose} aria-label="收起面板">
+            <button type="button" className="assistant-close" onClick={() => setOpen(false)} aria-label="收起面板">
               ×
             </button>
           </div>

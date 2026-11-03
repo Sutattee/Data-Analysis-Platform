@@ -240,31 +240,25 @@
 .cockpit .bar-track { height: 10px; background: #24466c99; }
 .cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
 
-/* 右下悬浮按钮。bottom/right相对整个screen定位；滑出面板样式见下方补充段 .assistant-panel。 */
-.cockpit .insight-trigger {
+/* 右下角 AI 助手悬浮球（与其他板块同款头像球，深色描边发光；面板打开时组件卸载）。
+   bottom/right 相对整个 screen 定位；滑出面板样式见下方补充段 .assistant-panel。 */
+.cockpit .ai-fab {
   position: absolute;
   right: 20px;
   bottom: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 148px;
-  height: 48px;
-  padding: 8px 18px;
-  border: 1px solid #7beaff;
-  border-radius: 3px;
-  background: linear-gradient(120deg, #1c5daa, #1e4b99 55%, #315ac2);
-  color: #f1fbff;
-  box-shadow: 0 0 16px #2c9cff66, inset 0 0 12px #72dfff22;
-  font-size: 19px;
-  font-weight: 500;
-  letter-spacing: .08em;
   z-index: 30;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: 0 0 0 3px #55dbff66, 0 0 20px #2c9cff66, 0 10px 26px #0009;
+  transition: transform .15s;
 }
-.cockpit .insight-trigger:hover { background: linear-gradient(120deg, #2470be, #285bb1 55%, #416dd4); }
-.cockpit .insight-trigger.secondary { right: 188px; }
-.cockpit .icon { width: 20px; height: 20px; display: inline-block; }
+.cockpit .ai-fab:hover { transform: scale(1.06); }
+.cockpit .ai-fab:active { transform: scale(0.95); }
 
 /* ===== 正式页面补充样式 ===== */
 
@@ -389,6 +383,9 @@
 .cockpit .assistant-head h3 { font-size: 16px; margin-right: auto; }
 .cockpit .assistant-btn { border: 1px solid #46749a66; background: transparent; color: #cfe4f8; font-size: 12px; padding: 4px 8px; white-space: nowrap; }
 .cockpit .assistant-btn:hover, .cockpit .assistant-btn[aria-pressed="true"] { color: var(--cyan); border-color: #55dbff88; }
+/* 「智能解读」功能按钮：面板内高亮入口（点击自动执行一键报告） */
+.cockpit .assistant-btn.insight-action { color: var(--cyan); border-color: #55dbff88; font-weight: 500; }
+.cockpit .assistant-btn.insight-action:hover { border-color: var(--cyan); box-shadow: 0 0 10px #55dbff33; }
 .cockpit .assistant-close { width: 28px; height: 28px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 18px; line-height: 1; }
 .cockpit .assistant-body { position: relative; flex: 1; min-height: 0; background: #fff; }
 

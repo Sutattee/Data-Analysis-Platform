@@ -15,7 +15,6 @@ import { QualityPanel } from "./QualityPanel";
 import { MaterialPanel } from "./MaterialPanel";
 import { AnomalyPanel } from "./AnomalyPanel";
 import { CarbonWaterPanel } from "./CarbonWaterPanel";
-import { InsightLayer } from "./InsightLayer";
 import { CockpitAssistant } from "./CockpitAssistant";
 
 const DESIGN_WIDTH = 1920;
@@ -23,8 +22,6 @@ const DESIGN_HEIGHT = 1080;
 
 export function CockpitView() {
   const viewportRef = useRef<HTMLDivElement>(null);
-  // 右下两个滑出面板（智能解读 / AI 助手）互斥展开；null = 均收起
-  const [openPanel, setOpenPanel] = useState<"insight" | "assistant" | null>(null);
   // 客户端初次渲染即按视口初始化（避免 SSR scale=1 首帧溢出闪烁）；SSR 阶段用 1
   const [scale, setScale] = useState(() =>
     typeof window === "undefined" ? 1 : Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT),
@@ -76,17 +73,8 @@ export function CockpitView() {
           </div>
         </div>
 
-        {/* 右下角悬浮层（相对整个画布定位，随画布等比缩放）；两个滑出面板互斥展开 */}
-        <InsightLayer
-          open={openPanel === "insight"}
-          onOpen={() => setOpenPanel("insight")}
-          onClose={() => setOpenPanel(null)}
-        />
-        <CockpitAssistant
-          open={openPanel === "assistant"}
-          onOpen={() => setOpenPanel("assistant")}
-          onClose={() => setOpenPanel(null)}
-        />
+        {/* 右下角 AI 助手悬浮球 + 滑出对话面板（面板内含「智能解读」一键报告） */}
+        <CockpitAssistant />
       </div>
     </div>
   );
