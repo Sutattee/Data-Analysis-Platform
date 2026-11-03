@@ -73,9 +73,13 @@ export function CockpitView() {
           </div>
         </div>
 
-        {/* 右下角 AI 助手悬浮球 + 滑出对话面板（面板内含「智能解读」一键报告） */}
-        <CockpitAssistant />
       </div>
+
+      {/* 右下角 AI 助手悬浮球 + 滑出对话面板（面板内含「智能解读」一键报告）。
+          挂在 viewport 层而非 .cockpit 画布内：脱离深色画布的全局样式作用域
+          （.cockpit button { color: inherit } 会把面板内按钮文字压成浅色），
+          ChatPanel 恢复原生浅色渲染；面板与悬浮球也不再随画布等比缩放 */}
+      <CockpitAssistant />
     </div>
   );
 }

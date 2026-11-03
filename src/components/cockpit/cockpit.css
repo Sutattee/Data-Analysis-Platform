@@ -241,8 +241,9 @@
 .cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
 
 /* 右下角 AI 助手悬浮球（与其他板块同款头像球，深色描边发光；面板打开时组件卸载）。
-   bottom/right 相对整个 screen 定位；滑出面板样式见下方补充段 .assistant-panel。 */
-.cockpit .ai-fab {
+   挂在 .cockpit-viewport 层（脱离 .cockpit 画布样式作用域），bottom/right 相对视口定位，
+   不随画布等比缩放；滑出面板样式见下方补充段 .assistant-panel。 */
+.cockpit-viewport .ai-fab {
   position: absolute;
   right: 20px;
   bottom: 20px;
@@ -254,11 +255,12 @@
   border-radius: 50%;
   overflow: hidden;
   background: transparent;
+  cursor: pointer;
   box-shadow: 0 0 0 3px #55dbff66, 0 0 20px #2c9cff66, 0 10px 26px #0009;
   transition: transform .15s;
 }
-.cockpit .ai-fab:hover { transform: scale(1.06); }
-.cockpit .ai-fab:active { transform: scale(0.95); }
+.cockpit-viewport .ai-fab:hover { transform: scale(1.06); }
+.cockpit-viewport .ai-fab:active { transform: scale(0.95); }
 
 /* ===== 正式页面补充样式 ===== */
 
@@ -365,8 +367,11 @@
 .cockpit .chart-tip .tip-row span:first-child { color: var(--muted); }
 .cockpit .chart-tip .tip-title { color: #eaf6ff; margin-bottom: 2px; }
 
-/* AI 助手：右侧滑出深色壳 + 浅色对话面（复用 ChatPanel） */
-.cockpit .assistant-panel {
+/* AI 助手：右侧滑出深色壳 + 浅色对话面（复用 ChatPanel）。
+   挂在 .cockpit-viewport 层（非 .cockpit 画布内）：脱离画布的全局按钮/标题覆盖规则，
+   面板内 ChatPanel 按钮与文字按自身 Tailwind 类渲染（深色文字、白底可见）。 */
+.cockpit-viewport .assistant-panel {
+  --cyan: #55dbff;
   position: absolute;
   top: 0;
   right: 0;
@@ -375,19 +380,26 @@
   width: 460px;
   display: flex;
   flex-direction: column;
+  color: #ecf5ff;
+  font: 16px/1.4 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   background: linear-gradient(160deg, #10284a, #0b1b38);
   border-left: 1px solid #55dbff88;
   box-shadow: -18px 0 40px #000a, 0 0 24px #459dff22;
 }
-.cockpit .assistant-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #355a7c99; }
-.cockpit .assistant-head h3 { font-size: 16px; margin-right: auto; }
-.cockpit .assistant-btn { border: 1px solid #46749a66; background: transparent; color: #cfe4f8; font-size: 12px; padding: 4px 8px; white-space: nowrap; }
-.cockpit .assistant-btn:hover, .cockpit .assistant-btn[aria-pressed="true"] { color: var(--cyan); border-color: #55dbff88; }
+.cockpit-viewport .assistant-panel button { font: inherit; cursor: pointer; }
+.cockpit-viewport .assistant-panel [hidden] { display: none !important; }
+.cockpit-viewport .assistant-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #355a7c99; }
+.cockpit-viewport .assistant-head h3 { color: #f1f7ff; font-size: 16px; font-weight: 500; margin: 0; margin-right: auto; }
+.cockpit-viewport .assistant-btn { border: 1px solid #46749a66; background: transparent; color: #cfe4f8; font-size: 12px; padding: 4px 8px; white-space: nowrap; }
+.cockpit-viewport .assistant-btn:hover, .cockpit-viewport .assistant-btn[aria-pressed="true"] { color: var(--cyan); border-color: #55dbff88; }
 /* 「智能解读」功能按钮：面板内高亮入口（点击自动执行一键报告） */
-.cockpit .assistant-btn.insight-action { color: var(--cyan); border-color: #55dbff88; font-weight: 500; }
-.cockpit .assistant-btn.insight-action:hover { border-color: var(--cyan); box-shadow: 0 0 10px #55dbff33; }
-.cockpit .assistant-close { width: 28px; height: 28px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 18px; line-height: 1; }
-.cockpit .assistant-body { position: relative; flex: 1; min-height: 0; background: #fff; }
+.cockpit-viewport .assistant-btn.insight-action { color: var(--cyan); border-color: #55dbff88; font-weight: 500; }
+.cockpit-viewport .assistant-btn.insight-action:hover { border-color: var(--cyan); box-shadow: 0 0 10px #55dbff33; }
+.cockpit-viewport .assistant-close { width: 28px; height: 28px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 18px; line-height: 1; }
+/* 浅色对话面基线：深色文字（未被 Tailwind 类覆盖的裸文本继承此色）、
+   表单控件按亮色默认渲染（textarea/输入框白底黑字） */
+.cockpit-viewport .assistant-body { position: relative; flex: 1; min-height: 0; background: #fff; color: #1f2937; color-scheme: light; }
 
 /* 键盘可达性 */
 .cockpit button:focus-visible, .cockpit a:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }
+.cockpit-viewport .ai-fab:focus-visible, .cockpit-viewport .assistant-panel button:focus-visible { outline: 1px solid #55dbff; outline-offset: 2px; }
