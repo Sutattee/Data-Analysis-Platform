@@ -51,7 +51,7 @@
   height: 1080px;
   padding: 20px;
   display: grid;
-  grid-template-rows: 120px 832px 56px;
+  grid-template-rows: 110px 850px 48px;
   gap: 16px;
   overflow: hidden;
   transform-origin: top left;
@@ -63,14 +63,14 @@
   min-height: 0;
 }
 .cockpit .column { display: grid; gap: 16px; min-height: 0; min-width: 0; }
-.cockpit .column.left { grid-template-rows: 260px 340px 200px; }
-.cockpit .column.center { grid-template-rows: 230px 285px 285px; }
-.cockpit .column.right { grid-template-rows: 488px 328px; }
+.cockpit .column.left { grid-template-rows: 238px 340px 240px; }
+.cockpit .column.center { grid-template-rows: 224px 297px 297px; }
+.cockpit .column.right { grid-template-rows: 502px 332px; }
 
 /* 主标题：SVG只承载装饰，业务标题始终使用HTML文字。 */
 .cockpit .tech-header {
   position: relative;
-  height: 120px;
+  height: 110px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -240,7 +240,7 @@
 .cockpit .bar-track { height: 10px; background: #24466c99; }
 .cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
 
-/* 右下悬浮按钮与浮层。bottom/right相对整个screen定位。 */
+/* 右下悬浮按钮。bottom/right相对整个screen定位；滑出面板样式见下方补充段 .assistant-panel。 */
 .cockpit .insight-trigger {
   position: absolute;
   right: 20px;
@@ -264,11 +264,6 @@
 }
 .cockpit .insight-trigger:hover { background: linear-gradient(120deg, #2470be, #285bb1 55%, #416dd4); }
 .cockpit .insight-trigger.secondary { right: 188px; }
-.cockpit .insight-panel { position: absolute; right: 20px; bottom: 82px; z-index: 35; width: 480px; max-width: calc(100% - 40px); padding: 20px; background: linear-gradient(135deg, #16365a, #0e203d); border: 1px solid #5fbbf7; box-shadow: 0 12px 40px #0008, 0 0 24px #459dff33; }
-.cockpit .insight-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #3e6b94; margin-bottom: 12px; }
-.cockpit .insight-heading h3 { font-size: 22px; }
-.cockpit .insight-close { width: 30px; height: 30px; border: 1px solid #46749a; background: transparent; color: #dff6ff; font-size: 22px; line-height: 1; }
-.cockpit .insight-copy { color: #c7dcf0; font-size: 16px; line-height: 1.7; }
 .cockpit .icon { width: 20px; height: 20px; display: inline-block; }
 
 /* ===== 正式页面补充样式 ===== */
@@ -368,6 +363,9 @@
 .cockpit .legend-key.dotted i { border-top: 2px dotted #9bb1d0; }
 .cockpit .legend-key.dotline i { border-top: 1px dotted #9bb1d0; }
 .cockpit .chart-footnote { color: var(--muted); font-size: 12px; line-height: 1.5; }
+/* 图例与脚注同行（图表高度优先，放不下时自动换行），填满面板底部 */
+.cockpit .chart-foot-row { display: flex; align-items: center; justify-content: space-between; gap: 4px 18px; flex-wrap: wrap; }
+.cockpit .chart-foot-row .chart-legend { padding-top: 0; }
 .cockpit .chart-tip { min-width: 170px; padding: 8px 10px; background: #16365aee; border: 1px solid #5fbbf7; color: #d7ecff; font-size: 12px; line-height: 1.8; text-align: left; }
 .cockpit .chart-tip .tip-row { display: flex; justify-content: space-between; gap: 16px; }
 .cockpit .chart-tip .tip-row span:first-child { color: var(--muted); }

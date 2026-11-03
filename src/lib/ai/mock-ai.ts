@@ -2,6 +2,7 @@ import { QaMessage, ExecutionNode, KnowledgeSource } from "@/types";
 import { qaPresets, welcomeMessage } from "@/lib/mock-data/qa";
 import { matchStandardQa } from "@/lib/mock-data/standard-qa";
 import { matchSmartQuery, SmartQueryCase } from "@/lib/mock-data/smart-query";
+import { COCKPIT_INSIGHT_COMMAND, COCKPIT_INSIGHT_REPORT, cockpitAnomalies } from "@/lib/mock-data/cockpit";
 import { generateId, delay } from "@/lib/utils";
 
 // 统一命中答案的包装格式：已结构化内容保持原样，表格内容包装为结构化回答
@@ -325,6 +326,49 @@ function generateKnowledgeAnswer(userMessage: string): string {
 export async function mockAiResponse(userMessage: string): Promise<QaMessage> {
   const totalDelay = 800 + Math.random() * 1200;
   await delay(totalDelay);
+
+  // 管理驾驶舱「智能解读」固定指令：立即执行，展示执行过程并输出全厂KPI解读报告
+  if (userMessage.includes(COCKPIT_INSIGHT_COMMAND)) {
+    const anomalyTotal = cockpitAnomalies("全部").total;
+    let t = 0;
+    const nodes: ExecutionNode[] = [
+      {
+        id: "think", label: "分析思路", status: "completed",
+        duration: t += 80 + Math.random() * 120,
+        detail: "理解指令为「管理驾驶舱综合解读」：拉取六项核心KPI、能耗与预算趋势、16机组完成率、过程管控与重点异常，逐域评估后生成解读报告。",
+      },
+      {
+        id: "intent", label: "意图识别", status: "completed",
+        duration: t += 60 + Math.random() * 100,
+        detail: "命中驾驶舱固定指令，置信度 0.99。数据域：生产管理、工艺质量、能源消耗、费用预算执行。",
+      },
+      {
+        id: "data", label: "驾驶舱取数", status: "completed",
+        duration: t += 90 + Math.random() * 150,
+        detail: `核心指标卡 6 项、能耗趋势 10 个月、预算趋势 10 个月、机组完成率 16 台、过程管控 9 项、未处理异常 ${anomalyTotal} 项，取数与汇总完成。`,
+      },
+      {
+        id: "analysis", label: "指标评估", status: "completed",
+        duration: t += 70 + Math.random() * 130,
+        detail: "达标：单箱综合能耗、成品与制丝优质品率；关注：台时产量、设备运行净效率、4项过程参数未达标；风险：单箱可控费用超支、预算执行进度偏差。",
+      },
+      {
+        id: "report", label: "生成解读报告", status: "completed",
+        duration: t += 50 + Math.random() * 100,
+        detail: "按「总体判断 → 分项解读 → 行动建议」结构输出驾驶舱分析报告。",
+      },
+    ];
+    return {
+      id: generateId(),
+      role: "assistant",
+      content: COCKPIT_INSIGHT_REPORT,
+      timestamp: Date.now(),
+      followUpQuestions: ["哪些费用科目执行进度偏差最大？", "12#机组完成率偏低的原因？", "当前有哪些危险级异常？"],
+      executionNodes: nodes,
+      thinkingTime: Math.round(t / 100) / 10,
+      answerType: "analysis",
+    };
+  }
 
   // 图表修改指令
   if (isChartModification(userMessage)) {

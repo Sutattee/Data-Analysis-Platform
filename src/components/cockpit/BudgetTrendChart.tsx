@@ -75,14 +75,16 @@ export function BudgetTrendChart() {
             </LineChart>
           </ResponsiveContainer>
         </Link>
-        <div className="chart-legend">
-          <span className="legend-key solid"><i />预算执行率</span>
-          <span className="legend-key dashed"><i />计划执行进度</span>
-          <span className="legend-key dotline"><i />年度预算 100%</span>
-        </div>
-        <p className="chart-footnote">
+        <div className="chart-foot-row">
+          <div className="chart-legend">
+            <span className="legend-key solid"><i />预算执行率</span>
+            <span className="legend-key dashed"><i />计划执行进度</span>
+            <span className="legend-key dotline"><i />年度预算 100%</span>
+          </div>
+          <p className="chart-footnote">
           10月末累计执行 15,180 万元 ｜ 年度预算 {BUDGET_ANNUAL.toLocaleString()} 万元
-        </p>
+          </p>
+        </div>
       </div>
     </section>
   );

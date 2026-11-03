@@ -16,7 +16,7 @@ import { EFFICIENCY_CARDS, EQUIPMENT_UNITS } from "./equipment-efficiency";
 
 // ========== 基础口径 ==========
 export const COCKPIT_STAT = { monthLabel: "2026年10月", quarter: "2026年第三季度" };
-export const COCKPIT_HEADER = { platform: "产质耗 · 数智分析平台", title: "什邡卷烟厂 · 管理驾驶舱" };
+export const COCKPIT_HEADER = { platform: "产质耗KPI分析平台", title: "卷烟厂 · 管理驾驶舱" };
 
 // ========== 六张核心指标卡 ==========
 // 值复用各业务域现有数据；能耗 29.8 / 预算执行率 97.0 为驾驶舱 PRD 锚点
@@ -326,16 +326,45 @@ export const CARBON_WATER: CarbonWaterRow[] = [
   { name: "废水COD浓度", valueText: "42 mg/L", refText: "限值待配置", tone: "muted" },
 ];
 
-// ========== 智能解读（首条为素材样例文案，其余引用驾驶舱真实数字） ==========
-const anomalyBrief = cockpitAnomalies("全部");
+// ========== 智能解读：固定指令 + 一键生成的全厂KPI解读报告 ==========
+// 「智能解读」滑出面板每次打开都以新会话自动发送该指令，mock-ai 命中后返回报告
+export const COCKPIT_INSIGHT_COMMAND = "驾驶舱智能解读";
 
-export const COCKPIT_INSIGHT: string[] = [
-  "本月单箱综合能耗29.8 kgce/箱，低于目标1.2 kgce/箱。预算执行率97.0%，较计划执行进度高13.7个百分点。优先核查水分波动、卷包电耗及进度异常费用科目。",
-  `台时产量${hourlyCard.value.toLocaleString()}箱/台，低于目标${(hourlyCard.target! - hourlyCard.value).toLocaleString()}箱/台；设备运行净效率${netCard.value.toFixed(1)}%，低于历史均值0.6pct，建议关注卷接包装机组停机损失与提速瓶颈。`,
-  `16台卷接包装机组完成率${UNIT_RATES[0]!.rate.toFixed(1)}%～${UNIT_RATES[UNIT_RATES.length - 1]!.rate.toFixed(1)}%，${UNIT_RATES[0]!.name}（${UNIT_RATES[0]!.rate.toFixed(1)}%）与${UNIT_RATES[1]!.name}（${UNIT_RATES[1]!.rate.toFixed(1)}%）偏低，10月存在未完成计划的日期，建议核查排产计划与故障停机。`,
-  "过程管控9项中4项未达标：松散回潮非稳态指数4.8%（管控≤4.0%）、成品水分标准偏差1.65%（管控≤1.55%）、烟支单支克重偏差46mg（管控≤40mg）超上限，烘丝机出口水分偏差12.4%低于区间下限12.50%，建议跟踪批次趋势。",
-  `全厂重点异常${anomalyBrief.total}项（危险${anomalyBrief.danger}、告警${anomalyBrief.alarm}、预警${anomalyBrief.warning}），实测${anomalyBrief.actualCount}项、预测${anomalyBrief.predictionCount}项，点击右列列表可直达处置。`,
-];
+const anomalyBrief = cockpitAnomalies("全部");
+const topDefect = DEFECT_TOP[0]!;
+
+export const COCKPIT_INSIGHT_REPORT = `📊 驾驶舱智能解读报告 · ${COCKPIT_STAT.monthLabel}
+
+一、总体判断
+本月产质耗运行总体平稳：能耗与质量优于目标，产量效率略低于目标，费用执行存在两项重点风险（单箱可控费用超支、预算执行进度偏差）。
+
+二、分项解读
+
+【产量与效率】
+• 台时产量 ${hourlyCard.value.toLocaleString()} 箱/台，低于目标 ${(hourlyCard.target! - hourlyCard.value).toLocaleString()} 箱/台；设备运行净效率 ${netCard.value.toFixed(1)}%，低于历史均值 0.6 pct
+• 16台机组完成率 ${UNIT_RATES[0]!.rate.toFixed(1)}%～${UNIT_RATES[UNIT_RATES.length - 1]!.rate.toFixed(1)}%：${UNIT_RATES[0]!.name}（${UNIT_RATES[0]!.rate.toFixed(1)}%）、${UNIT_RATES[1]!.name}（${UNIT_RATES[1]!.rate.toFixed(1)}%）偏低，10月存在未完成计划日期，建议核查排产与故障停机
+
+【工艺质量】
+• 成品优质品率 ${YIELD_RINGS[0]!.value.toFixed(1)}%、制丝优质品率 ${YIELD_RINGS[1]!.value.toFixed(1)}%，保持高位
+• 过程管控 9 项中 4 项未达标：松散回潮非稳态指数 4.8%（≤4.0%）、成品水分标准偏差 1.65%（≤1.55%）、烟支单支克重偏差 46mg（≤40mg）超上限，烘丝机出口水分偏差 12.4% 低于下限 12.5%
+• 全部缺陷 ${DEFECT_TOTAL_COUNT} 条，以「${topDefect.name}」居首（${topDefect.count}条 / 占比${topDefect.pct}%）
+
+【能耗与碳水资源】
+• 单箱综合能耗 29.8 kgce/箱，低于目标 1.2 kgce/箱；单箱电耗 24.6 kWh/箱
+• 碳排放强度 0.032 kg CO₂/万支，超目标 0.002；中水回用率 82.6%（同比+3.1pct）持续向好
+
+【费用预算】
+• 单箱可控费用 408 元/箱，超目标 108 元/箱，为当前最大风险项
+• 预算执行率 97.0%，高于计划执行进度 13.7 pct；累计执行 15,180 万元 / 年度预算 ${BUDGET_ANNUAL.toLocaleString()} 万元；健康度 ${BUDGET_HEALTH.score}分（${BUDGET_HEALTH.grade}）
+
+【重点异常】
+• 未处理异常 ${anomalyBrief.total} 项（危险${anomalyBrief.danger}、告警${anomalyBrief.alarm}、预警${anomalyBrief.warning}），实测 ${anomalyBrief.actualCount} 项、预测 ${anomalyBrief.predictionCount} 项，建议优先处置危险级异常
+
+三、行动建议
+1. 核查可控费用超支科目，复盘预算执行进度偏差的费用成因
+2. 跟踪 ${UNIT_RATES[0]!.name}与${UNIT_RATES[1]!.name}的排产与停机损失，恢复台时产量
+3. 复盘 4 项未达标过程参数的批次趋势，定位工艺偏差根因
+4. 优先处置危险级实测异常，关注碳排放强度超标治理`;
 
 // ========== AI 助手推荐问题 ==========
 export const COCKPIT_AI_QUESTIONS = [

@@ -33,7 +33,7 @@ export function MaterialPanel() {
                 <td className="number">{r.valueText}</td>
                 <td className="muted">
                   {r.baseText}
-                  <em className="muted" style={{ display: "block", fontSize: 11, fontStyle: "normal" }}>{r.baseType}</em>
+                  <em className="muted" style={{ display: "inline", fontSize: 11, fontStyle: "normal", marginLeft: 4 }}>{r.baseType}</em>
                 </td>
               </tr>
             ))}

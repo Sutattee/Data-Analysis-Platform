@@ -1,6 +1,7 @@
 "use client";
 
 // 驾驶舱 AI 助手：右下角悬浮按钮 + 右侧滑出深色壳对话窗（浅色对话面复用 ChatPanel）。
+// 受控组件：open/onOpen/onClose 由 CockpitView 管理，与「智能解读」滑出面板互斥展开。
 // 会话管理照 energy-overview/AiAssistant.tsx：首次打开后面板常驻挂载（收起不销毁会话）、
 // chatKey 重挂（新建会话/继续历史）、面板内历史记录/收藏覆盖视图；Escape 收起面板。
 import { useEffect, useState } from "react";
@@ -14,9 +15,16 @@ import { COCKPIT_AI_QUESTIONS } from "@/lib/mock-data/cockpit";
 const WELCOME_TEXT =
   "您好，我是管理驾驶舱AI助手。可直接询问本月全厂产质耗KPI、重点异常与预算执行情况。";
 
-export function CockpitAssistant() {
+export function CockpitAssistant({
+  open,
+  onOpen,
+  onClose,
+}: {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}) {
   const { state, toggleFavorite } = useApp();
-  const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false); // 首次打开后面板常驻挂载（收起不销毁会话）
   const [chatKey, setChatKey] = useState(0); // 递增以重挂 ChatPanel（新建会话/继续历史）
   const [chatInitialQuery, setChatInitialQuery] = useState<string | undefined>(undefined);
@@ -28,15 +36,15 @@ export function CockpitAssistant() {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, onClose]);
 
   function handleOpen() {
-    setOpen(true);
     setEverOpened(true);
+    onOpen();
   }
 
   // 新建会话：清空当前对话重新开始
@@ -114,7 +122,7 @@ export function CockpitAssistant() {
             <button type="button" className="assistant-btn" onClick={handleNewSession}>
               新建会话
             </button>
-            <button type="button" className="assistant-close" onClick={() => setOpen(false)} aria-label="收起面板">
+            <button type="button" className="assistant-close" onClick={onClose} aria-label="收起面板">
               ×
             </button>
           </div>

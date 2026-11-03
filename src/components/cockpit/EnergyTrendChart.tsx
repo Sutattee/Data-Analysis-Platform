@@ -105,12 +105,14 @@ export function EnergyTrendChart() {
             </LineChart>
           </ResponsiveContainer>
         </div>
-        <div className="chart-legend">
-          <span className="legend-key solid"><i />实际</span>
-          <span className="legend-key dashed"><i />目标</span>
-          <span className="legend-key dotted"><i />历史均值</span>
+        <div className="chart-foot-row">
+          <div className="chart-legend">
+            <span className="legend-key solid"><i />实际</span>
+            <span className="legend-key dashed"><i />目标</span>
+            <span className="legend-key dotted"><i />历史均值</span>
+          </div>
+          <p className="chart-footnote">{ENERGY_FOOTNOTE}</p>
         </div>
-        <p className="chart-footnote">{ENERGY_FOOTNOTE}</p>
       </div>
     </section>
   );
