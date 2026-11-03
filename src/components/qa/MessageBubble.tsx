@@ -61,6 +61,8 @@ export function MessageBubble({
   // 思考过程展开
   const [showThinking, setShowThinking] = useState(false);
 
+  // 计算过程（指标溯源）功能暂时隐藏：按钮与弹窗代码保留，置 true 可恢复展示
+  const SHOW_CALC_PROCESS = false;
   // 计算过程弹窗（指标溯源：拓扑图 + 详细解释）
   const [calcOpen, setCalcOpen] = useState(false);
   // 用于匹配涉及指标的回答文本（结构化回答时并入查询结果与解读）
@@ -295,14 +297,17 @@ export function MessageBubble({
                 {message.feedback === "dislike" && "已反馈"}
               </button>
 
-              {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐 */}
-              <button
-                onClick={() => setCalcOpen(true)}
-                className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
-                title="查看指标计算过程（溯源链路与详细解释）"
-              >
-                {QA_BUBBLE_ICONS.calculation} 计算过程
-              </button>
+              {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐。
+                  功能暂时隐藏（按钮与弹窗代码保留，置 true 可恢复展示） */}
+              {SHOW_CALC_PROCESS && (
+                <button
+                  onClick={() => setCalcOpen(true)}
+                  className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
+                  title="查看指标计算过程（溯源链路与详细解释）"
+                >
+                  {QA_BUBBLE_ICONS.calculation} 计算过程
+                </button>
+              )}
             </div>
 
             {/* 点踩原因弹窗 */}
@@ -391,8 +396,8 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* 计算过程弹窗（指标溯源：拓扑图 + 详细解释） */}
-        {!isUser && !isWelcome && (
+        {/* 计算过程弹窗（指标溯源：拓扑图 + 详细解释）——随入口按钮一并隐藏 */}
+        {SHOW_CALC_PROCESS && !isUser && !isWelcome && (
           <CalculationProcess open={calcOpen} onClose={() => setCalcOpen(false)} text={calcText} />
         )}
       </div>

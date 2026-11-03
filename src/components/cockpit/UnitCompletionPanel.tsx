@@ -2,11 +2,11 @@
 
 // 卷接包装机台月度计划完成率：升序条形（最低在前），滚动窗独立滚动；
 // 条形按实际完成率分档着色（<95% 橙色警示、=100% 绿色达标、其余蓝青），
-// 行悬浮展示10月未完成计划的日期，点击下钻设备运行效率页
+// 点击下钻设备运行效率页（行悬浮提示暂隐藏，no-tips）
 import Link from "next/link";
-import { COCKPIT_STAT, UNIT_RATES } from "@/lib/mock-data/cockpit";
+import { UNIT_RATES } from "@/lib/mock-data/cockpit";
 
-// 名称缩短展示（“12#卷接包装机组” → “12#机组”），悬浮提示展示全名
+// 名称缩短展示（“12#卷接包装机组” → “12#机组”）
 const shortName = (name: string) => name.replace("卷接包装机组", "机组");
 
 // 条形颜色档位：<95% 橙色警示（未达标区，92.0%~94.9% 共6台），=100% 绿色达标
@@ -14,11 +14,8 @@ const barTone = (rate: number) => (rate < 95 ? " warning" : rate >= 100 ? " good
 
 export function UnitCompletionPanel() {
   return (
-    <section className="panel" aria-label="机台月度计划完成率">
-      <h2 className="panel-heading">
-        机台月度计划完成率
-        <span className="panel-extra">{COCKPIT_STAT.monthLabel} · 最低在前</span>
-      </h2>
+    <section className="panel no-tips" aria-label="机台月度计划完成率">
+      <h2 className="panel-heading">机台月度计划完成率</h2>
       <div className="panel-body">
         <div className="scroll-window" role="region" aria-label="机台完成率列表">
           {UNIT_RATES.map((u) => (

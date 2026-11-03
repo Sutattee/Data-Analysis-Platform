@@ -28,7 +28,7 @@ export function QualityPanel() {
   const maxDefectCount = DEFECT_TOP[0]?.count ?? 1;
 
   return (
-    <section className="panel" aria-label="工艺质量">
+    <section className="panel no-tips" aria-label="工艺质量">
       <h2 className="panel-heading">
         工艺质量
         <span className="panel-extra">优质品率 · 过程管控 · 缺陷</span>

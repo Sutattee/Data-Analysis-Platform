@@ -216,9 +216,10 @@
 .cockpit .tab[aria-selected="true"] { color: var(--cyan); }
 .cockpit .tab[aria-selected="true"]::after { content: ""; height: 2px; position: absolute; bottom: -1px; left: 0; right: 0; background: var(--cyan); }
 
-/* 小型环形图：--value表示百分数；剩余份额不等于缺陷率。 */
+/* 小型环形图：--value表示百分数；剩余份额不等于缺陷率。
+   名称排在环右侧（横排）以降低高度，把更多空间让给过程管控表格。 */
 .cockpit .yield-pair { display: grid; grid-template-columns: repeat(2, 1fr); justify-items: center; gap: 16px; }
-.cockpit .yield-item { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; }
+.cockpit .yield-item { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0; }
 .cockpit .yield-ring {
   position: relative;
   display: grid;
@@ -241,10 +242,15 @@
 .cockpit .risk-type { color: #b9d2ea; font-size: 14px; margin-left: 8px; }
 .cockpit .risk-type.prediction { color: var(--prediction); }
 .cockpit .bar-track { height: 10px; background: #24466c99; }
-.cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
-/* 条形按实际值分档着色：<95% 橙色警示（未完成计划机台）、=100% 绿色达标 */
+/* bar-mark 须显式块化：span 默认 inline，width/height 对 inline 无效，
+   不加 display:block 时填充条（含占比宽度与颜色）完全渲染不出来 */
+.cockpit .bar-mark { display: block; height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
+/* 条形按实际值分档着色：<95% 橙色警示（未达标区，92.0%~94.9% 共6台）、=100% 绿色达标 */
 .cockpit .bar-mark.warning { background: linear-gradient(90deg, #d18a4e, #ffc575); }
 .cockpit .bar-mark.good { background: linear-gradient(90deg, #2fa583, #65e7bf); }
+/* 面板行悬浮提示暂不展示（机台完成率/工艺质量/辅料消耗）：
+   .no-tips 挂在面板 section 上，row-tip 代码保留、仅隐藏展示 */
+.cockpit .panel.no-tips .row-tip { display: none !important; }
 
 /* 右下角 AI 助手悬浮球（与其他板块同款头像球，深色描边发光；面板打开时组件卸载）。
    挂在 .cockpit-viewport 层（脱离 .cockpit 画布样式作用域），bottom/right 相对视口定位，

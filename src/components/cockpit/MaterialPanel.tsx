@@ -9,7 +9,7 @@ export function MaterialPanel() {
   const router = useRouter();
 
   return (
-    <section className="panel" aria-label="辅料消耗">
+    <section className="panel no-tips" aria-label="辅料消耗">
       <h2 className="panel-heading">
         辅料消耗
         <span className="panel-extra">昨日口径</span>
