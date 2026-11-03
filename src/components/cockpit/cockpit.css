@@ -43,7 +43,10 @@
 .cockpit .warning { color: var(--warning); }
 .cockpit .prediction { color: var(--prediction); }
 
-/* 1920×1080设计坐标。外层容器负责等比缩放，内部滚动区保持独立。 */
+/* 1920×1080设计坐标。外层容器负责等比缩放，内部滚动区保持独立。
+   第三行 12px 仅为底部缓冲（AI 悬浮球已移至 viewport 层，不再占用画布内安全区），
+   高度尽量让给 screen-main：工艺质量加高（过程管控默认可见约4行）、两张趋势图加高、
+   辅料与碳水随上方面板加高而下移。 */
 .cockpit.screen {
   position: relative;
   isolation: isolate;
@@ -51,7 +54,7 @@
   height: 1080px;
   padding: 20px;
   display: grid;
-  grid-template-rows: 110px 850px 48px;
+  grid-template-rows: 110px 886px 12px;
   gap: 16px;
   overflow: hidden;
   transform-origin: top left;
@@ -63,9 +66,9 @@
   min-height: 0;
 }
 .cockpit .column { display: grid; gap: 16px; min-height: 0; min-width: 0; }
-.cockpit .column.left { grid-template-rows: 238px 340px 240px; }
-.cockpit .column.center { grid-template-rows: 224px 297px 297px; }
-.cockpit .column.right { grid-template-rows: 502px 332px; }
+.cockpit .column.left { grid-template-rows: 214px 400px 240px; }
+.cockpit .column.center { grid-template-rows: 224px 315px 315px; }
+.cockpit .column.right { grid-template-rows: 538px 332px; }
 
 /* 主标题：SVG只承载装饰，业务标题始终使用HTML文字。 */
 .cockpit .tech-header {
@@ -239,6 +242,9 @@
 .cockpit .risk-type.prediction { color: var(--prediction); }
 .cockpit .bar-track { height: 10px; background: #24466c99; }
 .cockpit .bar-mark { height: 100%; background: linear-gradient(90deg, #346bcb, #55dbff); }
+/* 条形按实际值分档着色：<95% 橙色警示（未完成计划机台）、=100% 绿色达标 */
+.cockpit .bar-mark.warning { background: linear-gradient(90deg, #d18a4e, #ffc575); }
+.cockpit .bar-mark.good { background: linear-gradient(90deg, #2fa583, #65e7bf); }
 
 /* 右下角 AI 助手悬浮球（与其他板块同款头像球，深色描边发光；面板打开时组件卸载）。
    挂在 .cockpit-viewport 层（脱离 .cockpit 画布样式作用域），bottom/right 相对视口定位，

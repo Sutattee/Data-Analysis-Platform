@@ -1,6 +1,7 @@
 "use client";
 
-// 16台卷接包装机组月度计划完成率：升序条形（最低在前），滚动窗独立滚动；
+// 卷接包装机台月度计划完成率：升序条形（最低在前），滚动窗独立滚动；
+// 条形按实际完成率分档着色（<95% 橙色警示、=100% 绿色达标、其余蓝青），
 // 行悬浮展示10月未完成计划的日期，点击下钻设备运行效率页
 import Link from "next/link";
 import { COCKPIT_STAT, UNIT_RATES } from "@/lib/mock-data/cockpit";
@@ -8,15 +9,18 @@ import { COCKPIT_STAT, UNIT_RATES } from "@/lib/mock-data/cockpit";
 // 名称缩短展示（“12#卷接包装机组” → “12#机组”），悬浮提示展示全名
 const shortName = (name: string) => name.replace("卷接包装机组", "机组");
 
+// 条形颜色档位：<95% 橙色警示（未达标区，92.0%~94.9% 共6台），=100% 绿色达标
+const barTone = (rate: number) => (rate < 95 ? " warning" : rate >= 100 ? " good" : "");
+
 export function UnitCompletionPanel() {
   return (
-    <section className="panel" aria-label="16机组月度计划完成率">
+    <section className="panel" aria-label="机台月度计划完成率">
       <h2 className="panel-heading">
-        16机组月度计划完成率
+        机台月度计划完成率
         <span className="panel-extra">{COCKPIT_STAT.monthLabel} · 最低在前</span>
       </h2>
       <div className="panel-body">
-        <div className="scroll-window" role="region" aria-label="机组完成率列表">
+        <div className="scroll-window" role="region" aria-label="机台完成率列表">
           {UNIT_RATES.map((u) => (
             <Link
               key={u.name}
@@ -26,7 +30,7 @@ export function UnitCompletionPanel() {
             >
               <span className="bar-name">{shortName(u.name)}</span>
               <span className="bar-track">
-                <span className="bar-mark" style={{ width: `${u.rate}%` }} />
+                <span className={`bar-mark${barTone(u.rate)}`} style={{ width: `${u.rate}%` }} />
               </span>
               <span className="bar-number">{u.rate.toFixed(1)}%</span>
               <span className="row-tip">
