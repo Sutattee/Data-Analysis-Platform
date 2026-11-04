@@ -4,7 +4,8 @@
 // 并尽量复用平台现有常量（台时产量/净效率/检验得分/可控费用/预算总额/缺陷/过程管控/辅料），
 // 不改动任何原有数据文件（制丝优质品率以驾驶舱素材 98.4 为准，不动 SILK_PREMIUM）。
 import type { AlertDomain, AlertLevel } from "@/types";
-import { ALERT_RECORDS, LEVEL_PRIORITY } from "./alerts";
+import { ALERT_RECORDS, LEVEL_PRIORITY, PRODUCTION_MATERIAL_METRICS } from "./alerts";
+import { EXPENSE_ALERT_METRIC_NAMES } from "./expense-alerts";
 import {
   DEFECT_TOTAL,
   FINISHED_PREMIUM,
@@ -258,13 +259,19 @@ export interface CockpitAnomalySummary {
   items: CockpitAnomalyItem[];
 }
 
-// 域 → 告警记录列表路由前缀（详情页兼作路由参数）
-const DOMAIN_HREF: Record<AlertDomain, string> = {
-  能源消耗: "/alert/records/",
-  生产管理: "/production/alert/records/",
-  工艺质量: "/quality/alert/records/",
-  费用预算执行: "/expense/alert/records/",
-};
+// 告警归板块：与各板块「告警记录」页取数口径完全一致，点击直达板块告警详情页——
+// 工艺质量=ZL前缀独立数据集 / 费用=费用告警指标集 / 生产=辅料指标白名单 / 其余=能源；
+// 详情页（AlertRecordDetail）按 id 全量查找，四类前缀均可打开
+function moduleOf(r: { id: string; metricName: string }): { domain: AlertDomain; href: string } {
+  if (r.id.startsWith("ZL")) return { domain: "工艺质量", href: `/quality/alert/records/${r.id}` };
+  if (EXPENSE_ALERT_METRIC_NAMES.has(r.metricName)) {
+    return { domain: "费用预算执行", href: `/expense/alert/records/${r.id}` };
+  }
+  if (PRODUCTION_MATERIAL_METRICS.includes(r.metricName)) {
+    return { domain: "生产管理", href: `/production/alert/records/${r.id}` };
+  }
+  return { domain: "能源消耗", href: `/alert/records/${r.id}` };
+}
 
 const ANOMALY_LEVELS: AlertLevel[] = ["预警", "告警", "危险"];
 
@@ -280,18 +287,21 @@ function sortAnomalies(a: CockpitAnomalyItem, b: CockpitAnomalyItem): number {
 export function cockpitAnomalies(filter: AnomalyFilter): CockpitAnomalySummary {
   const items: CockpitAnomalyItem[] = ALERT_RECORDS.filter(
     (r) => ANOMALY_LEVELS.includes(r.level) && !r.handledBy,
-  ).map((r) => ({
-    id: r.id,
-    level: r.level,
-    type: r.type === "当前异常" ? "实测异常" : "预测风险",
-    domain: r.domain,
-    title: r.title,
-    object: r.objectName,
-    metric: r.metricName,
-    time: r.triggerTime,
-    value: r.valueLabel,
-    href: `${DOMAIN_HREF[r.domain]}${r.id}`,
-  }));
+  ).map((r) => {
+    const mod = moduleOf(r);
+    return {
+      id: r.id,
+      level: r.level,
+      type: r.type === "当前异常" ? "实测异常" : "预测风险",
+      domain: mod.domain,
+      title: r.title,
+      object: r.objectName,
+      metric: r.metricName,
+      time: r.triggerTime,
+      value: r.valueLabel,
+      href: mod.href,
+    };
+  });
   const sorted = items.sort(sortAnomalies);
   const full: CockpitAnomalySummary = {
     total: sorted.length,
@@ -319,11 +329,11 @@ export interface CarbonWaterRow {
 }
 
 export const CARBON_WATER: CarbonWaterRow[] = [
-  { name: "单位产量碳排放量", valueText: "0.032 kg CO₂/万支", refText: "目标0.030 ↑0.002", tone: "warning", href: "/energy/overview" },
+  { name: "单位产量碳排放量", valueText: "0.032 kg CO₂/万支", refText: "目标0.03 ↑0.002", tone: "warning", href: "/energy/overview" },
   { name: "单位产量水耗", valueText: "0.12 m³/万支", refText: "环比 ↑1.6%", tone: "warning", href: "/energy/overview" },
   { name: "污水COD", valueText: "42 mg/L", refText: "0mg/L", tone: "warning", href: "/energy/overview" },
-  { name: "第一类碳排放", valueText: "385.6 kg CO₂", refText: "待配置", tone: "muted", href: "/energy/overview" },
-  { name: "第二类碳排放", valueText: "1,248.3 kg CO₂", refText: "待配置", tone: "muted", href: "/energy/overview" },
+  { name: "第一类碳排放", valueText: "385.6 kg CO₂", refText: "-", tone: "muted", href: "/energy/overview" },
+  { name: "第二类碳排放", valueText: "1,248.3 kg CO₂", refText: "-", tone: "muted", href: "/energy/overview" },
 ];
 
 // ========== 智能解读：固定指令 + 一键生成的全厂KPI解读报告 ==========
