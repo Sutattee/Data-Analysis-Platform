@@ -338,13 +338,9 @@
 .cockpit .row-tip .tip-label { color: var(--muted); margin-right: 6px; }
 .cockpit .yield-item .row-tip { left: 50%; right: auto; transform: translateX(-50%); top: calc(100% + 6px); text-align: center; white-space: nowrap; }
 
-/* 碳与水资源：基准/变化列小字防折行；碳排放行四类子项（标签+数值+共享单位）右对齐堆叠 */
+/* 碳与水资源：当前值列 13px 防折行（如「第二类碳排放 1,248.3 kg CO₂」较长），基准列小字 */
+.cockpit .cw-table td.number { font-size: 13px; white-space: nowrap; }
 .cockpit .cw-ref { font-size: 12px; }
-.cockpit .cw-lines { display: flex; flex-direction: column; align-items: flex-end; }
-.cockpit .cw-line { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; line-height: 1.7; white-space: nowrap; }
-.cockpit .cw-line .cw-label { color: var(--muted); font-size: 11px; }
-.cockpit .cw-line .cw-val { font-size: 13px; font-variant-numeric: tabular-nums; }
-.cockpit .cw-line .cw-unit { color: var(--muted); font-size: 10px; }
 
 /* 过程管控表：整行可点下钻稳定性分析 */
 .cockpit tr.row-link { cursor: pointer; }
