@@ -29,10 +29,7 @@ export function QualityPanel() {
 
   return (
     <section className="panel no-tips" aria-label="工艺质量">
-      <h2 className="panel-heading">
-        工艺质量
-        <span className="panel-extra">优质品率 · 过程管控 · 缺陷</span>
-      </h2>
+      <h2 className="panel-heading">工艺质量</h2>
       <div className="panel-body">
         <div className="yield-pair">
           {YIELD_RINGS.map((y) => (

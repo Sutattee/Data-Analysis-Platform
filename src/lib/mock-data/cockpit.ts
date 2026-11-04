@@ -309,21 +309,34 @@ export function cockpitAnomalies(filter: AnomalyFilter): CockpitAnomalySummary {
   };
 }
 
-// ========== 碳与水资源（五行，PRD 值） ==========
+// ========== 碳与水资源（四行；碳排放本月含四类子项，PRD 值） ==========
 export interface CarbonWaterRow {
   name: string;
-  valueText: string;
+  valueText?: string; // 单值行的当前值
+  valueLines?: { label: string; value: string }[]; // 多子项行（碳排放本月，四类排放）
+  valueUnit?: string; // 子项共享单位（如 kg CO₂）
   refText: string; // 基准或变化
   tone: "good" | "warning" | "muted";
   href?: string;
 }
 
 export const CARBON_WATER: CarbonWaterRow[] = [
-  { name: "碳排放强度", valueText: "0.032 kg CO₂/万支", refText: "目标0.030，超0.002", tone: "warning", href: "/energy/overview" },
-  { name: "中水回用率", valueText: "82.6%", refText: "同比+3.1pct", tone: "good" },
-  { name: "单箱烟丝消耗", valueText: "3.26 g/箱", refText: "环比-3.8%", tone: "good" },
-  { name: "万支耗水量", valueText: "0.12 m³/万支", refText: "环比-4.1%", tone: "good" },
-  { name: "废水COD浓度", valueText: "42 mg/L", refText: "限值待配置", tone: "muted" },
+  { name: "单位产量碳排放量", valueText: "0.032 kg CO₂/万支", refText: "目标值：0.030（↑0.002）", tone: "warning", href: "/energy/overview" },
+  { name: "单位产量水耗", valueText: "0.12 m³/万支", refText: "同比 ↓4.1% 环比 ↑1.6%", tone: "good", href: "/energy/overview" },
+  { name: "污水COD", valueText: "42 mg/L", refText: "目标值：0mg/L", tone: "warning", href: "/energy/overview" },
+  {
+    name: "碳排放（本月）",
+    valueLines: [
+      { label: "第一类碳排放", value: "385.6" },
+      { label: "第二类碳排放", value: "1,248.3" },
+      { label: "第三类碳排放", value: "96.5" },
+      { label: "第四类碳排放", value: "42.8" },
+    ],
+    valueUnit: "kg CO₂",
+    refText: "待配置",
+    tone: "muted",
+    href: "/energy/overview",
+  },
 ];
 
 // ========== 智能解读：固定指令 + 一键生成的全厂KPI解读报告 ==========
