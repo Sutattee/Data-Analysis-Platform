@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { useState, useMemo, ReactNode } from "react";
 import { QaMessage, DISLIKE_REASONS } from "@/types";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
 import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
+import { useToast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { collectMessageTables, exportTablesToExcel } from "@/lib/qa/export-excel";
 
 // 图表类型 → emoji
 const CHART_ICONS: Record<string, string> = {
@@ -60,6 +63,23 @@ export function MessageBubble({
 
   // 思考过程展开
   const [showThinking, setShowThinking] = useState(false);
+
+  // 导出 Excel：仅包含数据结果表的回答展示入口（每张表一个 Sheet，全量导出）
+  const exportTables = useMemo(() => (isUser || isWelcome ? [] : collectMessageTables(message)), [message, isUser, isWelcome]);
+  const canExport = exportTables.length > 0;
+  const [exporting, setExporting] = useState(false);
+  const toast = useToast();
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await exportTablesToExcel(exportTables, message.chartMeta?.title);
+    } catch {
+      toast("导出失败，请重试", "danger");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // 计算过程（指标溯源）功能暂时隐藏：按钮与弹窗代码保留，置 true 可恢复展示
   const SHOW_CALC_PROCESS = false;
@@ -296,6 +316,20 @@ export function MessageBubble({
                 <ThumbsDown size={14} />
                 {message.feedback === "dislike" && "已反馈"}
               </button>
+
+              {/* 导出 Excel：操作栏最右侧，仅含数据结果表的回答显示；
+                  生成中展示加载状态，失败提示后可重试 */}
+              {canExport && (
+                <button
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                  title="将该回答的全部结果表导出为 Excel 文件（每张表一个 Sheet）"
+                >
+                  {exporting ? <Spinner size="sm" /> : "📥"}
+                  {exporting ? "导出中..." : "导出Excel"}
+                </button>
+              )}
 
               {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐。
                   功能暂时隐藏（按钮与弹窗代码保留，置 true 可恢复展示） */}
