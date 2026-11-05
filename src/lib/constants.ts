@@ -103,6 +103,12 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "归因配置", href: "/settings/attribution" },
     ],
   },
+  {
+    group: "报告模板",
+    items: [
+      { label: "报告模板", href: "/settings/report-templates" },
+    ],
+  },
 ];
 
 // AI演示卡片

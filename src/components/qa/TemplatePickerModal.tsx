@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import type { ReportTemplateItem } from "@/types";
 import { REPORT_TEMPLATES_ANALYSIS, REPORT_TEMPLATES_EXCEL } from "@/lib/mock-data/report-gen";
+import { listUploadedTemplates, uploadedToTemplateItem } from "@/lib/mock-data/report-templates-admin";
 
 type TemplateKind = "analysis" | "excel";
 
@@ -44,7 +45,11 @@ export function TemplatePickerModal({
 
   if (!open) return null;
 
-  const list = kind === "analysis" ? REPORT_TEMPLATES_ANALYSIS : REPORT_TEMPLATES_EXCEL;
+  // 内置模板 + 启用中的上传模板（管理后台上传并启用后在此可选，停用/删除后不再提供）
+  const list = [
+    ...(kind === "analysis" ? REPORT_TEMPLATES_ANALYSIS : REPORT_TEMPLATES_EXCEL),
+    ...listUploadedTemplates(kind).filter((t) => t.enabled).map(uploadedToTemplateItem),
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">

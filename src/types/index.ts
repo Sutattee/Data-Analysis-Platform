@@ -92,6 +92,18 @@ export interface ReportTemplateItem {
   preview: string;      // 模板内容预览（markdown）
 }
 
+// 上传的报告模板文件（管理后台「报告模板」页管理；启用中的模板联动问数「选择模板」弹窗）
+export interface UploadedTemplate {
+  id: string;                      // ut- 前缀
+  kind: "analysis" | "excel";      // 所属页签
+  name: string;                    // 默认上传文件名去扩展名
+  format: "DOCX" | "PDF" | "XLSX"; // 统一大写展示
+  sizeBytes: number;
+  enabled: boolean;
+  uploader: string;                // 上传人用户名
+  uploadedAt: string;              // YYYY-MM-DD HH:mm:ss
+}
+
 // 对话内报告卡片（挂在 QaMessage.reportCard 上，作为会话记录的一部分）
 export interface ReportCardData {
   kind: "outline" | "report";
