@@ -7,11 +7,11 @@ import type { ReportTemplateItem, UploadedTemplate } from "@/types";
 // ========== 预置数据（卷烟厂口径，含 PRD 示例） ==========
 
 let templates: UploadedTemplate[] = [
-  { id: "ut-a1", kind: "analysis", name: "2026年三季度经济运行分析报告", format: "DOCX", sizeBytes: 2.4 * 1024 * 1024, enabled: true,  uploader: "苏恒", uploadedAt: "2026-11-08 10:19:20" },
-  { id: "ut-a2", kind: "analysis", name: "卷烟厂月度能耗分析报告模板", format: "DOCX", sizeBytes: 1.1 * 1024 * 1024, enabled: true,  uploader: "admin", uploadedAt: "2026-10-15 14:32:08" },
-  { id: "ut-a3", kind: "analysis", name: "年度质量工作总结报告模板", format: "PDF",  sizeBytes: 3.6 * 1024 * 1024, enabled: false, uploader: "李文", uploadedAt: "2026-09-28 16:05:41" },
-  { id: "ut-x1", kind: "excel",    name: "什邡卷烟厂2026年消耗对标指标数据看板", format: "XLSX", sizeBytes: 2 * 1024 * 1024, enabled: true, uploader: "苏恒", uploadedAt: "2026-11-08 10:19:20" },
-  { id: "ut-x2", kind: "excel",    name: "生产日报表填报模板", format: "XLSX", sizeBytes: 860 * 1024, enabled: false, uploader: "王敏", uploadedAt: "2026-10-22 09:12:33" },
+  { id: "ut-a1", kind: "analysis", name: "2026年三季度经济运行分析报告", format: "DOCX", sizeBytes: 2.4 * 1024 * 1024, enabled: true,  uploader: "苏恒", uploadedAt: "2026-11-08 10:19:20", domain: "生产管理" },
+  { id: "ut-a2", kind: "analysis", name: "卷烟厂月度能耗分析报告模板", format: "DOCX", sizeBytes: 1.1 * 1024 * 1024, enabled: true,  uploader: "admin", uploadedAt: "2026-10-15 14:32:08", domain: "能源消耗" },
+  { id: "ut-a3", kind: "analysis", name: "年度质量工作总结报告模板", format: "PDF",  sizeBytes: 3.6 * 1024 * 1024, enabled: false, uploader: "李文", uploadedAt: "2026-09-28 16:05:41", domain: "工艺质量" },
+  { id: "ut-x1", kind: "excel",    name: "卷烟厂2026年消耗对标指标数据看板", format: "XLSX", sizeBytes: 2 * 1024 * 1024, enabled: true, uploader: "苏恒", uploadedAt: "2026-11-08 10:19:20", domain: "能源消耗" },
+  { id: "ut-x2", kind: "excel",    name: "生产日报表填报模板", format: "XLSX", sizeBytes: 860 * 1024, enabled: false, uploader: "王敏", uploadedAt: "2026-10-22 09:12:33", domain: "生产管理" },
 ];
 
 // ========== 查询与变更 ==========
@@ -130,6 +130,36 @@ const GENERIC_OUTLINE_EXCEL: ReportTemplateItem["outline"] = {
   ],
 };
 
+// 通用 Excel 工作表预览骨架（上传的 XLSX 无法解析原版式，按对标看板通用结构展示；
+// 正文数据以原文件为准，此处仅为只读预览示意）
+const GENERIC_EXCEL_SHEETS: ReportTemplateItem["excelSheets"] = [
+  {
+    name: "对标指标总览",
+    cells: [
+      ["对标指标总览（当期累计）", "", "", "", ""],
+      ["指标名称", "单位", "本期值", "对标值", "差距"],
+      ["万支卷烟综合能耗", "kgce/万支", "28.6", "30.0", "-1.4"],
+      ["万支卷烟耗水", "m³/万支", "1.8", "2.0", "-0.2"],
+      ["单箱耗叶", "kg/箱", "38.6", "40.0", "-1.4"],
+    ],
+    merges: [{ row: 0, col: 0, rowSpan: 1, colSpan: 5 }],
+    headerRows: 2,
+    numericCols: [2, 3, 4],
+  },
+  {
+    name: "口径说明",
+    cells: [
+      ["统计口径说明", ""],
+      ["项目", "说明"],
+      ["统计周期", "当期累计（月初至昨日）"],
+      ["对标口径", "行业平均先进值"],
+      ["数据来源", "ERP系统、能源管理系统"],
+    ],
+    merges: [{ row: 0, col: 0, rowSpan: 1, colSpan: 2 }],
+    headerRows: 2,
+  },
+];
+
 // 上传模板 → 问数侧模板项（骨架为共享常量，消费侧 outlineFromTemplate 会深拷贝分配章节 id）
 export function uploadedToTemplateItem(t: UploadedTemplate): ReportTemplateItem {
   const outline = t.kind === "analysis" ? GENERIC_OUTLINE_ANALYSIS : GENERIC_OUTLINE_EXCEL;
@@ -141,10 +171,12 @@ export function uploadedToTemplateItem(t: UploadedTemplate): ReportTemplateItem 
     kind: t.kind,
     name: t.name,
     category: "上传模板",
+    domain: t.domain ?? "通用",
     keywords: [t.name],
     description: `上传于 ${t.uploadedAt} 的${t.format}模板文件`,
     refFile: `样例：${t.name}.${t.format.toLowerCase()}`,
     outline,
     preview: `# ${t.name}\n\n（上传文件模板：正文按通用结构生成，内容以原文件为准）\n\n${sectionTitles}`,
+    excelSheets: t.kind === "excel" ? GENERIC_EXCEL_SHEETS : undefined,
   };
 }

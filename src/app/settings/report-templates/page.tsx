@@ -1,7 +1,7 @@
 "use client";
 
-// 报告模板管理：顶部双页签（分析报告模板 | Excel报表模版）+ 右上角「上传模板」；
-// 列表含 模板名称/文件格式/文件大小/启停状态(开关)/上传人/上传时间/操作(预览、删除)。
+// 报告模板管理：顶部双页签（分析报告模板 | Excel报表模版）+ 业务域筛选 + 右上角「上传模板」；
+// 列表含 模板名称/文件格式/文件大小/业务域/启停状态(开关)/上传人/上传时间/操作(预览、删除)。
 // 启用中的上传模板联动智能问数「选择模板」弹窗（停用/删除后不再提供选择）。
 import { useMemo, useState } from "react";
 import type { UploadedTemplate } from "@/types";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { UploadTemplateDrawer } from "@/components/settings/UploadTemplateDrawer";
+import { DomainFilter } from "@/components/shared/DomainFilter";
+import { ExcelPreview } from "@/components/shared/ExcelPreview";
 import {
   addUploadedTemplate,
   formatFileSize,
@@ -40,13 +42,16 @@ export default function ReportTemplatesPage() {
   const toast = useToast();
   const [tab, setTab] = useState<TabKey>("analysis");
   const [tick, setTick] = useState(0); // mock 内存态变更后强制刷新
+  const [domain, setDomain] = useState("全部"); // 业务域筛选，默认「全部」
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [previewTarget, setPreviewTarget] = useState<UploadedTemplate | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UploadedTemplate | null>(null);
 
-  // mock 内存态变更（启停/删除/上传）后靠 tick 失效重取
-  const rows = useMemo(() => listUploadedTemplates(tab), [tab, tick]);
+  // mock 内存态变更（启停/删除/上传）后靠 tick 失效重取；再按业务域过滤
+  const allRows = useMemo(() => listUploadedTemplates(tab), [tab, tick]);
+  const rows = domain === "全部" ? allRows : allRows.filter((t) => (t.domain ?? "通用") === domain);
+  const domainOptions = useMemo(() => Array.from(new Set(allRows.map((t) => t.domain ?? "通用"))), [allRows]);
 
   function handleUploaded(t: UploadedTemplate) {
     addUploadedTemplate(t);
@@ -69,10 +74,9 @@ export default function ReportTemplatesPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">报告模板</h1>
-        <p className="text-sm text-gray-500 mt-1">管理报告与报表模板文件，启用后可供智能问数选择使用</p>
       </div>
 
-      {/* 页签 + 右上角上传入口 */}
+      {/* 页签 + 业务域筛选 + 右上角上传入口 */}
       <div className="flex items-center gap-1.5" role="tablist" aria-label="模板类型">
         {TABS.map((t) => {
           const active = t.key === tab;
@@ -82,7 +86,10 @@ export default function ReportTemplatesPage() {
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setTab(t.key)}
+              onClick={() => {
+                setTab(t.key);
+                setDomain("全部"); // 切页签重置业务域筛选
+              }}
               className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
                 active
                   ? "bg-primary-600 text-white"
@@ -93,7 +100,10 @@ export default function ReportTemplatesPage() {
             </button>
           );
         })}
-        <Button className="ml-auto" onClick={() => setUploadOpen(true)}>上传模板</Button>
+        <div className="ml-auto flex items-center gap-2">
+          <DomainFilter value={domain} options={domainOptions} onChange={setDomain} />
+          <Button onClick={() => setUploadOpen(true)}>上传模板</Button>
+        </div>
       </div>
 
       <Card padding={false}>
@@ -104,6 +114,7 @@ export default function ReportTemplatesPage() {
                 <th className={th}>模板名称</th>
                 <th className={th}>文件格式</th>
                 <th className={th}>文件大小</th>
+                <th className={th}>业务域</th>
                 <th className={th}>启停状态</th>
                 <th className={th}>上传人</th>
                 <th className={th}>上传时间</th>
@@ -113,7 +124,7 @@ export default function ReportTemplatesPage() {
             <tbody className="divide-y divide-gray-50">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">
                     暂无模板，点击右上角「上传模板」
                   </td>
                 </tr>
@@ -125,6 +136,7 @@ export default function ReportTemplatesPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{t.format}</td>
                     <td className="px-4 py-3 text-gray-600">{formatFileSize(t.sizeBytes)}</td>
+                    <td className="px-4 py-3 text-gray-600">{t.domain ?? "通用"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {/* 启停开关：启用后可供问数选择生成报告 */}
@@ -193,9 +205,14 @@ export default function ReportTemplatesPage() {
               <Field label="上传人" value={previewTarget.uploader} />
               <Field label="上传时间" value={previewTarget.uploadedAt} />
             </div>
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">
-              {uploadedToTemplateItem(previewTarget).preview}
-            </pre>
+            {/* Excel 模板：工作表只读预览；分析报告模板：通用结构文本预览 */}
+            {previewTarget.kind === "excel" ? (
+              <ExcelPreview sheets={uploadedToTemplateItem(previewTarget).excelSheets ?? []} maxHeight={320} />
+            ) : (
+              <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">
+                {uploadedToTemplateItem(previewTarget).preview}
+              </pre>
+            )}
           </div>
         )}
       </Modal>

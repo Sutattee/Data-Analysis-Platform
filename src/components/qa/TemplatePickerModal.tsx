@@ -1,12 +1,14 @@
 "use client";
 
-// 选择模板弹窗：顶部 tab（分析报告模板 / Excel报表模版），
-// 下方左右分区（约1:2，分割线区分）：左=模板目录列表，右=模板内容预览；
-// 右上角 X 关闭，左下角「使用模板」按钮（选中模板后可用）。
+// 选择模板弹窗：顶部 tab（分析报告模板 / Excel报表模版）+ 业务域筛选，
+// 下方左右分区（约1:2，分割线区分）：左=模板目录列表，右=模板内容预览
+// （Excel 模板用工作表只读预览）；右下角「取消」（灰线框）+「使用模板」（蓝）。
 import { useEffect, useState } from "react";
 import type { ReportTemplateItem } from "@/types";
 import { REPORT_TEMPLATES_ANALYSIS, REPORT_TEMPLATES_EXCEL } from "@/lib/mock-data/report-gen";
 import { listUploadedTemplates, uploadedToTemplateItem } from "@/lib/mock-data/report-templates-admin";
+import { DomainFilter } from "@/components/shared/DomainFilter";
+import { ExcelPreview } from "@/components/shared/ExcelPreview";
 
 type TemplateKind = "analysis" | "excel";
 
@@ -26,12 +28,14 @@ export function TemplatePickerModal({
 }) {
   const [kind, setKind] = useState<TemplateKind>("analysis");
   const [selected, setSelected] = useState<ReportTemplateItem | null>(null);
+  const [domain, setDomain] = useState("全部");
 
-  // 打开时重置到分析模板 tab 并清空选中
+  // 打开时重置到分析模板 tab 并清空选中与业务域筛选
   useEffect(() => {
     if (open) {
       setKind("analysis");
       setSelected(null);
+      setDomain("全部");
     }
   }, [open]);
 
@@ -46,10 +50,13 @@ export function TemplatePickerModal({
   if (!open) return null;
 
   // 内置模板 + 启用中的上传模板（管理后台上传并启用后在此可选，停用/删除后不再提供）
-  const list = [
+  const allOfKind = [
     ...(kind === "analysis" ? REPORT_TEMPLATES_ANALYSIS : REPORT_TEMPLATES_EXCEL),
     ...listUploadedTemplates(kind).filter((t) => t.enabled).map(uploadedToTemplateItem),
   ];
+  // 业务域筛选：候选 = 当前 tab 可见模板的域去重；「全部」不过滤
+  const domainOptions = Array.from(new Set(allOfKind.map((t) => t.domain ?? "通用")));
+  const list = domain === "全部" ? allOfKind : allOfKind.filter((t) => (t.domain ?? "通用") === domain);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -74,12 +81,12 @@ export function TemplatePickerModal({
           </button>
         </div>
 
-        {/* tab 页签 */}
-        <div className="flex gap-6 px-5 border-b border-gray-100 flex-shrink-0">
+        {/* tab 页签 + 业务域筛选（右侧） */}
+        <div className="flex items-center gap-6 px-5 border-b border-gray-100 flex-shrink-0">
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setKind(t.key); setSelected(null); }}
+              onClick={() => { setKind(t.key); setSelected(null); setDomain("全部"); }}
               aria-selected={kind === t.key}
               role="tab"
               className={`relative py-2.5 text-sm transition-colors ${
@@ -90,6 +97,9 @@ export function TemplatePickerModal({
               {kind === t.key && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-primary-600 rounded-full" />}
             </button>
           ))}
+          <div className="ml-auto py-1.5">
+            <DomainFilter value={domain} options={domainOptions} onChange={setDomain} />
+          </div>
         </div>
 
         {/* 左右分区：左 1/3 目录列表 + 分割线 + 右预览 */}
@@ -107,7 +117,7 @@ export function TemplatePickerModal({
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-800 truncate">{t.kind === "excel" ? "📊" : "📄"} {t.name}</span>
-                  <span className="ml-auto flex-shrink-0 text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{t.category}</span>
+                  <span className="ml-auto flex-shrink-0 text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{t.domain ?? "通用"}</span>
                 </div>
                 <p className="mt-1 text-xs text-gray-500 line-clamp-2">{t.description}</p>
               </button>
@@ -117,10 +127,15 @@ export function TemplatePickerModal({
             {selected ? (
               <div>
                 <h4 className="font-semibold text-gray-800 mb-1">{selected.name}</h4>
-                <p className="text-xs text-gray-400 mb-3">{selected.description} ｜ 分类：{selected.category}</p>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">
-                  {selected.preview}
-                </pre>
+                <p className="text-xs text-gray-400 mb-3">{selected.description} ｜ 业务域：{selected.domain ?? "通用"}</p>
+                {selected.kind === "excel" && selected.excelSheets?.length ? (
+                  // Excel 模板：工作表只读预览（保留版式，支持页签切换、滚动与缩放）
+                  <ExcelPreview sheets={selected.excelSheets} maxHeight={320} />
+                ) : (
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">
+                    {selected.preview}
+                  </pre>
+                )}
               </div>
             ) : (
               <div className="h-full flex items-center justify-center text-sm text-gray-400">
@@ -130,17 +145,20 @@ export function TemplatePickerModal({
           </div>
         </div>
 
-        {/* 底部：左下「使用模板」，右下取消 */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 flex-shrink-0">
+        {/* 底部右下角：「取消」灰色线框在左，「使用模板」蓝色在右 */}
+        <div className="flex items-center justify-end gap-3 px-5 py-3.5 border-t border-gray-100 flex-shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 bg-white text-gray-600 text-sm rounded-lg hover:border-gray-400 hover:text-gray-700 transition-colors"
+          >
+            取消
+          </button>
           <button
             onClick={() => selected && onSelect(selected)}
             disabled={!selected}
             className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             使用模板
-          </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
-            取消
           </button>
         </div>
       </div>

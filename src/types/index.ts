@@ -85,11 +85,22 @@ export interface ReportTemplateItem {
   kind: "analysis" | "excel";
   name: string;         // 模板名（关键词触发源，如「能耗分析报告」）
   category: string;
+  domain?: string;      // 业务域（板块全名：生产管理/能源消耗/工艺质量/设备管理/成本费用/安全环保/通用）
   keywords: string[];   // 高区分度触发词（建议录入不易与其他问题混淆的词）
   description: string;
   refFile?: string;     // 模板自带参考文件（样例文档名，展示在大纲卡片）
   outline: Omit<ReportOutline, "requirement">; // 模板自带大纲骨架
   preview: string;      // 模板内容预览（markdown）
+  excelSheets?: ExcelSheetPreview[]; // Excel 工作表只读预览（kind=excel）
+}
+
+// Excel 工作表只读预览数据（模板预览用）：单元格网格 + 合并 + 版式描述
+export interface ExcelSheetPreview {
+  name: string;         // Sheet 名（底部页签）
+  cells: string[][];    // 行列网格（空串 = 空单元格）
+  merges?: { row: number; col: number; rowSpan: number; colSpan: number }[]; // 合并单元格（0 起索引）
+  headerRows?: number;  // 表头区行数（灰底加粗，含标题行）
+  numericCols?: number[]; // 数字列索引（右对齐 + 等宽数字，模拟数字格式）
 }
 
 // 上传的报告模板文件（管理后台「报告模板」页管理；启用中的模板联动问数「选择模板」弹窗）
@@ -100,6 +111,7 @@ export interface UploadedTemplate {
   format: "DOCX" | "PDF" | "XLSX"; // 统一大写展示
   sizeBytes: number;
   enabled: boolean;
+  domain?: string;                 // 业务域（缺省展示「通用」）
   uploader: string;                // 上传人用户名
   uploadedAt: string;              // YYYY-MM-DD HH:mm:ss
 }
