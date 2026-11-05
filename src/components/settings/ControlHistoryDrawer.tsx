@@ -1,17 +1,18 @@
 "use client";
 
-// 管控值管理 - 变更记录抽屉：新增 / 修改 / 启用 / 停用自动留痕，按时间倒序展示
+// 管控值管理 - 变更记录抽屉：新增 / 修改 / 启用 / 停用 / 删除自动留痕，按时间倒序展示
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { listChangeLogs } from "@/lib/mock-data/metric-controls";
 import type { ControlChangeLog, MetricControlConfig } from "@/types";
 
-// 操作类型标签：新增蓝 / 修改主色 / 启用绿 / 停用灰
+// 操作类型标签：新增蓝 / 修改主色 / 启用绿 / 停用灰 / 删除红
 const TYPE_TAG_CLS: Record<ControlChangeLog["type"], string> = {
   新增: "bg-primary-50 text-primary-700",
   修改: "bg-blue-50 text-blue-600",
   启用: "bg-green-50 text-green-600",
   停用: "bg-gray-100 text-gray-500",
+  删除: "bg-red-50 text-red-500",
 };
 
 export function ControlHistoryDrawer({

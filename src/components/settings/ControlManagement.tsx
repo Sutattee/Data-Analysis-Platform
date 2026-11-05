@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import { ControlFormDrawer } from "@/components/settings/ControlFormDrawer";
@@ -13,6 +14,7 @@ import {
   controlMetricOf,
   controlText,
   listControlConfigs,
+  removeControlConfig,
   toggleControlEnabled,
 } from "@/lib/mock-data/metric-controls";
 import type { MetricControlConfig } from "@/types";
@@ -36,6 +38,8 @@ export function ControlManagement({ user }: { user: string }) {
   const [page, setPage] = useState(1);
   const [formBase, setFormBase] = useState<MetricControlConfig | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  // 删除二次确认目标
+  const [deleteTarget, setDeleteTarget] = useState<MetricControlConfig | null>(null);
 
   const list = useMemo(
     () =>
@@ -67,6 +71,15 @@ export function ControlManagement({ user }: { user: string }) {
         : `「${c.metricName}」管控值已停用，相关页面将展示「管控值未启用」`,
       enabled ? "success" : "warning"
     );
+  }
+
+  // 删除配置：物理移除并留痕，指标恢复「管控值未配置」
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    removeControlConfig(deleteTarget.id, { user, now: formatNow() });
+    setDeleteTarget(null);
+    setTick((t) => t + 1);
+    toast(`「${deleteTarget.metricName}」管控值已删除，该指标恢复「管控值未配置」`, "success");
   }
 
   const th = "text-left px-4 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
@@ -169,6 +182,12 @@ export function ControlManagement({ user }: { user: string }) {
                           >
                             编辑
                           </button>
+                          <button
+                            onClick={() => setDeleteTarget(c)}
+                            className="rounded px-1.5 py-0.5 text-xs text-red-500 transition-colors hover:bg-red-50"
+                          >
+                            删除
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -191,6 +210,28 @@ export function ControlManagement({ user }: { user: string }) {
         user={user}
         onSaved={() => setTick((t) => t + 1)}
       />
+
+      {/* 删除二次确认弹窗 */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="删除管控值配置"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-gray-600">
+            确认删除「{deleteTarget?.metricName}」的管控值配置？删除后该指标恢复「管控值未配置」，相关页面不再执行管控判断，如需恢复请重新新增，且不可找回本次配置。
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              确认删除
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

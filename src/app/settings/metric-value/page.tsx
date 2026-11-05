@@ -56,7 +56,7 @@ export default function MetricValuePage() {
 
   const [tab, setTab] = useState<TabKey>("target");
 
-  // 目标值页签：仅支持配置目标值的指标可选
+  // 目标值页签：仅支持配置目标值的指标可选；默认「全部指标」聚合视图
   const targetMetrics = useMemo(
     () =>
       SUPPORTED_TARGET_METRICS
@@ -64,8 +64,10 @@ export default function MetricValuePage() {
         .filter((m): m is MetricManage => !!m),
     []
   );
-  const [targetMetricId, setTargetMetricId] = useState(targetMetrics[0]?.id ?? "");
-  const targetMetric = targetMetrics.find((m) => m.id === targetMetricId) ?? targetMetrics[0];
+  const [targetMetricId, setTargetMetricId] = useState("");
+  const targetMetric = targetMetricId
+    ? targetMetrics.find((m) => m.id === targetMetricId) ?? null
+    : null;
 
   const [rows, setRows] = useState<MetricValueRecord[]>(() => listMetricValues());
 
@@ -138,8 +140,8 @@ export default function MetricValuePage() {
         })}
       </div>
 
-      {/* 目标值：指标选择 + 当前生效目标 + 历史版本列表 + 新增目标值 */}
-      {tab === "target" && targetMetric && (
+      {/* 目标值：指标筛选（全部指标/单指标）+ 历史版本列表 + 新增目标值 */}
+      {tab === "target" && targetMetrics.length > 0 && (
         <Card padding>
           <label className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">指标</span>
@@ -148,6 +150,7 @@ export default function MetricValuePage() {
               onChange={(e) => setTargetMetricId(e.target.value)}
               className={selectCls}
             >
+              <option value="">全部指标</option>
               {targetMetrics.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.nameCn}
@@ -156,7 +159,8 @@ export default function MetricValuePage() {
             </select>
           </label>
           <div className="mt-4">
-            <TargetManagement metric={targetMetric} />
+            {/* key 随筛选变化重挂载：切换指标时版本列表同步刷新 */}
+            <TargetManagement key={targetMetricId} metric={targetMetric} metrics={targetMetrics} />
           </div>
         </Card>
       )}

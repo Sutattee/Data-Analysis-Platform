@@ -384,6 +384,11 @@ export function listTargets(metricId: string): MetricTargetVersion[] {
     .sort((a, b) => versionNum(b.version) - versionNum(a.version));
 }
 
+// 全部指标的目标值版本聚合（按传入指标顺序分组，同指标内最新版本在前；「全部指标」视图用）
+export function listAllTargets(metricIds: string[]): MetricTargetVersion[] {
+  return metricIds.flatMap((id) => listTargets(id));
+}
+
 export function getTarget(id: string): MetricTargetVersion | undefined {
   return targets.find((t) => t.id === id);
 }

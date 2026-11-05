@@ -235,6 +235,21 @@ export function saveControlConfig(
   return created;
 }
 
+// 删除配置：物理移除并留痕；指标随之释放（恢复「管控值未配置」，可重新新增）
+export function removeControlConfig(
+  id: string,
+  ctx: { user: string; now: string }
+): MetricControlConfig | undefined {
+  const prev = configs.find((c) => c.id === id);
+  if (!prev) return undefined;
+  configs = configs.filter((c) => c.id !== id);
+  changeLogs = [
+    { id: nextLogId(), controlId: id, type: "删除", before: controlSummary(prev), after: "—", by: ctx.user, at: ctx.now },
+    ...changeLogs,
+  ];
+  return prev;
+}
+
 // 启停切换：立即生效并留痕
 export function toggleControlEnabled(
   id: string,

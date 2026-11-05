@@ -576,11 +576,11 @@ export interface MetricControlConfig {
   updatedAt: string;          // 最近更新时间 YYYY-MM-DD HH:mm
 }
 
-// 管控值变更记录（新增 / 修改 / 启用 / 停用自动留痕，时间倒序展示）
+// 管控值变更记录（新增 / 修改 / 启用 / 停用 / 删除自动留痕，时间倒序展示）
 export interface ControlChangeLog {
   id: string;                 // cl-001 递增
   controlId: string;          // 所属配置
-  type: "新增" | "修改" | "启用" | "停用";
+  type: "新增" | "修改" | "启用" | "停用" | "删除";
   before: string;             // 变更前内容（配置快照摘要，新增时为 "—")
   after: string;              // 变更后内容
   by: string;                 // 操作人
