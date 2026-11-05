@@ -21,7 +21,7 @@ export function ReportCard({
   const task = data.task!;
   return (
     <div
-      className="group relative border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0"
+      className="group border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0"
       aria-label="报告任务卡片"
     >
       <div className="flex items-center gap-2.5">
@@ -65,9 +65,9 @@ export function ReportCard({
         </div>
       )}
 
-      {/* 已完成：hover 浮现下载/分享 */}
+      {/* 已完成：hover 显示下载/分享——卡片底部独立一行右对齐，不遮挡标题 */}
       {task.status === "done" && (
-        <div className="absolute top-2.5 right-2.5 hidden group-hover:flex items-center gap-1.5">
+        <div className="mt-1.5 hidden group-hover:flex items-center justify-end gap-1.5 pl-8">
           <button
             onClick={(e) => { e.stopPropagation(); onDownload(); }}
             className="px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"

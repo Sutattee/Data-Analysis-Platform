@@ -789,16 +789,29 @@ export function ChatPanel({
   const ToolBar = () => (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="relative" ref={(el) => { menuRefs.current.skill = el; }}>
-        <button
-          onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
-            selectedSkillTag
-              ? "bg-green-50 text-green-600 border-green-200"
-              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
-          }`}
-        >
-          {QA_TOOLBAR_ICONS.skill} {selectedSkillTag ? "技能" : "选择技能"}
-        </button>
+        {selectedSkillTag ? (
+          /* 已选技能：标签展示在「选择技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-green-50 text-green-600 border-green-200"
+            title={`已选技能：${selectedSkillTag.name}`}
+          >
+            {QA_TOOLBAR_ICONS.skill} {selectedSkillTag.name}
+            <button
+              onClick={() => setSelectedSkillTag(null)}
+              className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"
+              title="移除技能"
+            >
+              ×
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+          >
+            {QA_TOOLBAR_ICONS.skill} 选择技能
+          </button>
+        )}
         {openMenu === "skill" && (
           <div className="absolute left-0 top-full z-30 mt-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
             <div className="max-h-64 space-y-1 overflow-auto">
@@ -882,29 +895,23 @@ export function ChatPanel({
             disabled={loading}
             rows={6}
             className="w-full pl-4 pr-12 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 resize-none transition-all duration-200"
-            style={selectedSkillTag ? { paddingLeft: "100px" } : undefined}
           />
-          {/* 技能标签放在输入框内部左上角（与首行文字对齐） */}
-          {selectedSkillTag && (
-            <div className="absolute left-2 top-2 inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full">
-              {QA_TOOLBAR_ICONS.skill} {selectedSkillTag.name}
-              <button
-                onClick={() => setSelectedSkillTag(null)}
-                className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"
-                title="移除技能"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {/* 圆形发送按钮（输入框内右下角） */}
+          {/* 圆形发送按钮（输入框内右下角）：大纲生成中变为停止按钮（点击暂停任务），其余为发送 */}
           <button
-            onClick={() => sendMessage(input)}
-            disabled={loading || !input.trim()}
-            className="absolute right-2 bottom-2 w-9 h-9 bg-primary-600 text-white rounded-full flex items-center justify-center hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
-            title="发送"
+            onClick={() => (outlineBusy ? stopOutlineGeneration() : sendMessage(input))}
+            disabled={!outlineBusy && (loading || !input.trim())}
+            className={`absolute right-2 bottom-2 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+              outlineBusy
+                ? "bg-gray-700 text-white hover:bg-gray-800"
+                : "bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            }`}
+            title={outlineBusy ? "停止生成" : "发送"}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            {outlineBusy ? (
+              <span className="block w-2.5 h-2.5 bg-white rounded-[2px]" aria-hidden />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            )}
           </button>
         </div>
       </div>
@@ -1084,21 +1091,14 @@ export function ChatPanel({
                   </div>
                 </div>
               )}
-              {/* 大纲生成中：正在整理数据... + 停止生成 */}
+              {/* 大纲生成中：正在整理数据...（暂停走输入框右下角的停止按钮） */}
               {outlineBusy && (
                 <div className="flex justify-start">
-                  <div className="bg-gray-100 px-4 py-3 rounded-lg flex items-center gap-3">
+                  <div className="bg-gray-100 px-4 py-3 rounded-lg flex items-center gap-2">
                     <span className="flex items-center gap-2 text-gray-500 text-sm">
                       <Spinner size="sm" />
                       正在整理数据...
                     </span>
-                    <button
-                      onClick={stopOutlineGeneration}
-                      className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1 hover:text-red-500 hover:border-red-300 transition-colors"
-                      title="停止生成"
-                    >
-                      ⏹ 停止生成
-                    </button>
                   </div>
                 </div>
               )}

@@ -76,7 +76,7 @@ export default function ReportTemplatesPage() {
         <h1 className="text-xl font-bold text-gray-900">报告模板</h1>
       </div>
 
-      {/* 页签 + 业务域筛选 + 右上角上传入口 */}
+      {/* 页签 + 业务域筛选（紧跟页签）+ 右上角上传入口 */}
       <div className="flex items-center gap-1.5" role="tablist" aria-label="模板类型">
         {TABS.map((t) => {
           const active = t.key === tab;
@@ -100,8 +100,11 @@ export default function ReportTemplatesPage() {
             </button>
           );
         })}
-        <div className="ml-auto flex items-center gap-2">
+        {/* 业务域筛选位于 tab 页签之后 */}
+        <div className="ml-3">
           <DomainFilter value={domain} options={domainOptions} onChange={setDomain} />
+        </div>
+        <div className="ml-auto">
           <Button onClick={() => setUploadOpen(true)}>上传模板</Button>
         </div>
       </div>

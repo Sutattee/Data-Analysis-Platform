@@ -3,7 +3,7 @@
 // 报告抽屉（右侧滑出，复用 ui/Drawer）：
 // 生成中 = 流式输出页（顶部阶段状态条 + 正文逐字增长 + 末尾闪烁光标；AI撰写中.../停止生成）；
 // 完成 = 报告页（正文 markdown 渲染；左侧悬浮目录按钮 hover 展开点击定位；
-//        右上角：报告创作思考过程 / 下载 / 分享）；思考页（思考已完成 + 执行过程，可切回）；
+//        右上角：下载 / 分享——思考过程在对话页消息卡片上方查看，抽屉内不再提供入口）；
 // 失败 = 失败原因 + 重新生成。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
@@ -201,17 +201,15 @@ export function ReportDrawer({
 }) {
   const toast = useToast();
   const task = data?.task ?? null;
-  const [view, setView] = useState<"report" | "thinking">("report");
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   // 流式输出正文区（生成中随内容增长自动滚动到底部）
   const streamRef = useRef<HTMLDivElement | null>(null);
 
-  // 打开/切换报告时复位视图
+  // 打开/切换报告时复位弹层状态
   useEffect(() => {
     if (open) {
-      setView("report");
       setShowShare(false);
       setTocOpen(false);
       if (autoExport) setShowExport(true);
@@ -232,9 +230,7 @@ export function ReportDrawer({
     ? "报告"
     : task.status === "generating"
       ? `${task.title} ｜ 思考中...`
-      : view === "thinking"
-        ? `${task.title} ｜ 思考已完成`
-        : task.title;
+      : task.title;
 
   return (
     <>
@@ -247,13 +243,6 @@ export function ReportDrawer({
         headerExtra={
           task?.status === "done" ? (
             <div className="flex items-center gap-1 relative">
-              <button
-                onClick={() => setView(view === "thinking" ? "report" : "thinking")}
-                className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 transition-colors"
-                title={view === "thinking" ? "切回报告内容" : "查看报告创作思考过程"}
-              >
-                {view === "thinking" ? "📄 报告内容" : "🧠 思考过程"}
-              </button>
               <button onClick={() => setShowExport(true)} className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 transition-colors" title="下载报告文档">⬇ 下载</button>
               <button
                 onClick={() => setShowShare((v) => !v)}
@@ -333,27 +322,8 @@ export function ReportDrawer({
           </div>
         )}
 
-        {/* ===== 思考过程页 ===== */}
-        {task?.status === "done" && view === "thinking" && (
-          <div className="p-6">
-            <p className="text-xs text-gray-400 mb-4">报告创作思考过程（执行步骤与数据来源，不含模型内部推理）</p>
-            <div className="relative pl-6 space-y-4">
-              <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-gray-200" />
-              {(task.thinking ?? []).map((node) => (
-                <div key={node.id} className="relative">
-                  <span className="absolute -left-[17px] top-0.5 text-xs">✅</span>
-                  <div className="text-sm font-medium text-gray-700">{node.label}</div>
-                  {node.detail && (
-                    <div className="mt-1 text-xs text-gray-500 leading-relaxed bg-gray-50 rounded p-2.5 border border-gray-100">{node.detail}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* ===== 报告内容页 ===== */}
-        {task?.status === "done" && view === "report" && (
+        {task?.status === "done" && (
           <div className="relative h-full flex flex-col">
             {/* 正文区：markdown 渲染 */}
             <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">

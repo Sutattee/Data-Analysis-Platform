@@ -228,8 +228,8 @@ export function MessageBubble({
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      {/* 大纲确认卡片突破气泡 78% 宽度，铺满中间内容区 */}
-      <div className={`${message.reportCard?.kind === "outline" ? "w-full" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
+      {/* 大纲确认卡片铺满中间内容区；报告任务卡片加宽到 90%（普通气泡仍 78%） */}
+      <div className={`${message.reportCard?.kind === "outline" ? "w-full" : message.reportCard ? "max-w-[90%]" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
         {/* 头像（无时间戳） */}
         <div className="flex items-center gap-2 mb-1">
           <span
