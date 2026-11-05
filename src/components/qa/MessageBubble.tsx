@@ -8,6 +8,7 @@ import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
 import { OutlineCard } from "./OutlineCard";
 import { ReportCard } from "./ReportCard";
+import { FillCard } from "./FillCard";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -56,6 +57,10 @@ interface MessageBubbleProps {
   onDownloadReport?: (msgId: string) => void;
   onShareReport?: (msgId: string) => void;
   onRetryReport?: (msgId: string) => void;
+  // 填表卡片事件：由 ChatPanel 统一处理状态机
+  onOpenFill?: (msgId: string) => void;
+  onDownloadFill?: (msgId: string) => void;
+  onRetryFill?: (msgId: string) => void;
 }
 
 export function MessageBubble({
@@ -71,6 +76,9 @@ export function MessageBubble({
   onDownloadReport,
   onShareReport,
   onRetryReport,
+  onOpenFill,
+  onDownloadFill,
+  onRetryFill,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isWelcome = message.id === "welcome";
@@ -202,8 +210,18 @@ export function MessageBubble({
           </div>
         )}
 
+        {/* ===== 填表卡片消息：不套普通气泡与操作栏 ===== */}
+        {!isUser && message.fillCard && (
+          <FillCard
+            data={message.fillCard}
+            onOpen={() => onOpenFill?.(message.id)}
+            onDownload={() => onDownloadFill?.(message.id)}
+            onRetry={() => onRetryFill?.(message.id)}
+          />
+        )}
+
         {/* ===== AI 回答区 ===== */}
-        {!isUser && !isWelcome && !message.reportCard && (
+        {!isUser && !isWelcome && !message.reportCard && !message.fillCard && (
           <div className="space-y-3">
             {/* 思考过程：可折叠 */}
             {hasThinking && (

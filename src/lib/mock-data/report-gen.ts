@@ -508,29 +508,93 @@ export function generateReportContent(outline: ReportOutline, ctx: SessionCtx): 
   return `${head}\n${body}${tail}`;
 }
 
-// 报告创作思考过程（抽屉内查看；不展示模型内部推理，只列执行步骤与数据来源）
-export function reportThinkingNodes(outline: ReportOutline): ExecutionNode[] {
-  const filled = fillApproaches(outline);
-  const l1 = filled.sections.length;
-  const l2 = filled.sections.reduce((n, s) => n + s.children.length, 0);
-  return [
-    {
-      id: "rt-parse", label: "解析生成要求", status: "completed", duration: 120,
-      detail: `报告主题「${filled.title}」，共规划 ${l1} 个一级章节、${l2} 个二级章节；已结合用户要求与会话上下文确定统计范围。`,
-    },
-    {
-      id: "rt-query", label: "查询数据", status: "completed", duration: 480,
-      detail: "连接数据资产：产量与机组效率（生产域）、优质品率与过程管控（质量域）、综合能耗与碳排放（能源域）、可控费用与辅料消耗（费用域），取数完成。",
-    },
-    {
-      id: "rt-write", label: "逐章生成", status: "completed", duration: 1650,
-      detail: `按大纲顺序撰写：${filled.sections.map((s) => s.title).join("；")}。各章节结合分析思路（${l2 > 0 ? "目标对比/环比/排名/占比" : "目标对比与环比"}）展开。`,
-    },
-    {
-      id: "rt-integrate", label: "整合排版", status: "completed", duration: 260,
-      detail: "统一章节编号与表格口径，检查数据一致性，生成目录与统计说明头。",
-    },
-  ];
+// 报告创作思考过程（抽屉内查看）：按 PRD Agent 执行流程逐步骤展示，
+// 三种生成方式对应三条流程文案；不展示模型内部推理，关键步骤引用大纲与数据来源。
+const REPORT_AGENT_FLOWS: Record<ReportGenMode, string[]> = {
+  // ① 分析报告：根据报告要求生成（方式二，先出大纲确认）
+  outline: [
+    "用户提问",
+    "加载会话上下文",
+    "意图识别（报告生成：根据要求生成）",
+    "解析报告需求，必要时澄清信息",
+    "权限校验",
+    "任务规划与数据可用性检查",
+    "生成拟定大纲",
+    "用户确认大纲（支持修改）",
+    "查询、计算与分析数据（独立任务可并行）",
+    "生成正文和图表",
+    "校验数据及结论",
+    "调用文档工具生成完整报告",
+    "展示预览并支持下载",
+  ],
+  // ② 分析报告：基于报告模板生成（方式一）
+  template: [
+    "用户提问",
+    "加载会话上下文",
+    "意图识别（报告生成：基于模板生成）",
+    "解析报告需求",
+    "检索并确定报告模板",
+    "读取模板结构与分析要求，必要时澄清统计周期及范围",
+    "权限校验",
+    "任务规划",
+    "查询、计算与分析数据（独立任务可并行）",
+    "按模板生成正文和图表",
+    "校验数据及结论",
+    "调用文档工具生成完整报告",
+    "展示预览并支持下载",
+  ],
+  // ③ 分析报告：基于对话分析结果生成（方式三）
+  conversation: [
+    "用户提问",
+    "加载会话上下文",
+    "意图识别（报告生成：基于对话分析结果生成）",
+    "解析报告需求",
+    "提取当前会话中相关分析结果及数据依据",
+    "权限校验",
+    "组织报告结构并识别信息缺口，必要时澄清",
+    "任务规划",
+    "按需补查、计算与分析数据（独立任务可并行）",
+    "整合正文和图表",
+    "校验数据及结论",
+    "调用文档工具生成完整报告",
+    "展示预览并支持下载",
+  ],
+};
+
+// 步骤说明：按步骤关键词映射（引用大纲章节与数据域，其余给通用说明）
+function reportStepDetail(step: string, outline: ReportOutline, mode: ReportGenMode): string {
+  const l1 = outline.sections.length;
+  const l2 = outline.sections.reduce((n, s) => n + s.children.length, 0);
+  if (step === "用户提问") return `「${outline.requirement.split("\n")[0].slice(0, 60)}」`;
+  if (step.startsWith("意图识别")) {
+    const kind = mode === "template" ? "基于报告模板生成" : mode === "conversation" ? "基于对话分析结果生成" : "根据报告要求生成";
+    return `判定用户意图为报告生成：${kind}。`;
+  }
+  if (step.includes("解析报告需求")) return `报告主题「${outline.title}」，共规划 ${l1} 个一级章节、${l2} 个二级章节；已结合用户要求与会话上下文确定统计范围。`;
+  if (step.includes("检索并确定报告模板")) return outline.refFile ? `命中模板：${outline.refFile}。` : "已在内置模板库中确定最匹配的报告模板。";
+  if (step.includes("读取模板结构")) return `模板结构：${l1} 个一级章节、${l2} 个二级章节；统计周期及范围按用户要求执行。`;
+  if (step.includes("生成拟定大纲")) return `拟定大纲：${outline.sections.map((s) => s.title).join("；")}。`;
+  if (step.includes("用户确认大纲")) return "用户已确认大纲（支持修改），生成任务按确认后的大纲执行。";
+  if (step.includes("提取当前会话")) return "已从当前会话中提取相关分析结果与数据依据，作为报告素材。";
+  if (step.includes("组织报告结构")) return `按素材组织报告结构：${l1} 个章节；识别信息缺口并按需补查。`;
+  if (step === "权限校验") return "当前用户具备生产、质量、能源、费用域数据的查询与导出权限。";
+  if (step.includes("任务规划")) return `规划 ${l1 + l2} 个写作任务与配套取数任务，独立任务并行执行；已核对所需数据可用。`;
+  if (step.includes("查询") || step.includes("补查")) return "并行查询数据资产：产量与机组效率（生产域）、优质品率与过程管控（质量域）、综合能耗与碳排放（能源域）、可控费用与辅料消耗（费用域），取数与计算完成。";
+  if (step.includes("正文")) return `按大纲顺序撰写 ${l1} 个章节，结合分析思路（${l2 > 0 ? "目标对比/环比/排名/占比" : "目标对比与环比"}）展开，图表随文生成。`;
+  if (step.includes("校验数据")) return "逐项交叉核对正文数值与取数结果，结论与数据一致，无口径冲突。";
+  if (step.includes("文档工具")) return "调用文档工具生成完整报告：统一章节编号、表格口径与目录。";
+  if (step.includes("预览")) return "报告已生成，支持在抽屉中预览并导出 Word/PDF。";
+  return "步骤执行完成。";
+}
+
+export function reportThinkingNodes(outline: ReportOutline, mode: ReportGenMode = "outline"): ExecutionNode[] {
+  return REPORT_AGENT_FLOWS[mode].map((step, i) => ({
+    id: `rt-${i + 1}`,
+    label: step,
+    status: "completed" as const,
+    duration: 80 + i * 130,
+    detail: reportStepDetail(step, outline, mode),
+  }));
 }
 
 // ========== 对话式报告编辑 ==========

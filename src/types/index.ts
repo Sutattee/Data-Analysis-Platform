@@ -121,6 +121,28 @@ export interface ReportCardData {
   };
 }
 
+// ========== 智能填表 ==========
+
+// 智能填表数据表（预览与 XLSX 导出共用；结构与 export-excel 的 ExportTable 一致）
+export interface FillTable {
+  title: string;     // 表名（Sheet 名）
+  headers: string[]; // 字段名（含单位）
+  rows: string[][];  // 填好的数据行
+}
+
+// 对话内填表任务卡片（挂在 QaMessage.fillCard 上，作为会话记录的一部分）
+export interface FillCardData {
+  title: string;              // 报表名（模板名）
+  status: "generating" | "done" | "failed";
+  stage?: string;             // 正在检索报表模板 / 正在查询数据 / 正在回填数据 / 正在校验填报结果
+  failReason?: string;        // 失败或手动停止的原因
+  templateId?: string;        // 使用的报表模板
+  period?: string;            // 统计周期（默认 2026年10月）
+  tables?: FillTable[];       // 填好的表
+  thinking?: ExecutionNode[]; // 智能填表 Agent 执行流程（抽屉内查看）
+  edited?: boolean;           // 生成后经对话修改过
+}
+
 
 export interface DislikeReasonTag {
   id: string;
@@ -154,6 +176,7 @@ export interface QaMessage {
   answerType?: "analysis" | "knowledge"; // 回答类型
   smartAnswer?: SmartAnswer;        // 智能问数 4 段结构化回答
   reportCard?: ReportCardData;      // 报告生成卡片（大纲确认 / 报告任务）
+  fillCard?: FillCardData;          // 智能填表任务卡片
   question?: string;                // 收藏时记录的对应用户问题（仅收藏项使用）
 }
 

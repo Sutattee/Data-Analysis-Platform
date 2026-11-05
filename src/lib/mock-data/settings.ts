@@ -46,6 +46,7 @@ export const mockAiSkills: AiSkill[] = [
   { id: "as4", name: "异常检测", description: "实时监控数据异常并告警", enabled: true },
   { id: "as5", name: "报告生成", description: "自动撰写数据分析报告", enabled: true },
   { id: "as6", name: "知识问答", description: "基于企业知识库的问答", enabled: true },
+  { id: "as9", name: "智能填表", description: "基于报表模板自动查询数据并生成XLSX报表", enabled: true },
   { id: "as7", name: "智能调度", description: "AI辅助生产排程优化", enabled: false },
   { id: "as8", name: "图像质检", description: "基于CV的产品表面缺陷检测", enabled: false },
 ];
