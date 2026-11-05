@@ -61,7 +61,55 @@ export interface SmartAnswer {
   dataNotes: string;        // 4. 数据说明（口径/时间范围/筛选/更新时间）
 }
 
-// 点踩原因分类
+// ========== 报告生成 ==========
+
+// 大纲章节（两级：一级章节含 children，二级章节 children 恒为空）
+export interface OutlineSection {
+  id: string;
+  title: string;
+  approach?: string;          // 分析思路（该章节分析什么、用什么数据与方式；可留空，生成报告时自动补充）
+  children: OutlineSection[];
+}
+
+// 报告大纲（方式二先出大纲供用户确认编辑，方式一/三由模板或系统规划）
+export interface ReportOutline {
+  title: string;        // 报告标题
+  requirement: string;  // 本次报告生成要求（用户输入原文，含上下文补全说明）
+  refFile?: string;     // 参考文件名（模板自带样例时展示；用户无需上传）
+  sections: OutlineSection[];
+}
+
+// 报告模板（分析报告 / Excel 报表两类，选择模板弹窗与关键词触发共用）
+export interface ReportTemplateItem {
+  id: string;
+  kind: "analysis" | "excel";
+  name: string;         // 模板名（关键词触发源，如「能耗分析报告」）
+  category: string;
+  keywords: string[];   // 高区分度触发词（建议录入不易与其他问题混淆的词）
+  description: string;
+  refFile?: string;     // 模板自带参考文件（样例文档名，展示在大纲卡片）
+  outline: Omit<ReportOutline, "requirement">; // 模板自带大纲骨架
+  preview: string;      // 模板内容预览（markdown）
+}
+
+// 对话内报告卡片（挂在 QaMessage.reportCard 上，作为会话记录的一部分）
+export interface ReportCardData {
+  kind: "outline" | "report";
+  outline?: ReportOutline;   // kind=outline：大纲确认卡片
+  outlineLocked?: boolean;   // 用户点击「生成报告」后锁定（收起只读，避免任务期间继续修改）
+  task?: {                   // kind=report：报告任务卡片
+    title: string;
+    status: "generating" | "done" | "failed";
+    stage?: string;             // 当前阶段（正在查询数据 / 正在生成第N章 / 正在整合报告）
+    failReason?: string;        // 失败或手动停止的原因
+    templateId?: string;        // 使用的模板（方式一）
+    content?: string;           // 报告正文（markdown）
+    thinking?: ExecutionNode[]; // 报告创作思考过程（抽屉内查看）
+    edited?: boolean;           // 生成后经对话修改过
+  };
+}
+
+
 export interface DislikeReasonTag {
   id: string;
   label: string;
@@ -93,6 +141,7 @@ export interface QaMessage {
   knowledgeSources?: KnowledgeSource[]; // 知识来源(知识问答类)
   answerType?: "analysis" | "knowledge"; // 回答类型
   smartAnswer?: SmartAnswer;        // 智能问数 4 段结构化回答
+  reportCard?: ReportCardData;      // 报告生成卡片（大纲确认 / 报告任务）
   question?: string;                // 收藏时记录的对应用户问题（仅收藏项使用）
 }
 

@@ -1,13 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { QaMessage, VisitBoard } from "@/types";
+import { QaMessage, VisitBoard, ReportCardData, ReportOutline, ReportTemplateItem } from "@/types";
 import { mockAiResponse, getWelcomeMessage } from "@/lib/ai/mock-ai";
 import { generateId } from "@/lib/utils";
 import { useApp } from "@/lib/store/AppContext";
 import { dataModels } from "@/lib/mock-data/data-assets";
 import { mockKnowledgeDocs, mockAiSkills } from "@/lib/mock-data/settings";
+import {
+  classifyReportRequest,
+  generateOutline,
+  generateReportContent,
+  matchTemplateByKeyword,
+  outlineFromTemplate,
+  applyReportEdit,
+  isReportEditIntent,
+  reportThinkingNodes,
+} from "@/lib/mock-data/report-gen";
 import { MessageBubble } from "./MessageBubble";
+import { TemplatePickerModal } from "./TemplatePickerModal";
+import { ReportDrawer } from "./ReportDrawer";
 import { QA_TOOLBAR_ICONS } from "@/components/layout/NavIcon";
 import { AnalystAvatar } from "./AnalystAvatar";
 import { Spinner } from "@/components/ui/Spinner";
@@ -20,7 +32,7 @@ const allTables = dataModels.flatMap((dm) =>
 const demoTables = allTables.slice(0, 3).map((t) => t.id);
 const knowledgeBases = mockKnowledgeDocs.map((d) => ({ id: d.id, name: d.title, category: d.category }));
 const skillList = mockAiSkills
-  .filter((s) => s.enabled && s.name !== "异常检测" && s.name !== "报告生成")
+  .filter((s) => s.enabled && s.name !== "异常检测")
   .map((s) => ({ id: s.id, name: s.name, description: s.description }));
 
 const RECOMMENDED_QUESTIONS = [
@@ -102,6 +114,150 @@ export function ChatPanel({
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  // ----- 报告生成状态机 -----
+  // 已选模板（方式一）/ 模板选择弹窗 / 大纲生成中 / 报告抽屉（autoExport=打开后直接弹导出）
+  const [reportTemplate, setReportTemplate] = useState<ReportTemplateItem | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [outlineBusy, setOutlineBusy] = useState(false);
+  const [reportDrawer, setReportDrawer] = useState<{ open: boolean; msgId: string | null; autoExport: boolean }>({ open: false, msgId: null, autoExport: false });
+  // 报告任务计时器（阶段轮换）与大纲生成计时器；报告大纲上下文（供失败重试重跑）
+  const reportTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const outlineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reportFlows = useRef<Record<string, { outline: ReportOutline; turnCount: number }>>({});
+
+  // 卸载时清理计时器
+  useEffect(() => {
+    return () => {
+      reportTimers.current.forEach(clearTimeout);
+      if (outlineTimer.current) clearTimeout(outlineTimer.current);
+    };
+  }, []);
+
+  // 报告技能是否选中（placeholder 与生成方式判定共用）
+  const reportSkillOn = selectedSkillTag?.name === "报告生成";
+  // 会话已有对话轮数（报告上下文复用说明用）
+  const countUserTurns = useCallback(() => messages.filter((m) => m.role === "user").length, [messages]);
+
+  // 更新某条消息上的报告任务
+  const updateReportTask = useCallback((msgId: string, patch: Partial<NonNullable<ReportCardData["task"]>>) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId && m.reportCard?.task
+          ? { ...m, reportCard: { ...m.reportCard, task: { ...m.reportCard.task, ...patch } } }
+          : m
+      )
+    );
+  }, []);
+
+  // 报告阶段轮换：正在查询数据 → 正在生成第N章… → 正在整合报告 → done
+  const runReportStages = useCallback((reportMsgId: string, outline: ReportOutline, turnCount: number) => {
+    const stages = [
+      "正在查询数据",
+      ...outline.sections.map((s, i) => `正在生成第${i + 1}章：${s.title}`),
+      "正在整合报告",
+    ];
+    let step = 0;
+    const tick = () => {
+      if (step < stages.length) {
+        updateReportTask(reportMsgId, { stage: stages[step] });
+        step += 1;
+        const t = setTimeout(tick, 500);
+        reportTimers.current.push(t);
+      } else {
+        updateReportTask(reportMsgId, {
+          status: "done",
+          stage: undefined,
+          content: generateReportContent(outline, { turnCount }),
+          thinking: reportThinkingNodes(outline),
+        });
+      }
+    };
+    tick();
+  }, [updateReportTask]);
+
+  // 启动报告生成：push 报告任务卡片 + 自动打开抽屉 + 阶段轮换
+  const startReportFlow = useCallback((outline: ReportOutline, opts: { templateId?: string; turnCount: number }) => {
+    const reportMsgId = generateId();
+    reportFlows.current[reportMsgId] = { outline, turnCount: opts.turnCount };
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: reportMsgId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        reportCard: {
+          kind: "report",
+          task: { title: outline.title, status: "generating", stage: "正在查询数据", templateId: opts.templateId },
+        },
+      },
+    ]);
+    setReportDrawer({ open: true, msgId: reportMsgId, autoExport: false });
+    runReportStages(reportMsgId, outline, opts.turnCount);
+  }, [runReportStages]);
+
+  // 停止生成：清全部阶段计时器，标记当前生成中的任务为失败
+  const stopReportGeneration = useCallback(() => {
+    reportTimers.current.forEach(clearTimeout);
+    reportTimers.current = [];
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.reportCard?.task?.status === "generating"
+          ? { ...m, reportCard: { ...m.reportCard, task: { ...m.reportCard.task!, status: "failed", failReason: "已手动停止生成" } } }
+          : m
+      )
+    );
+  }, []);
+
+  // 失败后重新生成：按原大纲重跑
+  const retryReportGeneration = useCallback((msgId: string) => {
+    const rec = reportFlows.current[msgId];
+    if (!rec) {
+      showToast("未找到生成上下文，请重新发起报告生成");
+      return;
+    }
+    updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据" });
+    setReportDrawer({ open: true, msgId, autoExport: false });
+    runReportStages(msgId, rec.outline, rec.turnCount);
+  }, [runReportStages, showToast, updateReportTask]);
+
+  // 大纲确认：锁定大纲消息 → 启动报告生成
+  const handleOutlineConfirm = useCallback((msgId: string, outline: ReportOutline) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId && m.reportCard
+          ? { ...m, reportCard: { ...m.reportCard, outlineLocked: true } }
+          : m
+      )
+    );
+    startReportFlow(outline, { turnCount: countUserTurns() });
+  }, [countUserTurns, startReportFlow]);
+
+  // 大纲重新生成：按原始要求重拟大纲（换消息 id 令卡片重挂载、丢弃未保存的编辑）
+  const handleOutlineRegenerate = useCallback((msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== msgId || !m.reportCard?.outline) return m;
+        const text = m.reportCard.outline.requirement.split("\n")[0];
+        return {
+          ...m,
+          id: generateId(),
+          reportCard: { kind: "outline", outline: generateOutline(text, { turnCount: countUserTurns() }) },
+        };
+      })
+    );
+  }, [countUserTurns]);
+
+  // 大纲生成停止：清计时器 + 提示消息
+  const stopOutlineGeneration = useCallback(() => {
+    if (outlineTimer.current) {
+      clearTimeout(outlineTimer.current);
+      outlineTimer.current = null;
+    }
+    setOutlineBusy(false);
+    setMessages((prev) => [...prev, { id: generateId(), role: "assistant", content: "已停止生成", timestamp: Date.now() }]);
   }, []);
 
 
@@ -190,14 +346,13 @@ export function ChatPanel({
   );
 
   // ----- 发送消息 -----
-  const sendMessage = useCallback(
-    async (text: string) => {
-      if (!text.trim() || loading) return;
+  // 用户消息入列（普通问答与报告生成分支共用）
+  const postUserMessage = useCallback(
+    (text: string) => {
       const userMsg: QaMessage = { id: generateId(), role: "user", content: text, timestamp: Date.now() };
       // 进入对话后移除欢迎语气泡
       setMessages((prev) => [...prev.filter((m) => m.id !== "welcome"), userMsg]);
       setInput("");
-      setLoading(true);
       // 案例演示模式不计入业务问数历史与热门问题统计
       if (!suppressHistory) {
         addHistory(userMsg);
@@ -212,6 +367,64 @@ export function ChatPanel({
           route: `/qa?query=${encodeURIComponent(text)}`,
         });
       }
+    },
+    [addHistory, suppressHistory, addRecentVisit, state.user]
+  );
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || loading) return;
+      if (outlineBusy) {
+        showToast("正在整理大纲，请稍候");
+        return;
+      }
+
+      // ===== 报告生成分支：编辑已有报告 > 模板（方式一）> 对话引用（方式三）> 技能大纲（方式二）=====
+      const doneReport = [...messages].reverse().find((m) => m.reportCard?.task?.status === "done");
+      if (doneReport?.reportCard?.task && isReportEditIntent(text)) {
+        postUserMessage(text);
+        const task = doneReport.reportCard.task;
+        const { content, note } = applyReportEdit(task.content ?? "", text);
+        updateReportTask(doneReport.id, { content, edited: true });
+        setReportDrawer({ open: true, msgId: doneReport.id, autoExport: false });
+        showToast(note);
+        return;
+      }
+      const mode = classifyReportRequest(text, { skillOn: reportSkillOn, template: reportTemplate });
+      if (mode) {
+        const turnCount = countUserTurns();
+        postUserMessage(text);
+        if (mode === "template") {
+          // 方式一：按模板固定大纲直接生成，无大纲确认
+          const tpl = reportTemplate ?? matchTemplateByKeyword(text)!;
+          startReportFlow(outlineFromTemplate(tpl, text), { templateId: tpl.id, turnCount });
+        } else if (mode === "conversation") {
+          // 方式三：整理当前对话分析结果，系统内部规划大纲后直接生成
+          startReportFlow(generateOutline(text, { turnCount }), { turnCount });
+        } else {
+          // 方式二：先出大纲确认卡片（正在整理数据...，可停止）
+          setOutlineBusy(true);
+          outlineTimer.current = setTimeout(() => {
+            outlineTimer.current = null;
+            setOutlineBusy(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: generateId(),
+                role: "assistant",
+                content: "",
+                timestamp: Date.now(),
+                reportCard: { kind: "outline", outline: generateOutline(text, { turnCount }) },
+              },
+            ]);
+          }, 1800);
+        }
+        return;
+      }
+
+      // ===== 普通问答 =====
+      postUserMessage(text);
+      setLoading(true);
       try {
         const reply = await mockAiResponse(text);
         setMessages((prev) => [...prev, reply]);
@@ -230,7 +443,7 @@ export function ChatPanel({
         setLoading(false);
       }
     },
-    [loading, addHistory, suppressHistory, addRecentVisit, state.user]
+    [loading, outlineBusy, messages, reportSkillOn, reportTemplate, postUserMessage, countUserTurns, startReportFlow, updateReportTask, showToast, addHistory, suppressHistory]
   );
 
   sendMessageRef.current = sendMessage;
@@ -420,6 +633,30 @@ export function ChatPanel({
           </div>
         )}
       </div>
+      {/* 选择模板：位于选择技能与切换大模型之间；选中后展示模板名标签，可取消 */}
+      {reportTemplate ? (
+        <span
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-primary-50 text-primary-600 border-primary-200"
+          title={`已选模板：${reportTemplate.name}`}
+        >
+          📋 {reportTemplate.name}
+          <button
+            onClick={() => setReportTemplate(null)}
+            className="ml-0.5 text-primary-400 hover:text-primary-600 font-bold leading-none"
+            title="取消模板"
+          >
+            ×
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setShowTemplateModal(true)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+          title="选择报告模板"
+        >
+          📋 选择模板
+        </button>
+      )}
       <button
         onClick={() => setShowModelSwitch(true)}
         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
@@ -447,7 +684,7 @@ export function ChatPanel({
                 sendMessage(input);
               }
             }}
-            placeholder={inputPlaceholder ?? "请输入您的问题，例如：今天产量是多少？"}
+            placeholder={reportSkillOn ? "请输入报告主题、统计范围及生成要求" : inputPlaceholder ?? "请输入您的问题，例如：今天产量是多少？"}
             disabled={loading}
             rows={6}
             className="w-full pl-4 pr-12 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 resize-none transition-all duration-200"
@@ -527,6 +764,28 @@ export function ChatPanel({
         </div>
       </Modal>
 
+      {/* 选择模板弹窗 */}
+      <TemplatePickerModal
+        open={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSelect={(t) => {
+          setReportTemplate(t);
+          setShowTemplateModal(false);
+        }}
+      />
+
+      {/* 报告抽屉（进度/报告内容/思考过程/导出/分享） */}
+      <ReportDrawer
+        open={reportDrawer.open}
+        onClose={() => setReportDrawer({ open: false, msgId: null, autoExport: false })}
+        data={messages.find((m) => m.id === reportDrawer.msgId)?.reportCard ?? null}
+        reportId={reportDrawer.msgId ?? "report"}
+        autoExport={reportDrawer.autoExport}
+        onStop={stopReportGeneration}
+        onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
+        onSaveContent={(content) => reportDrawer.msgId && updateReportTask(reportDrawer.msgId, { content })}
+      />
+
       {/* ===== 内容区（唯一滚动区）：欢迎模式 / 消息列表 ===== */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className={`max-w-3xl mx-auto w-full px-4 ${compact ? "pt-6" : "pt-8"}`}>
@@ -597,6 +856,15 @@ export function ChatPanel({
                   onFeedback={handleFeedback}
                   onFollowUpClick={(q) => sendMessage(q)}
                   onChartTypeChange={(t) => handleChartTypeChange(msg.id, t)}
+                  onReportOutlineConfirm={handleOutlineConfirm}
+                  onReportOutlineRegenerate={handleOutlineRegenerate}
+                  onOpenReport={(id) => setReportDrawer({ open: true, msgId: id, autoExport: false })}
+                  onDownloadReport={(id) => setReportDrawer({ open: true, msgId: id, autoExport: true })}
+                  onShareReport={(id) => {
+                    try { navigator.clipboard?.writeText(`https://shifang.example.com/r/${id}`); } catch { /* 剪贴板不可用时静默 */ }
+                    showToast("链接已复制");
+                  }}
+                  onRetryReport={retryReportGeneration}
                 />
               ))}
               {loading && (
@@ -606,6 +874,24 @@ export function ChatPanel({
                       <Spinner size="sm" />
                       思考中...
                     </div>
+                  </div>
+                </div>
+              )}
+              {/* 大纲生成中：正在整理数据... + 停止生成 */}
+              {outlineBusy && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span className="flex items-center gap-2 text-gray-500 text-sm">
+                      <Spinner size="sm" />
+                      正在整理数据...
+                    </span>
+                    <button
+                      onClick={stopOutlineGeneration}
+                      className="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1 hover:text-red-500 hover:border-red-300 transition-colors"
+                      title="停止生成"
+                    >
+                      ⏹ 停止生成
+                    </button>
                   </div>
                 </div>
               )}

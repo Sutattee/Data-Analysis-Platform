@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useMemo, ReactNode } from "react";
-import { QaMessage, DISLIKE_REASONS } from "@/types";
+import { QaMessage, DISLIKE_REASONS, ReportOutline } from "@/types";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
 import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
+import { OutlineCard } from "./OutlineCard";
+import { ReportCard } from "./ReportCard";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -47,6 +49,13 @@ interface MessageBubbleProps {
   onFeedback?: (msgId: string, feedback: "like" | "dislike", reasons?: string[], note?: string) => void;
   onFollowUpClick?: (question: string) => void;
   onChartTypeChange?: (newType: string) => void;
+  // 报告卡片（大纲/任务）事件：由 ChatPanel 统一处理状态机
+  onReportOutlineConfirm?: (msgId: string, outline: ReportOutline) => void;
+  onReportOutlineRegenerate?: (msgId: string) => void;
+  onOpenReport?: (msgId: string) => void;
+  onDownloadReport?: (msgId: string) => void;
+  onShareReport?: (msgId: string) => void;
+  onRetryReport?: (msgId: string) => void;
 }
 
 export function MessageBubble({
@@ -56,6 +65,12 @@ export function MessageBubble({
   onFeedback,
   onFollowUpClick,
   onChartTypeChange,
+  onReportOutlineConfirm,
+  onReportOutlineRegenerate,
+  onOpenReport,
+  onDownloadReport,
+  onShareReport,
+  onRetryReport,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isWelcome = message.id === "welcome";
@@ -165,8 +180,30 @@ export function MessageBubble({
           </span>
         </div>
 
+        {/* ===== 报告卡片消息（大纲确认 / 报告任务）：不套普通气泡与操作栏 ===== */}
+        {!isUser && message.reportCard && (
+          <div className="space-y-1.5">
+            {message.reportCard.kind === "outline" ? (
+              <OutlineCard
+                data={message.reportCard}
+                locked={!!message.reportCard.outlineLocked}
+                onConfirm={(outline) => onReportOutlineConfirm?.(message.id, outline)}
+                onRegenerate={() => onReportOutlineRegenerate?.(message.id)}
+              />
+            ) : (
+              <ReportCard
+                data={message.reportCard}
+                onOpen={() => onOpenReport?.(message.id)}
+                onDownload={() => onDownloadReport?.(message.id)}
+                onShare={() => onShareReport?.(message.id)}
+                onRetry={() => onRetryReport?.(message.id)}
+              />
+            )}
+          </div>
+        )}
+
         {/* ===== AI 回答区 ===== */}
-        {!isUser && !isWelcome && (
+        {!isUser && !isWelcome && !message.reportCard && (
           <div className="space-y-3">
             {/* 思考过程：可折叠 */}
             {hasThinking && (

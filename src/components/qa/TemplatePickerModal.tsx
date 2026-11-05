@@ -1,0 +1,144 @@
+"use client";
+
+// 选择模板弹窗：顶部 tab（分析报告模板 / Excel报表模版），
+// 下方左右分区（约1:2，分割线区分）：左=模板目录列表，右=模板内容预览；
+// 右上角 X 关闭，左下角「使用模板」按钮（选中模板后可用）。
+import { useEffect, useState } from "react";
+import type { ReportTemplateItem } from "@/types";
+import { REPORT_TEMPLATES_ANALYSIS, REPORT_TEMPLATES_EXCEL } from "@/lib/mock-data/report-gen";
+
+type TemplateKind = "analysis" | "excel";
+
+const TABS: { key: TemplateKind; label: string }[] = [
+  { key: "analysis", label: "分析报告模板" },
+  { key: "excel", label: "Excel报表模版" },
+];
+
+export function TemplatePickerModal({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (t: ReportTemplateItem) => void;
+}) {
+  const [kind, setKind] = useState<TemplateKind>("analysis");
+  const [selected, setSelected] = useState<ReportTemplateItem | null>(null);
+
+  // 打开时重置到分析模板 tab 并清空选中
+  useEffect(() => {
+    if (open) {
+      setKind("analysis");
+      setSelected(null);
+    }
+  }, [open]);
+
+  // ESC 关闭
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const list = kind === "analysis" ? REPORT_TEMPLATES_ANALYSIS : REPORT_TEMPLATES_EXCEL;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+      {/* 遮罩 */}
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      {/* 弹窗主体 */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="选择模板"
+        className="relative w-[960px] max-w-full max-h-[80vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+      >
+        {/* 标题栏：窗口名 + 右上角 X */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 flex-shrink-0">
+          <h3 className="font-semibold text-gray-800">选择模板</h3>
+          <button
+            onClick={onClose}
+            aria-label="关闭"
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* tab 页签 */}
+        <div className="flex gap-6 px-5 border-b border-gray-100 flex-shrink-0">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => { setKind(t.key); setSelected(null); }}
+              aria-selected={kind === t.key}
+              role="tab"
+              className={`relative py-2.5 text-sm transition-colors ${
+                kind === t.key ? "text-primary-600 font-medium" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+              {kind === t.key && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-primary-600 rounded-full" />}
+            </button>
+          ))}
+        </div>
+
+        {/* 左右分区：左 1/3 目录列表 + 分割线 + 右预览 */}
+        <div className="flex flex-1 min-h-0">
+          <div className="w-1/3 min-w-0 border-r border-gray-100 overflow-y-auto p-3 space-y-1.5" role="listbox" aria-label="模板列表">
+            {list.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSelected(t)}
+                className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                  selected?.id === t.id
+                    ? "border-primary-400 bg-primary-50"
+                    : "border-gray-100 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-800 truncate">{t.kind === "excel" ? "📊" : "📄"} {t.name}</span>
+                  <span className="ml-auto flex-shrink-0 text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{t.category}</span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 line-clamp-2">{t.description}</p>
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-w-0 overflow-y-auto p-5">
+            {selected ? (
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-1">{selected.name}</h4>
+                <p className="text-xs text-gray-400 mb-3">{selected.description} ｜ 分类：{selected.category}</p>
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">
+                  {selected.preview}
+                </pre>
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                请在左侧选择模板查看内容预览
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 底部：左下「使用模板」，右下取消 */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 flex-shrink-0">
+          <button
+            onClick={() => selected && onSelect(selected)}
+            disabled={!selected}
+            className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            使用模板
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
