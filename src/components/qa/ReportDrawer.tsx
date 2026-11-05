@@ -1,9 +1,9 @@
 "use client";
 
 // 报告抽屉（右侧滑出，复用 ui/Drawer）：
-// 生成中 = 进度页（任务名｜思考中... → 阶段状态轮换 + 后台执行提示 + AI撰写中.../停止生成）；
-// 完成 = 报告页（顶部文本编辑器：工具条+编辑开关；正文 markdown 渲染；左侧悬浮目录按钮 hover 展开点击定位；
-//        右上角：报告创作思考过程 / 保存 / 下载 / 分享）；思考页（思考已完成 + 执行过程，可切回）；
+// 生成中 = 流式输出页（顶部阶段状态条 + 正文逐字增长 + 末尾闪烁光标；AI撰写中.../停止生成）；
+// 完成 = 报告页（正文 markdown 渲染；左侧悬浮目录按钮 hover 展开点击定位；
+//        右上角：报告创作思考过程 / 下载 / 分享）；思考页（思考已完成 + 执行过程，可切回）；
 // 失败 = 失败原因 + 重新生成。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
@@ -190,7 +190,6 @@ export function ReportDrawer({
   autoExport = false,
   onStop,
   onRetry,
-  onSaveContent,
 }: {
   open: boolean;
   onClose: () => void;
@@ -199,55 +198,35 @@ export function ReportDrawer({
   autoExport?: boolean; // 打开抽屉后直接弹出导出文档弹窗（对话卡片「下载」入口）
   onStop: () => void;
   onRetry: () => void;
-  onSaveContent: (content: string) => void;
 }) {
   const toast = useToast();
   const task = data?.task ?? null;
   const [view, setView] = useState<"report" | "thinking">("report");
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState("");
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
-  const textRef = useRef<HTMLTextAreaElement | null>(null);
+  // 流式输出正文区（生成中随内容增长自动滚动到底部）
+  const streamRef = useRef<HTMLDivElement | null>(null);
 
-  // 打开/切换报告时复位视图与编辑态
+  // 打开/切换报告时复位视图
   useEffect(() => {
     if (open) {
       setView("report");
-      setEditing(false);
       setShowShare(false);
       setTocOpen(false);
       if (autoExport) setShowExport(true);
     }
   }, [open, reportId, autoExport]);
-  // 正文被外部更新（如对话式修改）时同步编辑缓冲，外部内容优先
+
+  // 生成中正文流式增长时自动滚动到底部（跟随最新输出）
   useEffect(() => {
-    setEditText(task?.content ?? "");
-  }, [task?.content]);
+    if (task?.status === "generating" && streamRef.current) {
+      streamRef.current.scrollTop = streamRef.current.scrollHeight;
+    }
+  }, [task?.status, task?.content]);
 
   const shareUrl = `https://shifang.example.com/r/${reportId}`;
   const toc = useMemo(() => (task?.content ? extractToc(task.content) : []), [task?.content]);
-
-  // 工具条：对编辑态 textarea 选区前后插入 markdown 标记
-  const wrapSelection = (before: string, after = before) => {
-    const el = textRef.current;
-    if (!el) return;
-    const { selectionStart: s, selectionEnd: e } = el;
-    setEditText(editText.slice(0, s) + before + editText.slice(s, e) + after + editText.slice(e));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(s + before.length, e + before.length);
-    });
-  };
-
-  const handleSave = () => {
-    if (editing) {
-      onSaveContent(editText);
-      setEditing(false);
-    }
-    toast("保存成功", "success");
-  };
 
   const drawerTitle = !task
     ? "报告"
@@ -275,7 +254,6 @@ export function ReportDrawer({
               >
                 {view === "thinking" ? "📄 报告内容" : "🧠 思考过程"}
               </button>
-              <button onClick={handleSave} className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 transition-colors" title="保存报告">💾 保存</button>
               <button onClick={() => setShowExport(true)} className="px-2.5 py-1 text-xs text-gray-500 border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 transition-colors" title="下载报告文档">⬇ 下载</button>
               <button
                 onClick={() => setShowShare((v) => !v)}
@@ -321,14 +299,26 @@ export function ReportDrawer({
           ) : undefined
         }
       >
-        {/* ===== 进度页（生成中） ===== */}
+        {/* ===== 进度页（生成中）：顶部状态条 + 流式逐字输出的正文 ===== */}
         {task?.status === "generating" && (
-          <div className="h-full flex flex-col items-center justify-center gap-4 px-8 text-center">
-            <Spinner size="lg" />
-            <p className="text-base font-medium text-gray-800" aria-label="当前生成状态">{task.stage ?? "正在启动任务..."}</p>
-            <p className="text-xs text-gray-400 leading-relaxed max-w-sm">
-              执行过程可能较长，您可以暂时离开，稍后回来查看，后台继续运行
-            </p>
+          <div className="h-full flex flex-col">
+            {/* 状态条：当前阶段 + 后台运行提示 */}
+            <div className="flex items-center gap-2 px-6 py-3 border-b border-gray-100 flex-shrink-0">
+              <Spinner size="sm" />
+              <span className="text-sm font-medium text-gray-800" aria-label="当前生成状态">{task.stage ?? "正在启动任务..."}</span>
+              <span className="ml-auto text-xs text-gray-400">后台运行中，您可以暂时离开</span>
+            </div>
+            {/* 流式正文：随生成进度逐字增长，末尾光标闪烁；容器自动滚动跟随 */}
+            <div ref={streamRef} className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
+              {task.content ? (
+                <>
+                  <MiniMarkdown md={task.content} />
+                  <span className="inline-block w-2 h-4 -mb-0.5 bg-gray-600 animate-pulse" aria-hidden />
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 text-center pt-10">正在准备报告内容...</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -365,54 +355,17 @@ export function ReportDrawer({
         {/* ===== 报告内容页 ===== */}
         {task?.status === "done" && view === "report" && (
           <div className="relative h-full flex flex-col">
-            {/* 顶部文本编辑器：工具条（编辑态）+ 编辑开关 */}
-            <div className="flex items-center gap-1.5 px-6 py-2.5 border-b border-gray-100 flex-shrink-0 bg-white">
-              {editing ? (
-                <>
-                  <button onClick={() => wrapSelection("**")} className="px-2 py-1 text-xs text-gray-600 border border-gray-200 rounded hover:border-gray-300 font-bold" title="加粗">B</button>
-                  <button onClick={() => wrapSelection("*")} className="px-2 py-1 text-xs text-gray-600 border border-gray-200 rounded hover:border-gray-300 italic" title="斜体">I</button>
-                  <button onClick={() => wrapSelection("## ", "")} className="px-2 py-1 text-xs text-gray-600 border border-gray-200 rounded hover:border-gray-300" title="章节标题">H1</button>
-                  <button onClick={() => wrapSelection("### ", "")} className="px-2 py-1 text-xs text-gray-600 border border-gray-200 rounded hover:border-gray-300" title="小节标题">H2</button>
-                  <button
-                    onClick={() => { onSaveContent(editText); setEditing(false); }}
-                    className="ml-auto px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                  >
-                    完成编辑
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs text-gray-400">报告正文</span>
-                  <button onClick={() => { setEditText(task.content ?? ""); setEditing(true); }} className="ml-auto px-3 py-1 text-xs text-gray-600 border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 transition-colors" title="编辑报告内容">
-                    ✏️ 编辑
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* 正文区：展示态渲染 / 编辑态 textarea */}
+            {/* 正文区：markdown 渲染 */}
             <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
-              {editing ? (
-                <textarea
-                  ref={textRef}
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  rows={24}
-                  className="w-full h-full min-h-[420px] px-3 py-2 border border-gray-200 rounded-lg text-sm leading-relaxed font-mono focus:outline-none focus:ring-2 focus:ring-primary-200 resize-none"
-                  aria-label="报告内容编辑"
-                />
-              ) : (
-                <MiniMarkdown md={task.content ?? ""} />
-              )}
+              <MiniMarkdown md={task.content ?? ""} />
             </div>
 
             {/* 左侧悬浮目录按钮：hover 提示并自动展开，点击条目定位 */}
-            {!editing && (
-              <div
-                className="absolute left-2 top-20 z-10"
-                onMouseEnter={() => setTocOpen(true)}
-                onMouseLeave={() => setTocOpen(false)}
-              >
+            <div
+              className="absolute left-2 top-20 z-10"
+              onMouseEnter={() => setTocOpen(true)}
+              onMouseLeave={() => setTocOpen(false)}
+            >
                 <button
                   className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-md text-base hover:border-primary-300 transition-colors"
                   title="目录"
@@ -438,13 +391,12 @@ export function ReportDrawer({
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+            </div>
           </div>
         )}
       </Drawer>
 
-      {/* 导出内容取展示态正文（编辑中的暂存内容不参与导出，先保存再导出） */}
+      {/* 导出内容取当前报告正文 */}
       <ExportDocModal open={showExport} defaultName={task?.title ?? "报告"} content={task?.content ?? ""} onClose={() => setShowExport(false)} />
     </>
   );

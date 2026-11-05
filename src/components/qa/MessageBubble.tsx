@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, ReactNode } from "react";
-import { QaMessage, DISLIKE_REASONS, ReportOutline } from "@/types";
+import { QaMessage, DISLIKE_REASONS, ExecutionNode, ReportOutline } from "@/types";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
 import { ResultTable } from "./ResultTable";
@@ -41,6 +41,61 @@ function nodeIcon(status: string): string {
     case "failed":    return "❌";
     default:          return "○";
   }
+}
+
+// 思考过程折叠面板（普通回答 / 大纲卡片 / 报告卡片共用）：Agent 执行流程时间线，
+// 生成中标题「思考中...」，其余「已完成思考」；节点状态图标 running⏳/completed✅/failed❌/pending○。
+function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: boolean }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <button
+        onClick={() => setShow(!show)}
+        className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+      >
+        <span className="text-gray-700 flex items-center gap-1">{QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "已完成思考"}</span>
+        <span
+          className={`text-gray-400 transition-transform text-xs ${
+            show ? "rotate-180" : ""
+          }`}
+        >
+          ▾
+        </span>
+      </button>
+      {show && (
+        <div className="px-4 pb-3 pt-1 border-t border-gray-100">
+          <div className="relative pl-6">
+            <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-gray-200" />
+            <div className="space-y-2">
+              {nodes.map((node) => (
+                <div key={node.id} className="relative">
+                  <span className="absolute -left-[17px] top-0.5 text-xs">
+                    {nodeIcon(node.status)}
+                  </span>
+                  <div
+                    className={`text-xs font-medium ${
+                      node.status === "failed"
+                        ? "text-red-600"
+                        : node.status === "completed"
+                          ? "text-gray-700"
+                          : "text-gray-400"
+                    }`}
+                  >
+                    {node.label}
+                  </div>
+                  {node.detail && (
+                    <div className="mt-0.5 text-xs text-gray-500 whitespace-pre-wrap leading-relaxed bg-gray-50 rounded p-2 border border-gray-100">
+                      {node.detail}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface MessageBubbleProps {
@@ -83,9 +138,6 @@ export function MessageBubble({
   const isUser = message.role === "user";
   const isWelcome = message.id === "welcome";
   const hasThinking = message.executionNodes && message.executionNodes.length > 0;
-
-  // 思考过程展开
-  const [showThinking, setShowThinking] = useState(false);
 
   // 导出 Excel：仅包含数据结果表的回答展示入口（每张表一个 Sheet，全量导出）
   const exportTables = useMemo(() => (isUser || isWelcome ? [] : collectMessageTables(message)), [message, isUser, isWelcome]);
@@ -176,7 +228,8 @@ export function MessageBubble({
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[78%] min-w-0 ${isUser ? "order-1" : ""}`}>
+      {/* 大纲确认卡片突破气泡 78% 宽度，铺满中间内容区 */}
+      <div className={`${message.reportCard?.kind === "outline" ? "w-full" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
         {/* 头像（无时间戳） */}
         <div className="flex items-center gap-2 mb-1">
           <span
@@ -191,6 +244,13 @@ export function MessageBubble({
         {/* ===== 报告卡片消息（大纲确认 / 报告任务）：不套普通气泡与操作栏 ===== */}
         {!isUser && message.reportCard && (
           <div className="space-y-1.5">
+            {/* Agent 执行流程：大纲/报告卡片上方同样展示思考过程（报告生成中标题为「思考中...」，节点实时推进） */}
+            {message.executionNodes?.length ? (
+              <ThinkingPanel
+                nodes={message.executionNodes}
+                running={message.reportCard.kind === "report" && message.reportCard.task?.status === "generating"}
+              />
+            ) : null}
             {message.reportCard.kind === "outline" ? (
               <OutlineCard
                 data={message.reportCard}
@@ -223,56 +283,8 @@ export function MessageBubble({
         {/* ===== AI 回答区 ===== */}
         {!isUser && !isWelcome && !message.reportCard && !message.fillCard && (
           <div className="space-y-3">
-            {/* 思考过程：可折叠 */}
-            {hasThinking && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-                <button
-                  onClick={() => setShowThinking(!showThinking)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
-                >
-                  <span className="text-gray-700 flex items-center gap-1">{QA_BUBBLE_ICONS.thinking} 已完成思考</span>
-                  <span
-                    className={`text-gray-400 transition-transform text-xs ${
-                      showThinking ? "rotate-180" : ""
-                    }`}
-                  >
-                    ▾
-                  </span>
-                </button>
-                {showThinking && (
-                  <div className="px-4 pb-3 pt-1 border-t border-gray-100">
-                    <div className="relative pl-6">
-                      <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-gray-200" />
-                      <div className="space-y-2">
-                        {message.executionNodes!.map((node) => (
-                          <div key={node.id} className="relative">
-                            <span className="absolute -left-[17px] top-0.5 text-xs">
-                              {nodeIcon(node.status)}
-                            </span>
-                            <div
-                              className={`text-xs font-medium ${
-                                node.status === "failed"
-                                  ? "text-red-600"
-                                  : node.status === "completed"
-                                    ? "text-gray-700"
-                                    : "text-gray-400"
-                              }`}
-                            >
-                              {node.label}
-                            </div>
-                            {node.detail && (
-                              <div className="mt-0.5 text-xs text-gray-500 whitespace-pre-wrap leading-relaxed bg-gray-50 rounded p-2 border border-gray-100">
-                                {node.detail}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* 思考过程：可折叠（与大纲/报告卡片共用 ThinkingPanel） */}
+            {hasThinking && <ThinkingPanel nodes={message.executionNodes!} />}
 
             {/* 回答内容 / 结构化回答 */}
             {message.smartAnswer ? (

@@ -739,6 +739,36 @@ export function reportThinkingNodes(outline: ReportOutline, mode: ReportGenMode 
   }));
 }
 
+// 大纲阶段思考节点（对话页大纲卡片上方展示）：outline 流程截至「用户确认大纲」，
+// 卡片出现即大纲已拟好，全部置为已完成（用户正处于确认环节）
+export function outlineThinkingNodes(outline: ReportOutline): ExecutionNode[] {
+  const steps = REPORT_AGENT_FLOWS.outline.slice(0, REPORT_AGENT_FLOWS.outline.indexOf("用户确认大纲（支持修改）") + 1);
+  return steps.map((step, i) => ({
+    id: `ol-${i + 1}`,
+    label: step,
+    status: "completed" as const,
+    duration: 80 + i * 130,
+    detail: reportStepDetail(step, outline, "outline"),
+  }));
+}
+
+// 报告生成进度版思考节点（对话页报告任务卡片上方实时展示）：
+// 前 doneCount 步已完成、下一步执行中、其余待执行；detail 与抽屉思考页一致
+export function progressReportNodes(outline: ReportOutline, mode: ReportGenMode, doneCount: number): ExecutionNode[] {
+  const flow = REPORT_AGENT_FLOWS[mode];
+  return flow.map((step, i) => ({
+    id: `rt-${i + 1}`,
+    label: step,
+    status: i < doneCount ? ("completed" as const) : i === doneCount ? ("running" as const) : ("pending" as const),
+    detail: reportStepDetail(step, outline, mode),
+  }));
+}
+
+// 报告流程步骤总数（对话页节点按进度比例推进时计算终点用）
+export function reportFlowLength(mode: ReportGenMode): number {
+  return REPORT_AGENT_FLOWS[mode].length;
+}
+
 // ========== 对话式报告编辑 ==========
 
 const EDIT_VERBS = ["增加", "补充", "加入", "添加", "压缩", "精简", "缩短", "改写", "重写", "调整", "删除", "修改", "扩充"];

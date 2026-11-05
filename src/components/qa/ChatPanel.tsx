@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { QaMessage, VisitBoard, ReportCardData, ReportOutline, ReportTemplateItem, FillCardData } from "@/types";
+import { QaMessage, VisitBoard, ReportCardData, ReportOutline, ReportTemplateItem, FillCardData, ExecutionNode } from "@/types";
 import { mockAiResponse, getWelcomeMessage } from "@/lib/ai/mock-ai";
 import { generateId } from "@/lib/utils";
 import { useApp } from "@/lib/store/AppContext";
@@ -16,6 +16,9 @@ import {
   applyReportEdit,
   isReportEditIntent,
   reportThinkingNodes,
+  outlineThinkingNodes,
+  progressReportNodes,
+  reportFlowLength,
   type ReportGenMode,
 } from "@/lib/mock-data/report-gen";
 import {
@@ -170,9 +173,17 @@ export function ChatPanel({
     );
   }, []);
 
-  // 报告阶段轮换：正在查询数据 → 正在生成第N章… → 正在整合报告 → done
-  // mode 对应报告生成方式（template 按模板/outline 按要求+大纲/conversation 按对话），决定思考节点的执行流程文案
+  // 更新某条消息的思考节点（对话页报告卡片上方的 Agent 执行流程随生成进度实时推进）
+  const setMsgThinking = useCallback((msgId: string, nodes: ExecutionNode[]) => {
+    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, executionNodes: nodes } : m)));
+  }, []);
+
+  // 报告生成：阶段轮换（正在查询数据 → 正在生成第N章… → 正在整合报告）→ 流式逐字快速输出正文 → done。
+  // mode 对应报告生成方式（template 按模板/outline 按要求+大纲/conversation 按对话），决定思考节点的执行流程文案；
+  // 思考节点随进度推进：前 STAGE_NODES 步在阶段轮换期点亮，其余随流式输出比例点亮，完成后全部置为已完成。
   const runReportStages = useCallback((reportMsgId: string, outline: ReportOutline, turnCount: number, mode: ReportGenMode) => {
+    const flowLen = reportFlowLength(mode);
+    const STAGE_NODES = 9; // 阶段轮换期推进的节点数（「生成正文」起归流式输出期）
     const stages = [
       "正在查询数据",
       ...outline.sections.map((s, i) => `正在生成第${i + 1}章：${s.title}`),
@@ -182,25 +193,50 @@ export function ChatPanel({
     const tick = () => {
       if (step < stages.length) {
         updateReportTask(reportMsgId, { stage: stages[step] });
+        setMsgThinking(
+          reportMsgId,
+          progressReportNodes(outline, mode, Math.min(STAGE_NODES, Math.round(((step + 1) / stages.length) * STAGE_NODES)))
+        );
         step += 1;
         const t = setTimeout(tick, 500);
         reportTimers.current.push(t);
       } else {
-        updateReportTask(reportMsgId, {
-          status: "done",
-          stage: undefined,
-          content: generateReportContent(outline, { turnCount }),
-          thinking: reportThinkingNodes(outline, mode),
-        });
+        // 阶段轮换完成 → 流式逐字输出标题与正文：预生成全文，16ms/跳按片推进（全文约 2.5s 输出完）
+        const full = generateReportContent(outline, { turnCount });
+        const chunk = Math.max(4, Math.ceil(full.length / 160));
+        let pos = 0;
+        updateReportTask(reportMsgId, { stage: "正在生成正文" });
+        const stream = () => {
+          pos = Math.min(full.length, pos + chunk);
+          updateReportTask(reportMsgId, { content: full.slice(0, pos) });
+          if (pos >= full.length) {
+            // 输出完成：报告任务收尾 + 思考节点全绿
+            updateReportTask(reportMsgId, {
+              status: "done",
+              stage: undefined,
+              thinking: reportThinkingNodes(outline, mode),
+            });
+            setMsgThinking(reportMsgId, progressReportNodes(outline, mode, flowLen));
+            return;
+          }
+          setMsgThinking(
+            reportMsgId,
+            progressReportNodes(outline, mode, STAGE_NODES + Math.round((pos / full.length) * (flowLen - STAGE_NODES)))
+          );
+          const t = setTimeout(stream, 16);
+          reportTimers.current.push(t);
+        };
+        stream();
       }
     };
     tick();
-  }, [updateReportTask]);
+  }, [updateReportTask, setMsgThinking]);
 
-  // 启动报告生成：push 报告任务卡片 + 自动打开抽屉 + 阶段轮换
+  // 启动报告生成：push 报告任务卡片（含 Agent 执行流程节点，随进度推进）+ 自动打开抽屉 + 阶段轮换与流式输出
   const startReportFlow = useCallback((outline: ReportOutline, opts: { templateId?: string; turnCount: number; mode?: ReportGenMode }) => {
     const reportMsgId = generateId();
-    reportFlows.current[reportMsgId] = { outline, turnCount: opts.turnCount, mode: opts.mode ?? "outline" };
+    const mode = opts.mode ?? "outline";
+    reportFlows.current[reportMsgId] = { outline, turnCount: opts.turnCount, mode };
     setMessages((prev) => [
       ...prev,
       {
@@ -208,6 +244,7 @@ export function ChatPanel({
         role: "assistant",
         content: "",
         timestamp: Date.now(),
+        executionNodes: progressReportNodes(outline, mode, 0),
         reportCard: {
           kind: "report",
           task: { title: outline.title, status: "generating", stage: "正在查询数据", templateId: opts.templateId },
@@ -215,7 +252,7 @@ export function ChatPanel({
       },
     ]);
     setReportDrawer({ open: true, msgId: reportMsgId, autoExport: false });
-    runReportStages(reportMsgId, outline, opts.turnCount, opts.mode ?? "outline");
+    runReportStages(reportMsgId, outline, opts.turnCount, mode);
   }, [runReportStages]);
 
   // 停止生成：清全部阶段计时器，标记当前生成中的任务为失败
@@ -238,10 +275,12 @@ export function ChatPanel({
       showToast("未找到生成上下文，请重新发起报告生成");
       return;
     }
-    updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据" });
+    // 重置正文与思考节点（从第 1 步重新开始）后重跑
+    updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据", content: "" });
+    setMsgThinking(msgId, progressReportNodes(rec.outline, rec.mode, 0));
     setReportDrawer({ open: true, msgId, autoExport: false });
     runReportStages(msgId, rec.outline, rec.turnCount, rec.mode);
-  }, [runReportStages, showToast, updateReportTask]);
+  }, [runReportStages, showToast, updateReportTask, setMsgThinking]);
 
   // 大纲确认：锁定大纲消息 → 启动报告生成
   const handleOutlineConfirm = useCallback((msgId: string, outline: ReportOutline) => {
@@ -553,11 +592,12 @@ export function ChatPanel({
           // 方式三：整理当前对话分析结果，系统内部规划大纲后直接生成
           startReportFlow(generateOutline(text, { turnCount }), { turnCount, mode: "conversation" });
         } else {
-          // 方式二：先出大纲确认卡片（正在整理数据...，可停止）
+          // 方式二：先出大纲确认卡片（正在整理数据...，可停止）；卡片上方展示大纲阶段的 Agent 执行流程
           setOutlineBusy(true);
           outlineTimer.current = setTimeout(() => {
             outlineTimer.current = null;
             setOutlineBusy(false);
+            const outline = generateOutline(text, { turnCount });
             setMessages((prev) => [
               ...prev,
               {
@@ -565,7 +605,8 @@ export function ChatPanel({
                 role: "assistant",
                 content: "",
                 timestamp: Date.now(),
-                reportCard: { kind: "outline", outline: generateOutline(text, { turnCount }) },
+                executionNodes: outlineThinkingNodes(outline),
+                reportCard: { kind: "outline", outline },
               },
             ]);
           }, 1800);
@@ -691,6 +732,8 @@ export function ChatPanel({
   };
 
   // ========== 选择器条（数据范围 / 知识库：下拉菜单在按钮上方弹出，无遮罩层） ==========
+  // 注意：SelectorBar/ToolBar/InputArea 是渲染函数（非组件），调用处必须写 {Xxx()} 而非 <Xxx />：
+  // 组件写法下每次 re-render 函数引用都变，React 会卸载重挂整个子树，导致输入框每敲一个字丢一次焦点。
   const SelectorBar = () => (
     <div className="flex items-center gap-2 flex-wrap">
       {/* 选择数据范围 */}
@@ -821,7 +864,7 @@ export function ChatPanel({
   const InputArea = () => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <SelectorBar />
+        {SelectorBar()}
       </div>
       <div className="flex gap-2 items-end">
         <div className="flex-1 relative">
@@ -866,7 +909,7 @@ export function ChatPanel({
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <ToolBar />
+        {ToolBar()}
         <span
           className={`text-xs ${
             input.length > MAX_CHARS * 0.9 ? "text-red-400" : "text-gray-400"
@@ -934,7 +977,6 @@ export function ChatPanel({
         autoExport={reportDrawer.autoExport}
         onStop={stopReportGeneration}
         onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
-        onSaveContent={(content) => reportDrawer.msgId && updateReportTask(reportDrawer.msgId, { content })}
       />
 
       {/* 填表抽屉（进度/报表预览/执行过程/下载 XLSX） */}
@@ -1068,7 +1110,7 @@ export function ChatPanel({
       {/* ===== 底部固定输入区：不论是否发送，位置恒定 ===== */}
       <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-4">
         <div className="max-w-3xl mx-auto w-full">
-          <InputArea />
+          {InputArea()}
         </div>
       </div>
     </div>
