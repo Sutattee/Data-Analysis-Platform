@@ -42,18 +42,16 @@ const QUICK_ENTRIES = [
     href: "/energy/yearbook/reports",
   },
   {
-    label: "指标溯源",
-    desc: "追溯指标定义与数据链路",
+    label: "告警中心",
+    desc: "告警记录与处理跟踪",
     icon: (
       <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none">
-        <circle cx="6" cy="12" r="3" fill="#F59E0B" />
-        <circle cx="18" cy="6" r="3" fill="#10B981" />
-        <circle cx="18" cy="18" r="3" fill="#EF4444" />
-        <path d="M9 12L15 7" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
-        <path d="M9 12L15 17" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+        <rect x="2" y="4" width="20" height="16" rx="3" fill="#F59E0B" />
+        <path d="M12 8.5V13.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+        <circle cx="12" cy="16.5" r="1.3" fill="white" />
       </svg>
     ),
-    href: "/metric-trace",
+    href: "/alert/records",
   },
 ];
 

@@ -3,6 +3,7 @@
 // 对话内填表任务卡片：生成中（标题 + 标题下灰字「正在生成... · 阶段」）/ 已完成（标题下灰字
 // 「生成已完成」，hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（保留已填充部分，
 // 可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
+import { Table } from "lucide-react";
 import type { FillCardData } from "@/types";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -26,7 +27,10 @@ export function FillCard({
       aria-label="填表任务卡片"
     >
       <div className="flex items-center gap-2.5">
-        <span className="text-lg flex-shrink-0">{task.status === "failed" ? "⚠️" : "📊"}</span>
+        {/* 卡片图标：绿色表格（失败态保留警示） */}
+        <span className="flex-shrink-0">
+          {task.status === "failed" ? <span className="text-lg leading-none">⚠️</span> : <Table size={18} className="text-green-600" />}
+        </span>
         <button
           onClick={onOpen}
           className="text-sm font-medium text-gray-800 hover:text-primary-600 truncate text-left"
