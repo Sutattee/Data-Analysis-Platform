@@ -34,6 +34,8 @@ import {
   applyFillEdit,
 } from "@/lib/mock-data/fill-form";
 import { exportTablesToExcel } from "@/lib/qa/export-excel";
+import { validateUploadFile, uploadedToTemplateItem } from "@/lib/mock-data/report-templates-admin";
+import { Sparkles, FileText, Plus } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { TemplatePickerModal } from "./TemplatePickerModal";
 import { ReportDrawer } from "./ReportDrawer";
@@ -137,6 +139,9 @@ export function ChatPanel({
   // ----- 报告生成状态机 -----
   // 已选模板（方式一）/ 模板选择弹窗 / 大纲生成中 / 报告抽屉（autoExport=打开后直接弹导出）
   const [reportTemplate, setReportTemplate] = useState<ReportTemplateItem | null>(null);
+  // 对话内上传的填报文件（工具条「+」入口）：与已选模板互斥，发送后按通用对标表结构填表
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [reportDrawer, setReportDrawer] = useState<{ open: boolean; msgId: string | null; autoExport: boolean }>({ open: false, msgId: null, autoExport: false });
@@ -381,6 +386,18 @@ export function ChatPanel({
     tick();
   }, [updateFillCard]);
 
+  // 「+」选择填报文件：校验 XLSX 格式/大小；与已选模板互斥（最近选择的填报依据优先）
+  const pickFillFile = (f: File | null) => {
+    if (!f) return;
+    const err = validateUploadFile(f.name, f.size, "excel");
+    if (err) {
+      showToast(err);
+      return;
+    }
+    setReportTemplate(null);
+    setUploadFile(f);
+  };
+
   // 启动智能填表：push 填表任务卡片（预挂全量表结构，progress 从 0 流式推进）+ 自动打开抽屉
   const startFillFlow = useCallback((template: ReportTemplateItem, text: string) => {
     const period = defaultPeriodOf(text);
@@ -590,6 +607,28 @@ export function ChatPanel({
         return;
       }
 
+      // ===== 上传填报文件分支（工具条「+」入口）：上传的 XLSX 即填报依据，
+      // 不依赖技能与模板选择，按通用对标表结构智能填表（文件发送后消费，恢复「+」）=====
+      if (uploadFile) {
+        postUserMessage(text);
+        const now = new Date();
+        const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+        const tpl = uploadedToTemplateItem({
+          id: `ut-chat-${Date.now().toString(36)}`,
+          kind: "excel",
+          name: uploadFile.name.replace(/\.[^.]+$/, ""),
+          format: "XLSX",
+          sizeBytes: uploadFile.size,
+          enabled: true,
+          uploader: state.user?.username ?? "当前用户",
+          uploadedAt: `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`,
+          domain: "通用",
+        });
+        setUploadFile(null);
+        startFillFlow(tpl, text);
+        return;
+      }
+
       // ===== 智能填表分支（技能选中时优先于报告与普通问答）=====
       // 补充/修改已有报表 > 已选模板直接生成 > 文本匹配模板新生成 > 引导补充模板名称
       if (fillSkillOn) {
@@ -702,7 +741,7 @@ export function ChatPanel({
         setLoading(false);
       }
     },
-    [loading, outlineBusy, messages, fillSkillOn, startFillFlow, updateFillCard, beginFillRun, runFillStages, reportSkillOn, reportTemplate, postUserMessage, countUserTurns, startReportFlow, updateReportTask, showToast, addHistory, suppressHistory]
+    [loading, outlineBusy, messages, uploadFile, fillSkillOn, startFillFlow, updateFillCard, beginFillRun, runFillStages, reportSkillOn, reportTemplate, postUserMessage, countUserTurns, startReportFlow, updateReportTask, showToast, addHistory, suppressHistory, state.user]
   );
 
   sendMessageRef.current = sendMessage;
@@ -857,12 +896,12 @@ export function ChatPanel({
     <div className="flex items-center gap-2 flex-wrap">
       <div className="relative" ref={(el) => { menuRefs.current.skill = el; }}>
         {selectedSkillTag ? (
-          /* 已选技能：标签展示在「选择技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
+          /* 已选技能：标签展示在「技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
           <span
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-green-50 text-green-600 border-green-200"
             title={`已选技能：${selectedSkillTag.name}`}
           >
-            {QA_TOOLBAR_ICONS.skill} {selectedSkillTag.name}
+            <Sparkles size={13} className="flex-shrink-0" /> {selectedSkillTag.name}
             <button
               onClick={() => setSelectedSkillTag(null)}
               className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"
@@ -876,7 +915,7 @@ export function ChatPanel({
             onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
           >
-            {QA_TOOLBAR_ICONS.skill} 选择技能
+            <Sparkles size={13} className="text-gray-600" /> 技能
           </button>
         )}
         {openMenu === "skill" && (
@@ -906,13 +945,49 @@ export function ChatPanel({
           </div>
         )}
       </div>
-      {/* 选择模板：位于选择技能与切换大模型之间；选中后展示模板名标签，可取消 */}
+      {/* 「+」上传填报文件：位于技能与模板之间；选中后展示文件名标签，可移除，发送后按通用对标表结构智能填表 */}
+      {uploadFile ? (
+        <span
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-amber-50 text-amber-600 border-amber-200 max-w-[220px]"
+          title={`已上传填报文件：${uploadFile.name}`}
+        >
+          <FileText size={13} className="flex-shrink-0" />
+          <span className="truncate">{uploadFile.name}</span>
+          <button
+            onClick={() => setUploadFile(null)}
+            className="ml-0.5 text-amber-400 hover:text-amber-600 font-bold leading-none flex-shrink-0"
+            title="移除文件"
+          >
+            ×
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => uploadInputRef.current?.click()}
+          aria-label="上传报表文件"
+          title="上传 XLSX 报表模板并填报"
+          className="inline-flex items-center justify-center w-7 h-7 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+        >
+          <Plus size={13} className="text-gray-600" />
+        </button>
+      )}
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".xlsx"
+        className="hidden"
+        onChange={(e) => {
+          pickFillFile(e.target.files?.[0] ?? null);
+          e.target.value = "";
+        }}
+      />
+      {/* 模板：位于「+」与切换大模型之间；选中后展示模板名标签，可取消 */}
       {reportTemplate ? (
         <span
           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-primary-50 text-primary-600 border-primary-200"
           title={`已选模板：${reportTemplate.name}`}
         >
-          📋 {reportTemplate.name}
+          <FileText size={13} className="flex-shrink-0" /> {reportTemplate.name}
           <button
             onClick={() => setReportTemplate(null)}
             className="ml-0.5 text-primary-400 hover:text-primary-600 font-bold leading-none"
@@ -927,7 +1002,7 @@ export function ChatPanel({
           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
           title="选择报告模板"
         >
-          📋 选择模板
+          <FileText size={13} className="text-gray-600" /> 模板
         </button>
       )}
       <button
@@ -959,7 +1034,7 @@ export function ChatPanel({
                 sendMessage(input);
               }
             }}
-            placeholder={fillSkillOn ? "请输入报表名称、统计周期、统计范围及填报要求" : reportSkillOn ? "请输入报告主题、统计范围及生成要求" : inputPlaceholder ?? "请输入您的问题，例如：今天产量是多少？"}
+            placeholder={uploadFile ? "请说明填报要求（统计周期、统计范围等），将按上传的报表模板填表" : fillSkillOn ? "请输入报表名称、统计周期、统计范围及填报要求" : reportSkillOn ? "请输入报告主题、统计范围及生成要求" : inputPlaceholder ?? "请输入您的问题，例如：今天产量是多少？"}
             disabled={loading}
             rows={6}
             className="w-full pl-4 pr-12 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 resize-none transition-all duration-200"
