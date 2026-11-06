@@ -629,6 +629,13 @@ export function ChatPanel({
         return;
       }
 
+      // ===== 已选 Excel 报表模板分支：模板类型即意图，无需选「智能填表」技能，输入要求直接填表 =====
+      if (reportTemplate?.kind === "excel") {
+        postUserMessage(text);
+        startFillFlow(reportTemplate, text);
+        return;
+      }
+
       // ===== 智能填表分支（技能选中时优先于报告与普通问答）=====
       // 补充/修改已有报表 > 已选模板直接生成 > 文本匹配模板新生成 > 引导补充模板名称
       if (fillSkillOn) {
@@ -683,11 +690,6 @@ export function ChatPanel({
       }
       const mode = classifyReportRequest(text, { skillOn: reportSkillOn, template: reportTemplate });
       if (mode) {
-        // Excel 报表模板用于智能填表（生成 XLSX），不支持按报告大纲生成分析报告：引导改选
-        if (reportTemplate?.kind === "excel") {
-          showToast("已选 Excel 报表模板，请切换到「智能填表」技能生成报表，或改选分析报告模板");
-          return;
-        }
         const turnCount = countUserTurns();
         postUserMessage(text);
         if (mode === "template") {

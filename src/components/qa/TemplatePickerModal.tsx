@@ -134,7 +134,7 @@ export function TemplatePickerModal({
               <div>
                 <h4 className="font-semibold text-gray-800 mb-3">{selected.name}</h4>
                 {selected.kind === "excel" && selected.excelSheets?.length ? (
-                  // Excel 模板：工作表只读预览（保留版式，支持页签切换、滚动与缩放）
+                  // Excel 模板：工作表只读预览（保留版式，支持页签切换、滚动）
                   <ExcelPreview sheets={selected.excelSheets} maxHeight={320} />
                 ) : (
                   <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-sans bg-gray-50 rounded-lg p-4 border border-gray-100">

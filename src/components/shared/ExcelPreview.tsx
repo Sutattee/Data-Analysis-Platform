@@ -1,15 +1,11 @@
 "use client";
 
 // Excel 工作表形式的只读预览（选择模板弹窗 / 管理后台报告模板预览 / 智能填表抽屉共用）：
-// 顶部说明 + 缩放控件（−/百分比/+/重置，60%~150%）；滚动区支持横向、纵向滚动；
+// 滚动区支持横向、纵向滚动；
 // 表格按模板版式渲染——表头区灰底加粗、合并单元格（rowSpan/colSpan）、细边框、数字列右对齐；
 // 多 Sheet 时底部页签切换（Excel 风格标签条）。SheetGrid 单独导出供仅需网格渲染的场景复用。
 import { useEffect, useMemo, useState } from "react";
 import type { ExcelSheetPreview } from "@/types";
-
-const ZOOM_MIN = 0.6;
-const ZOOM_MAX = 1.5;
-const ZOOM_STEP = 0.1;
 
 // 合并单元格索引：起点 → span 信息；覆盖位 → skip（渲染时跳过）
 function buildMergeMap(sheet: ExcelSheetPreview) {
@@ -77,7 +73,6 @@ export function ExcelPreview({
   maxHeight?: number;
 }) {
   const [sheetIdx, setSheetIdx] = useState(0);
-  const [zoom, setZoom] = useState(1);
 
   // 数据源变化时回到第一个工作表
   useEffect(() => {
@@ -87,51 +82,13 @@ export function ExcelPreview({
   if (!sheets.length) return null;
   const idx = Math.min(sheetIdx, sheets.length - 1);
   const sheet = sheets[idx];
-  const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 10) / 10));
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden" aria-label="Excel 工作表只读预览">
-      {/* 工具条：预览说明 + 缩放控件 */}
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <span className="text-xs text-gray-400">Excel 工作表只读预览：底部页签可切换工作表，支持滚动与缩放查看</span>
-        <div className="flex items-center gap-1 flex-shrink-0 ml-3">
-          <button
-            onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}
-            disabled={zoom <= ZOOM_MIN}
-            className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:border-primary-300 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="缩小"
-            aria-label="缩小"
-          >
-            −
-          </button>
-          <span className="text-xs text-gray-500 w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}
-            disabled={zoom >= ZOOM_MAX}
-            className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:border-primary-300 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            title="放大"
-            aria-label="放大"
-          >
-            +
-          </button>
-          {zoom !== 1 && (
-            <button
-              onClick={() => setZoom(1)}
-              className="px-1.5 h-6 flex items-center justify-center rounded border border-gray-200 bg-white text-xs text-gray-500 hover:border-primary-300 hover:text-primary-600 transition-colors"
-              title="重置缩放"
-            >
-              重置
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 滚动区：横向、纵向；缩放用 transform，外层按比例放大宽度以保证横向滚动完整 */}
+      {/* 滚动区：横向、纵向 */}
       <div className="overflow-auto" style={{ maxHeight }}>
-        <div style={{ width: `${100 / zoom}%` }}>
-          <div style={{ transform: `scale(${zoom})`, transformOrigin: "0 0", padding: 12 }}>
-            <SheetGrid sheet={sheet} />
-          </div>
+        <div style={{ padding: 12 }}>
+          <SheetGrid sheet={sheet} />
         </div>
       </div>
 
