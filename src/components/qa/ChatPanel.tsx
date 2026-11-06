@@ -327,8 +327,8 @@ export function ChatPanel({
   }, []);
 
   // ----- 智能填表状态机（流式：表格逐行填充、阶段随进度切换、思考节点按比例推进） -----
-  // 填表抽屉（计时器与上下文 ref 见上方状态声明区）；exportSignal 递增触发导出弹窗
-  const [fillDrawer, setFillDrawer] = useState<{ open: boolean; msgId: string | null; exportSignal: number }>({ open: false, msgId: null, exportSignal: 0 });
+  // 填表抽屉（计时器与上下文 ref 见上方状态声明区）；下载直接导出，不经抽屉
+  const [fillDrawer, setFillDrawer] = useState<{ open: boolean; msgId: string | null }>({ open: false, msgId: null });
 
   // 更新某条消息上的填表任务
   const updateFillCard = useCallback((msgId: string, patch: Partial<FillCardData>) => {
@@ -423,7 +423,7 @@ export function ChatPanel({
         },
       },
     ]);
-    setFillDrawer({ open: true, msgId: fillMsgId, exportSignal: 0 });
+    setFillDrawer({ open: true, msgId: fillMsgId });
     runFillStages(fillMsgId, template, period, text);
   }, [runFillStages]);
 
@@ -448,21 +448,11 @@ export function ChatPanel({
       return;
     }
     beginFillRun(msgId, rec.template, rec.period, rec.text);
-    setFillDrawer({ open: true, msgId, exportSignal: 0 });
+    setFillDrawer({ open: true, msgId });
     runFillStages(msgId, rec.template, rec.period, rec.text);
   }, [beginFillRun, runFillStages, showToast]);
 
-  // 卡片「下载」：打开抽屉并直接弹出「导出报表」弹窗（xlsx，文件名可改）
-  const downloadFill = useCallback((msgId: string) => {
-    const card = messages.find((m) => m.id === msgId)?.fillCard;
-    if (!card || card.status !== "done") {
-      showToast("报表尚未生成完成");
-      return;
-    }
-    setFillDrawer((prev) => ({ open: true, msgId, exportSignal: prev.exportSignal + 1 }));
-  }, [messages, showToast]);
-
-  // 导出报表弹窗确认：按自定义文件名导出全部工作表（保留完整数据与格式）
+  // 直接导出：按报表名导出全部工作表（保留完整数据与格式，浏览器直接下载）
   const exportFill = useCallback(async (msgId: string, name: string) => {
     const card = messages.find((m) => m.id === msgId)?.fillCard;
     if (!card?.tables?.length) {
@@ -476,6 +466,16 @@ export function ChatPanel({
       showToast("导出失败，请重试");
     }
   }, [messages, showToast]);
+
+  // 卡片「下载」：浏览器直接下载 XLSX（无弹窗、不开抽屉）
+  const downloadFill = useCallback((msgId: string) => {
+    const card = messages.find((m) => m.id === msgId)?.fillCard;
+    if (!card || card.status !== "done") {
+      showToast("报表尚未生成完成");
+      return;
+    }
+    exportFill(msgId, card.title);
+  }, [messages, showToast, exportFill]);
 
   // 卡片「分享」：复制报表链接（访问遵循权限控制，更新后展示最新保存版本）
   const shareFill = useCallback((msgId: string) => {
@@ -654,7 +654,7 @@ export function ChatPanel({
           fillFlows.current[doneFill.id] = { ...rec, period: nextPeriod, text };
           beginFillRun(doneFill.id, rec.template, nextPeriod, text);
           updateFillCard(doneFill.id, { period: nextPeriod, edited: true });
-          setFillDrawer({ open: true, msgId: doneFill.id, exportSignal: 0 });
+          setFillDrawer({ open: true, msgId: doneFill.id });
           runFillStages(doneFill.id, rec.template, nextPeriod, text);
           showToast(note);
           return;
@@ -1132,13 +1132,12 @@ export function ChatPanel({
         onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
       />
 
-      {/* 填表抽屉（流式填充/报表预览/执行过程/导出弹窗/分享） */}
+      {/* 填表抽屉（流式填充/报表预览/分享；下载直接导出不经抽屉） */}
       <FillDrawer
         open={fillDrawer.open}
-        onClose={() => setFillDrawer({ open: false, msgId: null, exportSignal: 0 })}
+        onClose={() => setFillDrawer({ open: false, msgId: null })}
         data={messages.find((m) => m.id === fillDrawer.msgId)?.fillCard ?? null}
         fillId={fillDrawer.msgId ?? "fill"}
-        exportSignal={fillDrawer.exportSignal}
         onStop={stopFillGeneration}
         onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
         onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}
@@ -1223,7 +1222,7 @@ export function ChatPanel({
                     showToast("链接已复制");
                   }}
                   onRetryReport={retryReportGeneration}
-                  onOpenFill={(id) => setFillDrawer({ open: true, msgId: id, exportSignal: 0 })}
+                  onOpenFill={(id) => setFillDrawer({ open: true, msgId: id })}
                   onDownloadFill={downloadFill}
                   onShareFill={shareFill}
                   onRetryFill={retryFillGeneration}

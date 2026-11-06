@@ -1,7 +1,7 @@
 "use client";
 
 // 对话内填表任务卡片：生成中（标题 + 标题下灰字「正在生成... · 阶段」）/ 已完成（标题下灰字
-// 「生成已完成 ｜ 统计周期」，hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（保留已填充部分，
+// 「生成已完成」，hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（保留已填充部分，
 // 可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
 import type { FillCardData } from "@/types";
 import { Spinner } from "@/components/ui/Spinner";
@@ -15,7 +15,7 @@ export function FillCard({
 }: {
   data: FillCardData;
   onOpen: () => void;
-  onDownload: () => void; // 打开导出报表弹窗（xlsx）
+  onDownload: () => void; // 直接导出 XLSX（浏览器下载，无弹窗）
   onShare: () => void;    // 复制分享链接
   onRetry: () => void;    // 失败/停止后重新生成
 }) {
@@ -55,7 +55,7 @@ export function FillCard({
         )}
       </div>
 
-      {/* 状态：标题下灰色文字（生成中含当前阶段；完成含统计周期与对话修改标记） */}
+      {/* 状态：标题下灰色文字（生成中含当前阶段；完成态不再展示统计周期） */}
       {task.status === "generating" && (
         <p className="mt-1 pl-7 flex items-center gap-1.5 text-xs text-gray-400">
           <Spinner size="sm" /> 正在生成... {task.stage ? `· ${task.stage}` : ""}
@@ -63,7 +63,7 @@ export function FillCard({
       )}
       {task.status === "done" && (
         <p className="mt-1 pl-7 text-xs text-gray-400">
-          生成已完成{task.period ? ` ｜ 统计周期：${task.period}` : ""}{task.edited ? " ｜ 已按对话修改" : ""}
+          生成已完成{task.edited ? " ｜ 已按对话修改" : ""}
         </p>
       )}
       {task.status === "stopped" && (

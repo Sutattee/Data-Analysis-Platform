@@ -44,7 +44,7 @@ function nodeIcon(status: string): string {
 }
 
 // 思考过程折叠面板（普通回答 / 大纲卡片 / 报告卡片共用）：Agent 执行流程时间线，
-// 生成中标题「思考中...」，其余「已完成思考」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
+// 生成中标题「思考中...」，其余「思考过程」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
 function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: boolean }) {
   const [show, setShow] = useState(false);
   // 总用时：各步骤耗时求和（节点未带耗时不展示）
@@ -56,7 +56,7 @@ function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: b
         className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
       >
         <span className="text-gray-700 flex items-center gap-1">
-          {QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "已完成思考"}
+          {QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "思考过程"}
           {!running && totalMs > 0 && <span className="text-gray-400"> · 用时{(totalMs / 1000).toFixed(2)}秒</span>}
         </span>
         <span

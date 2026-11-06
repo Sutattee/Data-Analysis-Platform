@@ -2,10 +2,12 @@
 
 // 报告抽屉（右侧滑出，复用 ui/Drawer）：
 // 生成中 = 流式输出页（顶部阶段状态条 + 正文逐字增长 + 末尾闪烁光标；AI撰写中.../停止生成）；
-// 完成 = 报告页（正文 markdown 渲染；左侧悬浮目录按钮 hover 展开点击定位；
+// 完成 = 报告页（正文 markdown 渲染 + 按章节标题关键词随文插入柱状/折线图表；
+//        左侧悬浮目录按钮 hover 展开点击定位；
 //        右上角：下载 / 分享——思考过程在对话页消息卡片上方查看，抽屉内不再提供入口）；
 // 失败 = 失败原因 + 重新生成。
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Drawer } from "@/components/ui/Drawer";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
@@ -84,12 +86,101 @@ function MdBlock({ lines, idx }: { lines: string[]; idx: number }) {
   return <p className="text-sm text-gray-700 leading-relaxed my-1.5" dangerouslySetInnerHTML={{ __html: inlineHtml(line) }} />;
 }
 
-function MiniMarkdown({ md }: { md: string }) {
+// ---------- 报告随文图表：按章节标题关键词在对应标题块后插入可视化图表（每条规则全文至多一次） ----------
+// 图表数据与报告正文数值锚点同源（29.8 kgce/箱、98.6%、408 元/箱、机台完成率/效率等）
+type ReportChartRule = {
+  key: string;
+  match: RegExp; // 章节（## / ###）标题关键词
+  title: string;
+  kind: "bar" | "line";
+  xKey: string;
+  yKey: string;
+  data: Record<string, string | number>[];
+};
+
+const REPORT_CHART_RULES: ReportChartRule[] = [
+  { key: "energy-trend", match: /综合能耗|能源消耗|能源与费用/, title: "单箱综合能耗趋势（kgce/箱）", kind: "line", xKey: "月份", yKey: "综合能耗", data: [
+    { 月份: "5月", 综合能耗: 30.6 }, { 月份: "6月", 综合能耗: 30.4 }, { 月份: "7月", 综合能耗: 30.1 },
+    { 月份: "8月", 综合能耗: 30.2 }, { 月份: "9月", 综合能耗: 30.0 }, { 月份: "10月", 综合能耗: 29.8 },
+  ] },
+  { key: "process-energy", match: /能源结构|分项能耗|各车间|电耗/, title: "分工序单箱综合能耗（kgce/箱）", kind: "bar", xKey: "工序", yKey: "单箱能耗", data: [
+    { 工序: "制丝", 单箱能耗: 4.5 }, { 工序: "卷接", 单箱能耗: 3.6 }, { 工序: "包装", 单箱能耗: 2.3 }, { 工序: "动力", 单箱能耗: 1.5 },
+  ] },
+  { key: "production", match: /生产完成|生产运行|产量与达成/, title: "部分机台月度计划完成率（%）", kind: "bar", xKey: "机台", yKey: "完成率", data: [
+    { 机台: "1#", 完成率: 100.0 }, { 机台: "5#", 完成率: 98.4 }, { 机台: "8#", 完成率: 93.1 }, { 机台: "12#", 完成率: 92.0 },
+  ] },
+  { key: "quality", match: /质量指标|工艺质量|优质品率/, title: "各工序优质品率（%）", kind: "bar", xKey: "工序", yKey: "优质品率", data: [
+    { 工序: "成品", 优质品率: 98.6 }, { 工序: "制丝", 优质品率: 94.8 }, { 工序: "卷接", 优质品率: 92.5 }, { 工序: "包装", 优质品率: 91.2 },
+  ] },
+  { key: "defect", match: /缺陷/, title: "缺陷类型分布（条）", kind: "bar", xKey: "类型", yKey: "数量", data: [
+    { 类型: "空头", 数量: 16 }, { 类型: "漏气", 数量: 11 }, { 类型: "皱褶", 数量: 8 }, { 类型: "其他", 数量: 23 },
+  ] },
+  { key: "cost", match: /费用|成本|辅料/, title: "单箱可控费用趋势（元/箱）", kind: "line", xKey: "月份", yKey: "可控费用", data: [
+    { 月份: "5月", 可控费用: 372 }, { 月份: "6月", 可控费用: 381 }, { 月份: "7月", 可控费用: 390 },
+    { 月份: "8月", 可控费用: 396 }, { 月份: "9月", 可控费用: 401 }, { 月份: "10月", 可控费用: 408 },
+  ] },
+  { key: "device", match: /设备|机台运行|运行效率|台时产量/, title: "主要机台运行效率（%）", kind: "bar", xKey: "机台", yKey: "运行效率", data: [
+    { 机台: "卷接机1号", 运行效率: 90.1 }, { 机台: "卷接机2号", 运行效率: 89.2 }, { 机台: "包装机1号", 运行效率: 88.4 }, { 机台: "包装机2号", 运行效率: 86.8 },
+  ] },
+];
+
+// 标题块关键词命中 → 该标题块后插入图表（每条规则全文至多一次；一级章节先出现先占用）
+function chartForBlocks(md: string): Map<number, ReportChartRule> {
+  const result = new Map<number, ReportChartRule>();
+  const used = new Set<string>();
+  for (const b of splitMdBlocks(md)) {
+    const h = (b.lines[0] ?? "").match(/^#{2,4}\s+(.*)$/); // 只挂 ##/### 章节（# 大标题不配图）
+    if (!h) continue;
+    for (const rule of REPORT_CHART_RULES) {
+      if (!used.has(rule.key) && rule.match.test(h[1])) {
+        result.set(b.idx, rule);
+        used.add(rule.key);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// 图表卡片：标题 + Recharts 柱状/折线（单系列、主色 blue-600，与平台图表观感一致）
+function ReportChartCard({ rule }: { rule: ReportChartRule }) {
+  return (
+    <div className="my-3 border border-gray-100 rounded-lg bg-white p-3" aria-label={`报告图表：${rule.title}`}>
+      <p className="text-xs font-medium text-gray-600 mb-1.5">{rule.title}</p>
+      <ResponsiveContainer width="100%" height={180}>
+        {rule.kind === "bar" ? (
+          <BarChart data={rule.data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey={rule.xKey} tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Bar isAnimationActive animationDuration={900} animationEasing="ease-out" dataKey={rule.yKey} fill="#2563eb" radius={[4, 4, 0, 0]} barSize={22} />
+          </BarChart>
+        ) : (
+          <LineChart data={rule.data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey={rule.xKey} tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey={rule.yKey} stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+          </LineChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function MiniMarkdown({ md, withCharts = false }: { md: string; withCharts?: boolean }) {
   const blocks = useMemo(() => splitMdBlocks(md), [md]);
+  // 随文图表插入点（仅完成态启用；流式生成中不插，避免图表随文字闪动）
+  const charts = useMemo(() => (withCharts ? chartForBlocks(md) : null), [md, withCharts]);
   return (
     <div className="report-md">
       {blocks.map((b) => (
-        <MdBlock key={b.idx} lines={b.lines} idx={b.idx} />
+        <Fragment key={b.idx}>
+          <MdBlock lines={b.lines} idx={b.idx} />
+          {charts?.has(b.idx) ? <ReportChartCard rule={charts.get(b.idx)!} /> : null}
+        </Fragment>
       ))}
     </div>
   );
@@ -325,9 +416,9 @@ export function ReportDrawer({
         {/* ===== 报告内容页 ===== */}
         {task?.status === "done" && (
           <div className="relative h-full flex flex-col">
-            {/* 正文区：markdown 渲染 */}
+            {/* 正文区：markdown 渲染 + 章节随文图表 */}
             <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
-              <MiniMarkdown md={task.content ?? ""} />
+              <MiniMarkdown md={task.content ?? ""} withCharts />
             </div>
 
             {/* 左侧悬浮目录按钮：hover 提示并自动展开，点击条目定位 */}
