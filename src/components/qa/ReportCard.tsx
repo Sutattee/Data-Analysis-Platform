@@ -37,20 +37,20 @@ export function ReportCard({
         >
           {task.title}
         </button>
-        {/* 行尾组：hover 浮现下载/分享（与标题同行，卡片高度不变） */}
-        <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+        {/* 行尾组：恒占位 + hover 显现（opacity 过渡），行高与卡片高度固定不变 */}
+        <div className="ml-auto flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           {task.status === "done" && (
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                className="hidden group-hover:block px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
+                className="px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
                 title="下载报告文档"
               >
                 ⬇ 下载
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onShare(); }}
-                className="hidden group-hover:block px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
+                className="px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
                 title="复制分享链接"
               >
                 🔗 分享

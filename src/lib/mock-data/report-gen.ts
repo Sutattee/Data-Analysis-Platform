@@ -453,8 +453,8 @@ export type ReportGenMode = "template" | "outline" | "conversation";
  * 判定一条输入是否走报告生成、走哪种方式：
  * 1. 已手动选择模板 → template（方式一：按固定规则生成）
  * 2. 文本含会话引用词 +「报告」→ conversation（方式三：整理当前对话分析结果）
- * 3. 命中模板关键词（含「报告」或已选报告生成技能）→ template（方式一：关键词触发）
- * 4. 报告生成技能选中 → outline（方式二：按要求生成，先出大纲）
+ * 3. 其余（含命中模板关键词、报告生成技能选中）→ outline（方式二：先出大纲，
+ *    待用户修改/确认后再生成完整报告——未手动选模板不直接出完整报告）
  */
 export function classifyReportRequest(
   text: string,
@@ -465,8 +465,7 @@ export function classifyReportRequest(
   const refsConversation = CONVERSATION_REF_WORDS.some((w) => text.includes(w));
   if (mentionsReport && refsConversation) return "conversation";
   const hit = matchTemplateByKeyword(text);
-  if (hit && (mentionsReport || opts.skillOn)) return "template";
-  if (opts.skillOn) return "outline";
+  if ((hit && mentionsReport) || opts.skillOn) return "outline";
   return null;
 }
 

@@ -38,15 +38,15 @@ export const mockKnowledgeDocs: KnowledgeDoc[] = [
   { id: "kd6", title: "节能降耗与碳排放管理方案", category: "工作方案", uploadDate: "2026-07-05", status: "indexed" },
 ];
 
-// AI技能（数组顺序即选择菜单的展示顺序：智能填表、知识问答置顶，其余保持原相对顺序）
+// AI技能（数组顺序即选择菜单的展示顺序：智能问数 → 归因分析 → 预测分析 → 报告生成 → 智能填表 → 知识问答）
 export const mockAiSkills: AiSkill[] = [
-  { id: "as9", name: "智能填表", description: "基于报表模板自动查询数据并生成XLSX报表", enabled: true },
-  { id: "as6", name: "知识问答", description: "基于企业知识库的问答", enabled: true },
   { id: "as1", name: "智能问数", description: "自然语言查询生产、质量、能耗等数据", enabled: true },
   { id: "as2", name: "归因分析", description: "多维下钻定位KPI波动根因", enabled: true },
   { id: "as3", name: "预测分析", description: "基于时序模型预测生产趋势", enabled: true },
   { id: "as4", name: "异常检测", description: "实时监控数据异常并告警", enabled: true },
   { id: "as5", name: "报告生成", description: "自动撰写数据分析报告", enabled: true },
+  { id: "as9", name: "智能填表", description: "基于报表模板自动查询数据并生成XLSX报表", enabled: true },
+  { id: "as6", name: "知识问答", description: "基于企业知识库的问答", enabled: true },
   { id: "as7", name: "智能调度", description: "AI辅助生产排程优化", enabled: false },
   { id: "as8", name: "图像质检", description: "基于CV的产品表面缺陷检测", enabled: false },
 ];

@@ -43,7 +43,6 @@ import { FillDrawer } from "./FillDrawer";
 import { QA_TOOLBAR_ICONS } from "@/components/layout/NavIcon";
 import { AnalystAvatar } from "./AnalystAvatar";
 import { Spinner } from "@/components/ui/Spinner";
-import { Modal } from "@/components/ui/Modal";
 
 // ---------- 数据准备 ----------
 const allTables = dataModels.flatMap((dm) =>
@@ -122,10 +121,9 @@ export function ChatPanel({
   const [selectedModel, setSelectedModel] = useState("deepseek");
 
   // ----- 弹窗 / 下拉菜单 -----
-  // 选择器下拉菜单（无遮罩层）：null 关闭；"model" 数据范围；"kb" 知识库；"skill" 技能
-  const [openMenu, setOpenMenu] = useState<"model" | "kb" | "skill" | null>(null);
+  // 选择器下拉菜单（无遮罩层）：null 关闭；"model" 数据范围；"kb" 知识库；"skill" 技能；"modelSwitch" 切换大模型
+  const [openMenu, setOpenMenu] = useState<"model" | "kb" | "skill" | "modelSwitch" | null>(null);
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [showModelSwitch, setShowModelSwitch] = useState(false);
 
   // ----- Toast -----
   const [toast, setToast] = useState<string | null>(null);
@@ -848,10 +846,10 @@ export function ChatPanel({
       <div className="relative" ref={(el) => { menuRefs.current.model = el; }}>
         <button
           onClick={() => setOpenMenu(openMenu === "model" ? null : "model")}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition-colors ${
             selectedModels.length > 0
-              ? "bg-primary-50 text-primary-600 border-primary-200"
-              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
+              ? "bg-primary-50 text-primary-600"
+              : "bg-white text-gray-500 hover:bg-gray-50 active:scale-95"
           }`}
         >
           {QA_TOOLBAR_ICONS.model} {modelLabel} ▾
@@ -869,10 +867,10 @@ export function ChatPanel({
       <div className="relative" ref={(el) => { menuRefs.current.kb = el; }}>
         <button
           onClick={() => setOpenMenu(openMenu === "kb" ? null : "kb")}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition-colors ${
             selectedKbs.length > 0
-              ? "bg-blue-50 text-blue-600 border-blue-200"
-              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95"
+              ? "bg-blue-50 text-blue-600"
+              : "bg-white text-gray-500 hover:bg-gray-50 active:scale-95"
           }`}
         >
           {QA_TOOLBAR_ICONS.knowledge} {kbLabel} ▾
@@ -900,7 +898,7 @@ export function ChatPanel({
         {selectedSkillTag ? (
           /* 已选技能：标签展示在「技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
           <span
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-green-50 text-green-600 border-green-200"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-green-50 text-green-600"
             title={`已选技能：${selectedSkillTag.name}`}
           >
             <Sparkles size={13} className="flex-shrink-0" /> {selectedSkillTag.name}
@@ -915,7 +913,7 @@ export function ChatPanel({
         ) : (
           <button
             onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
           >
             <Sparkles size={13} className="text-gray-600" /> 技能
           </button>
@@ -950,7 +948,7 @@ export function ChatPanel({
       {/* 「+」上传填报文件：位于技能与模板之间；选中后展示文件名标签，可移除，发送后按通用对标表结构智能填表 */}
       {uploadFile ? (
         <span
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-amber-50 text-amber-600 border-amber-200 max-w-[220px]"
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-amber-50 text-amber-600 max-w-[220px]"
           title={`已上传填报文件：${uploadFile.name}`}
         >
           <FileText size={13} className="flex-shrink-0" />
@@ -968,7 +966,7 @@ export function ChatPanel({
           onClick={() => uploadInputRef.current?.click()}
           aria-label="上传报表文件"
           title="上传 XLSX 报表模板并填报"
-          className="inline-flex items-center justify-center w-7 h-7 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+          className="inline-flex items-center justify-center w-7 h-7 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
         >
           <Plus size={13} className="text-gray-600" />
         </button>
@@ -986,7 +984,7 @@ export function ChatPanel({
       {/* 模板：位于「+」与切换大模型之间；选中后展示模板名标签，可取消 */}
       {reportTemplate ? (
         <span
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-primary-50 text-primary-600 border-primary-200"
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-primary-50 text-primary-600"
           title={`已选模板：${reportTemplate.name}`}
         >
           <FileText size={13} className="flex-shrink-0" /> {reportTemplate.name}
@@ -1001,18 +999,45 @@ export function ChatPanel({
       ) : (
         <button
           onClick={() => setShowTemplateModal(true)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
           title="选择报告模板"
         >
           <FileText size={13} className="text-gray-600" /> 模板
         </button>
       )}
-      <button
-        onClick={() => setShowModelSwitch(true)}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border bg-white text-gray-500 border-gray-200 hover:border-gray-300 active:scale-95 transition-colors"
-      >
-        {QA_TOOLBAR_ICONS.modelSwitch} {currentModelName} ▾
-      </button>
+      {/* 切换大模型：按钮上方滑出菜单（与技能菜单同构，无中央弹窗） */}
+      <div className="relative" ref={(el) => { menuRefs.current.modelSwitch = el; }}>
+        <button
+          onClick={() => setOpenMenu(openMenu === "modelSwitch" ? null : "modelSwitch")}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
+        >
+          {QA_TOOLBAR_ICONS.modelSwitch} {currentModelName} ▾
+        </button>
+        {openMenu === "modelSwitch" && (
+          <div className="absolute left-0 bottom-full z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+            <div className="border-b border-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">切换大模型</div>
+            <div className="mt-1 space-y-0.5">
+              {MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setSelectedModel(m.id);
+                    setOpenMenu(null);
+                  }}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
+                    selectedModel === m.id
+                      ? "bg-primary-50"
+                      : "hover:bg-gray-50 active:scale-[0.99]"
+                  }`}
+                >
+                  <div className="text-sm font-medium text-gray-800">{m.name}</div>
+                  <div className="text-xs text-gray-400">{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1082,33 +1107,6 @@ export function ChatPanel({
           {toast}
         </div>
       )}
-
-      {/* 模型切换弹窗 */}
-      <Modal
-        open={showModelSwitch}
-        onClose={() => setShowModelSwitch(false)}
-        title="切换大模型"
-      >
-        <div className="space-y-2">
-          {MODELS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => {
-                setSelectedModel(m.id);
-                setShowModelSwitch(false);
-              }}
-              className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                selectedModel === m.id
-                  ? "border-primary-500 bg-primary-50"
-                  : "border-gray-100 hover:border-gray-300 active:scale-95"
-              }`}
-            >
-              <div className="text-sm font-medium text-gray-800">{m.name}</div>
-              <div className="text-xs text-gray-500">{m.desc}</div>
-            </button>
-          ))}
-        </div>
-      </Modal>
 
       {/* 选择模板弹窗：按技能锁定模板类型（报告生成→仅分析报告模板；智能填表→仅Excel报表模版） */}
       <TemplatePickerModal
