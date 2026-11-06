@@ -3,6 +3,8 @@
 // 选择模板弹窗：顶部 tab（分析报告模板 / Excel报表模版）+ 业务域筛选，
 // 下方左右分区（约1:2，分割线区分）：左=模板目录列表，右=模板内容预览
 // （Excel 模板用工作表只读预览）；右下角「取消」（灰线框）+「使用模板」（蓝）。
+// kindFilter 按技能过滤模板类型（报告生成→仅分析报告模板；智能填表→仅Excel报表模版），
+// 传入时隐藏 tab 切换行只展示对应类型；不传则双 tab 完整展示。
 import { useEffect, useState } from "react";
 import type { ReportTemplateItem } from "@/types";
 import { REPORT_TEMPLATES_ANALYSIS, REPORT_TEMPLATES_EXCEL } from "@/lib/mock-data/report-gen";
@@ -21,23 +23,25 @@ export function TemplatePickerModal({
   open,
   onClose,
   onSelect,
+  kindFilter,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (t: ReportTemplateItem) => void;
+  kindFilter?: TemplateKind; // 按技能锁定展示的模板类型（不传=双 tab 全展示）
 }) {
   const [kind, setKind] = useState<TemplateKind>("analysis");
   const [selected, setSelected] = useState<ReportTemplateItem | null>(null);
   const [domain, setDomain] = useState("全部");
 
-  // 打开时重置到分析模板 tab 并清空选中与业务域筛选
+  // 打开时重置（有类型过滤时锁定到该类型）并清空选中与业务域筛选
   useEffect(() => {
     if (open) {
-      setKind("analysis");
+      setKind(kindFilter ?? "analysis");
       setSelected(null);
       setDomain("全部");
     }
-  }, [open]);
+  }, [open, kindFilter]);
 
   // ESC 关闭
   useEffect(() => {
@@ -48,6 +52,9 @@ export function TemplatePickerModal({
   }, [open, onClose]);
 
   if (!open) return null;
+
+  // 类型过滤：只展示锁定的 tab；否则双 tab（单 tab 时不渲染 tab 切换按钮，仅保留业务域筛选）
+  const tabs = kindFilter ? TABS.filter((t) => t.key === kindFilter) : TABS;
 
   // 内置模板 + 启用中的上传模板（管理后台上传并启用后在此可选，停用/删除后不再提供）
   const allOfKind = [
@@ -81,9 +88,9 @@ export function TemplatePickerModal({
           </button>
         </div>
 
-        {/* tab 页签 + 业务域筛选（右侧） */}
+        {/* tab 页签 + 业务域筛选（右侧）；按技能锁定类型时无 tab 切换、仅展示对应模板 */}
         <div className="flex items-center gap-6 px-5 border-b border-gray-100 flex-shrink-0">
-          {TABS.map((t) => (
+          {tabs.length > 1 && tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => { setKind(t.key); setSelected(null); setDomain("全部"); }}

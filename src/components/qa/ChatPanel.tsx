@@ -591,10 +591,11 @@ export function ChatPanel({
       }
 
       // ===== 智能填表分支（技能选中时优先于报告与普通问答）=====
-      // 补充/修改已有报表 > 匹配模板新生成 > 引导补充模板名称
+      // 补充/修改已有报表 > 已选模板直接生成 > 文本匹配模板新生成 > 引导补充模板名称
       if (fillSkillOn) {
         const doneFill = [...messages].reverse().find((m) => m.fillCard?.status === "done");
-        const fillTpl = matchFillTemplate(text);
+        // 已选模板优先（含分析类模板：按通用对标表结构填报），避免文本匹配不上时误报未识别
+        const fillTpl = reportTemplate ?? matchFillTemplate(text);
         if (doneFill?.fillCard && isFillEditIntent(text) && (!fillTpl || fillTpl.id === doneFill.fillCard.templateId)) {
           // 对话式修改：识别周期调整/补充要求，重跑该卡片并标记已按对话修改
           postUserMessage(text);
@@ -643,6 +644,11 @@ export function ChatPanel({
       }
       const mode = classifyReportRequest(text, { skillOn: reportSkillOn, template: reportTemplate });
       if (mode) {
+        // Excel 报表模板用于智能填表（生成 XLSX），不支持按报告大纲生成分析报告：引导改选
+        if (reportTemplate?.kind === "excel") {
+          showToast("已选 Excel 报表模板，请切换到「智能填表」技能生成报表，或改选分析报告模板");
+          return;
+        }
         const turnCount = countUserTurns();
         postUserMessage(text);
         if (mode === "template") {
@@ -1027,7 +1033,7 @@ export function ChatPanel({
         </div>
       </Modal>
 
-      {/* 选择模板弹窗 */}
+      {/* 选择模板弹窗：按技能锁定模板类型（报告生成→仅分析报告模板；智能填表→仅Excel报表模版） */}
       <TemplatePickerModal
         open={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
@@ -1035,6 +1041,7 @@ export function ChatPanel({
           setReportTemplate(t);
           setShowTemplateModal(false);
         }}
+        kindFilter={fillSkillOn ? "excel" : reportSkillOn ? "analysis" : undefined}
       />
 
       {/* 报告抽屉（进度/报告内容/思考过程/导出/分享） */}
