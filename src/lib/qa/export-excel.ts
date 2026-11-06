@@ -102,9 +102,10 @@ function displayWidth(s: string): number {
 
 /**
  * 导出为 .xlsx 并触发浏览器下载：每表一个 Sheet（首行为表头），列宽按内容自适应。
+ * exactName 传入时直接作为文件名（导出报表弹窗自定义文件名），否则按「问数结果_时间戳」命名。
  * 返回 Promise，失败由调用方捕获提示。
  */
-export async function exportTablesToExcel(tables: ExportTable[], fileTitle?: string): Promise<void> {
+export async function exportTablesToExcel(tables: ExportTable[], fileTitle?: string, exactName?: string): Promise<void> {
   // 先让出主线程，确保「导出中」状态先渲染出来
   await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -126,7 +127,9 @@ export async function exportTablesToExcel(tables: ExportTable[], fileTitle?: str
   const now = new Date();
   const pad = (n: number) => (n < 10 ? "0" + n : "" + n);
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const filename = `${fileTitle ? fileTitle.slice(0, 40) + "_" : ""}问数结果_${stamp}.xlsx`;
+  const filename = exactName
+    ? `${exactName.trim().replace(/\.xlsx$/i, "").slice(0, 60) || "报表"}.xlsx`
+    : `${fileTitle ? fileTitle.slice(0, 40) + "_" : ""}问数结果_${stamp}.xlsx`;
   // await 确保（异步实现下的）写出失败能传导到调用方 catch，供失败提示与重试
   await XLSX.writeFile(wb, filename);
 }

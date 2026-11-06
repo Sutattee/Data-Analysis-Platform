@@ -115,6 +115,7 @@ interface MessageBubbleProps {
   // 填表卡片事件：由 ChatPanel 统一处理状态机
   onOpenFill?: (msgId: string) => void;
   onDownloadFill?: (msgId: string) => void;
+  onShareFill?: (msgId: string) => void;
   onRetryFill?: (msgId: string) => void;
 }
 
@@ -133,6 +134,7 @@ export function MessageBubble({
   onRetryReport,
   onOpenFill,
   onDownloadFill,
+  onShareFill,
   onRetryFill,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
@@ -228,8 +230,8 @@ export function MessageBubble({
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      {/* 大纲确认卡片铺满中间内容区；报告任务卡片加宽到 90%（普通气泡仍 78%） */}
-      <div className={`${message.reportCard?.kind === "outline" ? "w-full" : message.reportCard ? "max-w-[90%]" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
+      {/* 大纲确认卡片铺满中间内容区；报告/填表卡片加宽到 95%（普通气泡仍 78%） */}
+      <div className={`${message.reportCard?.kind === "outline" ? "w-full" : message.reportCard || message.fillCard ? "max-w-[95%]" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
         {/* 头像（无时间戳） */}
         <div className="flex items-center gap-2 mb-1">
           <span
@@ -270,14 +272,23 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* ===== 填表卡片消息：不套普通气泡与操作栏 ===== */}
+        {/* ===== 填表卡片消息：不套普通气泡与操作栏（Agent 执行流程挂卡片上方，生成中实时推进） ===== */}
         {!isUser && message.fillCard && (
-          <FillCard
-            data={message.fillCard}
-            onOpen={() => onOpenFill?.(message.id)}
-            onDownload={() => onDownloadFill?.(message.id)}
-            onRetry={() => onRetryFill?.(message.id)}
-          />
+          <div className="space-y-1.5">
+            {message.fillCard.thinking?.length ? (
+              <ThinkingPanel
+                nodes={message.fillCard.thinking}
+                running={message.fillCard.status === "generating"}
+              />
+            ) : null}
+            <FillCard
+              data={message.fillCard}
+              onOpen={() => onOpenFill?.(message.id)}
+              onDownload={() => onDownloadFill?.(message.id)}
+              onShare={() => onShareFill?.(message.id)}
+              onRetry={() => onRetryFill?.(message.id)}
+            />
+          </div>
         )}
 
         {/* ===== AI 回答区 ===== */}

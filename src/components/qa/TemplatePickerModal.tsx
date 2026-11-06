@@ -119,15 +119,13 @@ export function TemplatePickerModal({
                   <span className="text-sm font-medium text-gray-800 truncate">{t.kind === "excel" ? "📊" : "📄"} {t.name}</span>
                   <span className="ml-auto flex-shrink-0 text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{t.domain ?? "通用"}</span>
                 </div>
-                <p className="mt-1 text-xs text-gray-500 line-clamp-2">{t.description}</p>
               </button>
             ))}
           </div>
           <div className="flex-1 min-w-0 overflow-y-auto p-5">
             {selected ? (
               <div>
-                <h4 className="font-semibold text-gray-800 mb-1">{selected.name}</h4>
-                <p className="text-xs text-gray-400 mb-3">{selected.description} ｜ 业务域：{selected.domain ?? "通用"}</p>
+                <h4 className="font-semibold text-gray-800 mb-3">{selected.name}</h4>
                 {selected.kind === "excel" && selected.excelSheets?.length ? (
                   // Excel 模板：工作表只读预览（保留版式，支持页签切换、滚动与缩放）
                   <ExcelPreview sheets={selected.excelSheets} maxHeight={320} />

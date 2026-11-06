@@ -31,7 +31,7 @@ export function listFillTemplateNames(): { name: string; category: string }[] {
 
 // ========== 填报需求解析 ==========
 
-export const FILL_STAGES = ["正在检索报表模板", "正在查询数据", "正在回填数据", "正在校验填报结果"];
+export const FILL_STAGES = ["正在解析模板", "正在查询数据", "正在填充工作表", "正在校验填报结果"];
 
 // 统计周期：文本含「X月」取之，否则默认当月口径（mock 固定 2026年10月）
 export function defaultPeriodOf(text: string): string {
@@ -39,24 +39,37 @@ export function defaultPeriodOf(text: string): string {
   return m ? `2026年${m[0]}` : "2026年10月";
 }
 
-// ========== 填表数据（内置模板按 preview 列结构扩展；上传模板给通用对标表） ==========
+// ========== 填表数据（内置模板按 preview 列结构扩展，可多工作表；上传模板给通用对标表） ==========
 
-const TABLES_BUILTIN: Record<string, FillTable> = {
-  "rg-x-production": {
-    title: "当日产量汇总",
-    headers: ["机台", "工序", "计划产量(箱)", "实际产量(箱)", "达成率"],
-    rows: [
-      ["卷接机1号", "卷接", "1,050", "1,060", "101.0%"],
-      ["卷接机2号", "卷接", "1,050", "1,032", "98.3%"],
-      ["卷接机3号", "卷接", "1,050", "1,058", "100.8%"],
-      ["卷接机4号", "卷接", "1,040", "1,021", "98.2%"],
-      ["包装机1号", "包装", "1,020", "1,015", "99.5%"],
-      ["包装机2号", "包装", "1,020", "1,032", "101.2%"],
-      ["包装机3号", "包装", "1,000", "986", "98.6%"],
-      ["包装机4号", "包装", "1,000", "1,008", "100.8%"],
-    ],
-  },
-  "rg-x-energy": {
+const TABLES_BUILTIN: Record<string, FillTable[]> = {
+  "rg-x-production": [
+    {
+      title: "当日产量汇总",
+      headers: ["机台", "工序", "计划产量(箱)", "实际产量(箱)", "达成率"],
+      rows: [
+        ["卷接机1号", "卷接", "1,050", "1,060", "101.0%"],
+        ["卷接机2号", "卷接", "1,050", "1,032", "98.3%"],
+        ["卷接机3号", "卷接", "1,050", "1,058", "100.8%"],
+        ["卷接机4号", "卷接", "1,040", "1,021", "98.2%"],
+        ["包装机1号", "包装", "1,020", "1,015", "99.5%"],
+        ["包装机2号", "包装", "1,020", "1,032", "101.2%"],
+        ["包装机3号", "包装", "1,000", "986", "98.6%"],
+        ["包装机4号", "包装", "1,000", "1,008", "100.8%"],
+      ],
+    },
+    {
+      title: "未完成计划明细",
+      headers: ["日期", "机台", "计划产量(箱)", "实际产量(箱)", "缺口(箱)", "原因"],
+      rows: [
+        ["10-18", "卷接机2号", "1,050", "1,032", "18", "车速下调"],
+        ["10-18", "卷接机4号", "1,040", "1,021", "19", "换班停机"],
+        ["10-19", "包装机3号", "1,000", "986", "14", "辅料待料"],
+        ["10-20", "包装机1号", "1,020", "1,015", "5", "设备点检"],
+        ["10-21", "卷接机3号", "1,050", "1,045", "5", "牌号切换"],
+      ],
+    },
+  ],
+  "rg-x-energy": [{
     title: "分工序能耗统计",
     headers: ["工序", "单箱能耗(公斤标煤/箱)", "占比(%)"],
     rows: [
@@ -66,8 +79,8 @@ const TABLES_BUILTIN: Record<string, FillTable> = {
       ["动力", "1.5", "11.7"],
       ["其他", "0.9", "7.0"],
     ],
-  },
-  "rg-x-quality": {
+  }],
+  "rg-x-quality": [{
     title: "批次检验汇总",
     headers: ["批次", "工序", "检验得分", "优质品率(%)"],
     rows: [
@@ -77,8 +90,8 @@ const TABLES_BUILTIN: Record<string, FillTable> = {
       ["20261022-04", "卷接", "95.9", "91.7"],
       ["20261022-05", "包装", "97.4", "96.2"],
     ],
-  },
-  "rg-x-material": {
+  }],
+  "rg-x-material": [{
     title: "辅料消耗统计",
     headers: ["物料类型", "单箱消耗", "单位", "目标", "差距"],
     rows: [
@@ -87,7 +100,7 @@ const TABLES_BUILTIN: Record<string, FillTable> = {
       ["盘纸", "29.8", "米/箱", "30.0", "-0.2"],
       ["商标纸", "2,500", "张/箱", "2,480", "+20"],
     ],
-  },
+  }],
 };
 
 // 上传模板（无解析结构）：通用指标对标表
@@ -104,10 +117,12 @@ const TABLE_GENERIC: FillTable = {
   ],
 };
 
-// 按模板生成填好的表（模板原有结构 + 平台口径数据）
+// 按模板生成填好的表（模板原有结构 + 平台口径数据；可多工作表）
 export function generateFillTables(t: ReportTemplateItem): FillTable[] {
   const builtin = TABLES_BUILTIN[t.id];
-  return [builtin ? { ...builtin } : { ...TABLE_GENERIC, title: `${t.name}·对标` }];
+  return builtin
+    ? builtin.map((tb) => ({ ...tb, rows: tb.rows.map((r) => [...r]) }))
+    : [{ ...TABLE_GENERIC, title: `${t.name}·对标` }];
 }
 
 // ========== 对话式修改（技能未切换时的补充要求与修改指令） ==========
@@ -133,33 +148,58 @@ export function applyFillEdit(period: string, text: string): { period: string; n
 
 // ========== Agent 执行流程思考节点（PRD 流程：Excel报表·智能填表） ==========
 
+// 13 步流程文案（done 全绿与生成中流式推进共用）
+function buildFillSteps(t: ReportTemplateItem, period: string, text: string, tables: FillTable[]): { label: string; detail: string }[] {
+  const rows = tables.reduce((n, tb) => n + tb.rows.length, 0);
+  const cols = tables[0]?.headers.length ?? 0;
+  return [
+    { label: "用户提问", detail: `「${text.slice(0, 60)}」` },
+    { label: "加载会话上下文", detail: "已加载当前会话上下文，用于识别统计对象、指标口径与此前填报结果。" },
+    { label: "意图识别（智能填表：基于报表模板生成）", detail: "判定用户意图为智能填表：按已启用报表模板生成 XLSX 报表。" },
+    { label: "解析填报需求", detail: `报表「${t.name}」，统计周期 ${period}；未明确的统计范围按全厂口径处理。` },
+    { label: "检索并确定报表模板", detail: `在启用中的报表模板中命中「${t.name}」（分类：${t.category}），模板版本 V2.4 已锁定，生成期间不可变更。` },
+    { label: "读取工作表结构、待填位置及取数规则，必要时澄清统计周期和指标口径", detail: `解析模板工作表：${tables.length} 个工作表、${cols} 列字段；统计周期按 ${period} 执行，指标口径沿用平台数据字典。` },
+    { label: "权限校验", detail: "当前用户具备生产、能源、质量、费用域数据的查询与导出权限。" },
+    { label: "任务规划", detail: `拆分 ${tables.length} 个取数任务与 ${rows} 项指标计算任务，独立任务并行执行。` },
+    { label: "查询数据并调用计算工具（独立任务可并行）", detail: "并行连接数据资产：产量与机组效率（生产域）、综合能耗（能源域）、检验与优质品率（质量域）、可控费用与辅料消耗（费用域），取数与计算完成。" },
+    { label: "校验计算结果", detail: "逐项交叉核对：汇总值与明细加总一致，同比/环比与目标对比口径无误。" },
+    { label: "调用报表工具回填数据并更新相关公式", detail: `按模板原有结构回填 ${rows} 行 × ${cols} 列数据，仅填充模板指定区域，表头、合并关系与格式保持不变，合计与达成率等公式已同步更新。` },
+    { label: "校验填报完整性、公式及格式", detail: "待填单元格全部填充，公式计算与数字格式校验通过，无遗漏行列。" },
+    { label: "展示预览并支持下载", detail: "XLSX 报表已生成，支持在抽屉中预览并下载。" },
+  ];
+}
+
+// 执行流程步数（流式推进用）
+export const FILL_FLOW_LENGTH = 13;
+
+// 完成态：全部步骤 ✅
 export function fillThinkingNodes(
   t: ReportTemplateItem,
   period: string,
   text: string,
   tables: FillTable[]
 ): ExecutionNode[] {
-  const rows = tables.reduce((n, tb) => n + tb.rows.length, 0);
-  const cols = tables[0]?.headers.length ?? 0;
-  const steps: { label: string; detail: string }[] = [
-    { label: "用户提问", detail: `「${text.slice(0, 60)}」` },
-    { label: "加载会话上下文", detail: "已加载当前会话上下文，用于识别统计对象、指标口径与此前填报结果。" },
-    { label: "意图识别（智能填表：基于报表模板生成）", detail: "判定用户意图为智能填表：按已启用报表模板生成 XLSX 报表。" },
-    { label: "解析填报需求", detail: `报表「${t.name}」，统计周期 ${period}；未明确的统计范围按全厂口径处理。` },
-    { label: "检索并确定报表模板", detail: `在启用中的报表模板中命中「${t.name}」（分类：${t.category}）。` },
-    { label: "读取工作表结构、待填位置及取数规则，必要时澄清统计周期和指标口径", detail: `解析模板工作表：${tables.length} 个待填区域、${cols} 列字段；统计周期按 ${period} 执行，指标口径沿用平台数据字典。` },
-    { label: "权限校验", detail: "当前用户具备生产、能源、质量、费用域数据的查询与导出权限。" },
-    { label: "任务规划", detail: `拆分 ${tables.length} 个取数任务与 ${rows} 项指标计算任务，独立任务并行执行。` },
-    { label: "查询数据并调用计算工具（独立任务可并行）", detail: "并行连接数据资产：产量与机组效率（生产域）、综合能耗（能源域）、检验与优质品率（质量域）、可控费用与辅料消耗（费用域），取数与计算完成。" },
-    { label: "校验计算结果", detail: "逐项交叉核对：汇总值与明细加总一致，同比/环比与目标对比口径无误。" },
-    { label: "调用报表工具回填数据并更新相关公式", detail: `按模板原有结构回填 ${rows} 行 × ${cols} 列数据，合计与达成率等公式已同步更新。` },
-    { label: "校验填报完整性、公式及格式", detail: "待填单元格全部填充，公式计算与数字格式校验通过，无遗漏行列。" },
-    { label: "展示预览并支持下载", detail: "XLSX 报表已生成，支持在抽屉中预览并下载。" },
-  ];
-  return steps.map((s, i) => ({
+  return buildFillSteps(t, period, text, tables).map((s, i) => ({
     id: `ff-${i + 1}`,
     label: s.label,
     status: "completed" as const,
+    duration: 80 + i * 130,
+    detail: s.detail,
+  }));
+}
+
+// 生成中：前 doneCount 步已完成、当前步执行中（⏳）、其余待执行（○）——随填充进度推进
+export function progressFillNodes(
+  t: ReportTemplateItem,
+  period: string,
+  text: string,
+  tables: FillTable[],
+  doneCount: number
+): ExecutionNode[] {
+  return buildFillSteps(t, period, text, tables).map((s, i) => ({
+    id: `ff-${i + 1}`,
+    label: s.label,
+    status: i < doneCount ? "completed" : i === doneCount ? "running" : "pending",
     duration: 80 + i * 130,
     detail: s.detail,
   }));

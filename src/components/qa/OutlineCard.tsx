@@ -273,11 +273,12 @@ export function OutlineCard({
 
       {expanded && (
         <>
-          {/* 生成要求与参考文件 */}
-          <div className="text-xs text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-2 space-y-1">
-            <p><span className="text-gray-400">生成要求：</span>{outline.requirement}</p>
-            {outline.refFile && <p><span className="text-gray-400">参考文件：</span>{outline.refFile}</p>}
-          </div>
+          {/* 参考文件（生成要求行已按需求移除） */}
+          {outline.refFile && (
+            <div className="text-xs text-gray-500 bg-white border border-gray-100 rounded-lg px-3 py-2">
+              <p><span className="text-gray-400">参考文件：</span>{outline.refFile}</p>
+            </div>
+          )}
 
           {/* 目录树：自动编号（一级 一、二级 1.1），拖拽排序 */}
           <div className="space-y-1.5" aria-label="报告目录">

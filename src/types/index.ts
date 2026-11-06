@@ -145,12 +145,13 @@ export interface FillTable {
 // 对话内填表任务卡片（挂在 QaMessage.fillCard 上，作为会话记录的一部分）
 export interface FillCardData {
   title: string;              // 报表名（模板名）
-  status: "generating" | "done" | "failed";
-  stage?: string;             // 正在检索报表模板 / 正在查询数据 / 正在回填数据 / 正在校验填报结果
+  status: "generating" | "done" | "stopped" | "failed";
+  stage?: string;             // 正在解析模板 / 正在查询数据 / 正在填充工作表 / 正在校验填报结果
   failReason?: string;        // 失败或手动停止的原因
   templateId?: string;        // 使用的报表模板
   period?: string;            // 统计周期（默认 2026年10月）
-  tables?: FillTable[];       // 填好的表
+  progress?: number;          // 已填充数据行数（跨表累计；生成中流式递增，停止时冻结）
+  tables?: FillTable[];       // 填好的表（生成开始即挂载，抽屉按 progress 逐步展示）
   thinking?: ExecutionNode[]; // 智能填表 Agent 执行流程（抽屉内查看）
   edited?: boolean;           // 生成后经对话修改过
 }

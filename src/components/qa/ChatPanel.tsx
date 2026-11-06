@@ -23,11 +23,13 @@ import {
 } from "@/lib/mock-data/report-gen";
 import {
   FILL_STAGES,
+  FILL_FLOW_LENGTH,
   matchFillTemplate,
   listFillTemplateNames,
   defaultPeriodOf,
   generateFillTables,
   fillThinkingNodes,
+  progressFillNodes,
   isFillEditIntent,
   applyFillEdit,
 } from "@/lib/mock-data/fill-form";
@@ -319,9 +321,9 @@ export function ChatPanel({
     setMessages((prev) => [...prev, { id: generateId(), role: "assistant", content: "已停止生成", timestamp: Date.now() }]);
   }, []);
 
-  // ----- 智能填表状态机 -----
-  // 填表抽屉（计时器与上下文 ref 见上方状态声明区）
-  const [fillDrawer, setFillDrawer] = useState<{ open: boolean; msgId: string | null }>({ open: false, msgId: null });
+  // ----- 智能填表状态机（流式：表格逐行填充、阶段随进度切换、思考节点按比例推进） -----
+  // 填表抽屉（计时器与上下文 ref 见上方状态声明区）；exportSignal 递增触发导出弹窗
+  const [fillDrawer, setFillDrawer] = useState<{ open: boolean; msgId: string | null; exportSignal: number }>({ open: false, msgId: null, exportSignal: 0 });
 
   // 更新某条消息上的填表任务
   const updateFillCard = useCallback((msgId: string, patch: Partial<FillCardData>) => {
@@ -330,21 +332,48 @@ export function ChatPanel({
     );
   }, []);
 
-  // 填表阶段轮换：检索模板 → 查询数据 → 回填数据 → 校验结果 → done（填表+执行流程思考节点）
+  // 重置填表任务为生成中初始态（重试/对话修改共用）：挂全量表结构 + 初始思考节点
+  const beginFillRun = useCallback((msgId: string, template: ReportTemplateItem, period: string, text: string) => {
+    const tables = generateFillTables(template);
+    updateFillCard(msgId, {
+      status: "generating",
+      stage: FILL_STAGES[0],
+      failReason: undefined,
+      progress: 0,
+      tables,
+      thinking: progressFillNodes(template, period, text, tables, 0),
+    });
+  }, [updateFillCard]);
+
+  // 流式填充：progress 为已填充行数（跨表累计），300ms 推进一行；
+  // 阶段按进度区间切换（解析模板 → 查询数据 → 填充工作表 → 尾行校验），节点按比例推进，完成后全绿
   const runFillStages = useCallback((fillMsgId: string, template: ReportTemplateItem, period: string, text: string) => {
-    let step = 0;
+    const tables = generateFillTables(template);
+    const total = tables.reduce((n, tb) => n + tb.rows.length, 0);
+    let progress = 0;
     const tick = () => {
-      if (step < FILL_STAGES.length) {
-        updateFillCard(fillMsgId, { stage: FILL_STAGES[step] });
-        step += 1;
-        const t = setTimeout(tick, 500);
+      if (progress < total) {
+        progress += 1;
+        const stage =
+          progress === 1
+            ? FILL_STAGES[0]
+            : progress <= Math.max(2, Math.round(total * 0.3))
+              ? FILL_STAGES[1]
+              : progress < total
+                ? FILL_STAGES[2]
+                : FILL_STAGES[3];
+        const doneCount = Math.min(FILL_FLOW_LENGTH - 1, Math.floor((FILL_FLOW_LENGTH - 1) * (progress / total)));
+        updateFillCard(fillMsgId, {
+          progress,
+          stage,
+          thinking: progressFillNodes(template, period, text, tables, doneCount),
+        });
+        const t = setTimeout(tick, 300);
         fillTimers.current.push(t);
       } else {
-        const tables = generateFillTables(template);
         updateFillCard(fillMsgId, {
           status: "done",
           stage: undefined,
-          tables,
           thinking: fillThinkingNodes(template, period, text, tables),
         });
       }
@@ -352,9 +381,10 @@ export function ChatPanel({
     tick();
   }, [updateFillCard]);
 
-  // 启动智能填表：push 填表任务卡片 + 自动打开抽屉 + 阶段轮换
+  // 启动智能填表：push 填表任务卡片（预挂全量表结构，progress 从 0 流式推进）+ 自动打开抽屉
   const startFillFlow = useCallback((template: ReportTemplateItem, text: string) => {
     const period = defaultPeriodOf(text);
+    const tables = generateFillTables(template);
     const fillMsgId = generateId();
     fillFlows.current[fillMsgId] = { template, period, text };
     setMessages((prev) => [
@@ -364,52 +394,77 @@ export function ChatPanel({
         role: "assistant",
         content: "",
         timestamp: Date.now(),
-        fillCard: { title: template.name, status: "generating", stage: FILL_STAGES[0], templateId: template.id, period },
+        fillCard: {
+          title: template.name,
+          status: "generating",
+          stage: FILL_STAGES[0],
+          templateId: template.id,
+          period,
+          progress: 0,
+          tables,
+          thinking: progressFillNodes(template, period, text, tables, 0),
+        },
       },
     ]);
-    setFillDrawer({ open: true, msgId: fillMsgId });
+    setFillDrawer({ open: true, msgId: fillMsgId, exportSignal: 0 });
     runFillStages(fillMsgId, template, period, text);
   }, [runFillStages]);
 
-  // 停止填表：清全部阶段计时器，标记当前生成中的任务为失败
+  // 停止填表：清计时器，冻结进度保留已填充部分（标记已停止，可重新生成）
   const stopFillGeneration = useCallback(() => {
     fillTimers.current.forEach(clearTimeout);
     fillTimers.current = [];
     setMessages((prev) =>
       prev.map((m) =>
         m.fillCard?.status === "generating"
-          ? { ...m, fillCard: { ...m.fillCard, status: "failed", failReason: "已手动停止生成" } }
+          ? { ...m, fillCard: { ...m.fillCard, status: "stopped", stage: undefined } }
           : m
       )
     );
   }, []);
 
-  // 失败后重新生成：按原模板与周期重跑
+  // 停止/失败后重新生成：重置为初始态重跑
   const retryFillGeneration = useCallback((msgId: string) => {
     const rec = fillFlows.current[msgId];
     if (!rec) {
       showToast("未找到填报上下文，请重新发起智能填表");
       return;
     }
-    updateFillCard(msgId, { status: "generating", failReason: undefined, stage: FILL_STAGES[0] });
-    setFillDrawer({ open: true, msgId });
+    beginFillRun(msgId, rec.template, rec.period, rec.text);
+    setFillDrawer({ open: true, msgId, exportSignal: 0 });
     runFillStages(msgId, rec.template, rec.period, rec.text);
-  }, [runFillStages, showToast, updateFillCard]);
+  }, [beginFillRun, runFillStages, showToast]);
 
-  // 下载 XLSX：按卡片内填好的表导出
-  const downloadFill = useCallback(async (msgId: string) => {
+  // 卡片「下载」：打开抽屉并直接弹出「导出报表」弹窗（xlsx，文件名可改）
+  const downloadFill = useCallback((msgId: string) => {
+    const card = messages.find((m) => m.id === msgId)?.fillCard;
+    if (!card || card.status !== "done") {
+      showToast("报表尚未生成完成");
+      return;
+    }
+    setFillDrawer((prev) => ({ open: true, msgId, exportSignal: prev.exportSignal + 1 }));
+  }, [messages, showToast]);
+
+  // 导出报表弹窗确认：按自定义文件名导出全部工作表（保留完整数据与格式）
+  const exportFill = useCallback(async (msgId: string, name: string) => {
     const card = messages.find((m) => m.id === msgId)?.fillCard;
     if (!card?.tables?.length) {
       showToast("报表尚未生成完成");
       return;
     }
     try {
-      await exportTablesToExcel(card.tables, card.title);
-      showToast("XLSX报表导出成功");
+      await exportTablesToExcel(card.tables, undefined, name);
+      showToast("Excel报表导出成功");
     } catch {
       showToast("导出失败，请重试");
     }
   }, [messages, showToast]);
+
+  // 卡片「分享」：复制报表链接（访问遵循权限控制，更新后展示最新保存版本）
+  const shareFill = useCallback((msgId: string) => {
+    try { navigator.clipboard?.writeText(`https://shifang.example.com/f/${msgId}`); } catch { /* 剪贴板不可用时静默 */ }
+    showToast("链接已复制，报表更新后链接展示最新保存版本");
+  }, [showToast]);
 
 
   const isFresh = messages.length === 1 && messages[0].id === "welcome";
@@ -529,6 +584,11 @@ export function ChatPanel({
         showToast("正在整理大纲，请稍候");
         return;
       }
+      // 智能填表后台执行中：提示可离开或停止（输入框发送按钮此时为停止态）
+      if (messages.some((m) => m.fillCard?.status === "generating")) {
+        showToast("智能填表生成可能需要较长时间，您可以暂时离开，稍后回来查看");
+        return;
+      }
 
       // ===== 智能填表分支（技能选中时优先于报告与普通问答）=====
       // 补充/修改已有报表 > 匹配模板新生成 > 引导补充模板名称
@@ -545,8 +605,9 @@ export function ChatPanel({
           }
           const { period: nextPeriod, note } = applyFillEdit(rec.period, text);
           fillFlows.current[doneFill.id] = { ...rec, period: nextPeriod, text };
-          updateFillCard(doneFill.id, { status: "generating", stage: FILL_STAGES[0], failReason: undefined, period: nextPeriod, edited: true });
-          setFillDrawer({ open: true, msgId: doneFill.id });
+          beginFillRun(doneFill.id, rec.template, nextPeriod, text);
+          updateFillCard(doneFill.id, { period: nextPeriod, edited: true });
+          setFillDrawer({ open: true, msgId: doneFill.id, exportSignal: 0 });
           runFillStages(doneFill.id, rec.template, nextPeriod, text);
           showToast(note);
           return;
@@ -635,7 +696,7 @@ export function ChatPanel({
         setLoading(false);
       }
     },
-    [loading, outlineBusy, messages, fillSkillOn, startFillFlow, updateFillCard, runFillStages, reportSkillOn, reportTemplate, postUserMessage, countUserTurns, startReportFlow, updateReportTask, showToast, addHistory, suppressHistory]
+    [loading, outlineBusy, messages, fillSkillOn, startFillFlow, updateFillCard, beginFillRun, runFillStages, reportSkillOn, reportTemplate, postUserMessage, countUserTurns, startReportFlow, updateReportTask, showToast, addHistory, suppressHistory]
   );
 
   sendMessageRef.current = sendMessage;
@@ -813,7 +874,7 @@ export function ChatPanel({
           </button>
         )}
         {openMenu === "skill" && (
-          <div className="absolute left-0 top-full z-30 mt-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+          <div className="absolute left-0 bottom-full z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
             <div className="max-h-64 space-y-1 overflow-auto">
               {skillList.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-4">暂无可用技能</p>
@@ -832,7 +893,6 @@ export function ChatPanel({
                     }`}
                   >
                     <div className="text-sm font-medium text-gray-800">{skill.name}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{skill.description}</div>
                   </button>
                 ))
               )}
@@ -874,6 +934,8 @@ export function ChatPanel({
   );
 
   // ========== 输入区域 ==========
+  // 智能填表后台执行中：输入框发送按钮切换为停止态（点击停止填表任务）
+  const fillGenerating = messages.some((m) => m.fillCard?.status === "generating");
   const InputArea = () => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -896,18 +958,18 @@ export function ChatPanel({
             rows={6}
             className="w-full pl-4 pr-12 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50 resize-none transition-all duration-200"
           />
-          {/* 圆形发送按钮（输入框内右下角）：大纲生成中变为停止按钮（点击暂停任务），其余为发送 */}
+          {/* 圆形发送按钮（输入框内右下角）：大纲/填表生成中变为停止按钮（点击停止任务），其余为发送 */}
           <button
-            onClick={() => (outlineBusy ? stopOutlineGeneration() : sendMessage(input))}
-            disabled={!outlineBusy && (loading || !input.trim())}
+            onClick={() => (outlineBusy ? stopOutlineGeneration() : fillGenerating ? stopFillGeneration() : sendMessage(input))}
+            disabled={!outlineBusy && !fillGenerating && (loading || !input.trim())}
             className={`absolute right-2 bottom-2 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm ${
-              outlineBusy
+              outlineBusy || fillGenerating
                 ? "bg-gray-700 text-white hover:bg-gray-800"
                 : "bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed"
             }`}
-            title={outlineBusy ? "停止生成" : "发送"}
+            title={outlineBusy || fillGenerating ? "停止生成" : "发送"}
           >
-            {outlineBusy ? (
+            {outlineBusy || fillGenerating ? (
               <span className="block w-2.5 h-2.5 bg-white rounded-[2px]" aria-hidden />
             ) : (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -986,15 +1048,16 @@ export function ChatPanel({
         onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
       />
 
-      {/* 填表抽屉（进度/报表预览/执行过程/下载 XLSX） */}
+      {/* 填表抽屉（流式填充/报表预览/执行过程/导出弹窗/分享） */}
       <FillDrawer
         open={fillDrawer.open}
-        onClose={() => setFillDrawer({ open: false, msgId: null })}
+        onClose={() => setFillDrawer({ open: false, msgId: null, exportSignal: 0 })}
         data={messages.find((m) => m.id === fillDrawer.msgId)?.fillCard ?? null}
         fillId={fillDrawer.msgId ?? "fill"}
+        exportSignal={fillDrawer.exportSignal}
         onStop={stopFillGeneration}
         onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
-        onDownload={() => fillDrawer.msgId && downloadFill(fillDrawer.msgId)}
+        onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}
       />
 
       {/* ===== 内容区（唯一滚动区）：欢迎模式 / 消息列表 ===== */}
@@ -1076,8 +1139,9 @@ export function ChatPanel({
                     showToast("链接已复制");
                   }}
                   onRetryReport={retryReportGeneration}
-                  onOpenFill={(id) => setFillDrawer({ open: true, msgId: id })}
+                  onOpenFill={(id) => setFillDrawer({ open: true, msgId: id, exportSignal: 0 })}
                   onDownloadFill={downloadFill}
+                  onShareFill={shareFill}
                   onRetryFill={retryFillGeneration}
                 />
               ))}
