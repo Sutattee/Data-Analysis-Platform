@@ -115,9 +115,9 @@ export function TemplatePickerModal({
                     : "border-gray-100 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-800 truncate">{t.kind === "excel" ? "📊" : "📄"} {t.name}</span>
-                  <span className="ml-auto flex-shrink-0 text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">{t.domain ?? "通用"}</span>
+                <div>
+                  <span className="block text-sm font-medium text-gray-800 truncate">{t.kind === "excel" ? "📊" : "📄"} {t.name}</span>
+                  <p className="mt-0.5 text-xs text-gray-400">{t.domain ?? "通用"}</p>
                 </div>
               </button>
             ))}
