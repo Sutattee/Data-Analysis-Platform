@@ -8,6 +8,7 @@ import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
 import { OutlineCard } from "./OutlineCard";
 import { ReportCard } from "./ReportCard";
+import { MiniMarkdown } from "./ReportDrawer";
 import { FillCard } from "./FillCard";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 import { useToast } from "@/components/ui/Toast";
@@ -266,13 +267,42 @@ export function MessageBubble({
                 onRegenerate={() => onReportOutlineRegenerate?.(message.id)}
               />
             ) : (
-              <ReportCard
-                data={message.reportCard}
-                onOpen={() => onOpenReport?.(message.id)}
-                onDownload={() => onDownloadReport?.(message.id)}
-                onShare={() => onShareReport?.(message.id)}
-                onRetry={() => onRetryReport?.(message.id)}
-              />
+              <>
+                <ReportCard
+                  data={message.reportCard}
+                  onOpen={() => onOpenReport?.(message.id)}
+                  onDownload={() => onDownloadReport?.(message.id)}
+                  onShare={() => onShareReport?.(message.id)}
+                  onRetry={() => onRetryReport?.(message.id)}
+                />
+                {/* 生成中：执行日志在对话页流式逐字打出（编号步骤逐行出现，末尾闪烁光标） */}
+                {message.reportCard.task?.status === "generating" && message.streamLog ? (
+                  <div className="rounded-lg bg-gray-50 border border-gray-100 px-3.5 py-2.5" aria-label="执行过程流式输出">
+                    <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono leading-relaxed m-0">
+                      {message.streamLog}
+                      <span className="inline-block w-1.5 h-3.5 align-text-bottom bg-primary-500 animate-pulse ml-0.5 rounded-sm" />
+                    </pre>
+                  </div>
+                ) : null}
+                {/* 完成：报告内容预览（对话页直接输出文档；「打开文件」右侧滑出文档详情面板并列查看） */}
+                {message.reportCard.task?.status === "done" && message.reportCard.task.content ? (
+                  <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" aria-label="报告内容预览">
+                    <div className="flex items-center justify-between px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
+                      <span className="text-xs font-medium text-gray-600">报告内容</span>
+                      <button
+                        onClick={() => onOpenReport?.(message.id)}
+                        className="px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
+                        title="打开文档详情面板"
+                      >
+                        📄 打开文件
+                      </button>
+                    </div>
+                    <div className="px-3.5 py-2.5 max-h-[420px] overflow-y-auto">
+                      <MiniMarkdown md={message.reportCard.task.content} withCharts />
+                    </div>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         )}

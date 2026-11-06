@@ -189,6 +189,7 @@ export interface QaMessage {
   answerType?: "analysis" | "knowledge"; // 回答类型
   smartAnswer?: SmartAnswer;        // 智能问数 4 段结构化回答
   reportCard?: ReportCardData;      // 报告生成卡片（大纲确认 / 报告任务）
+  streamLog?: string;               // 报告生成中对话页流式展示的执行日志（逐字推进）
   fillCard?: FillCardData;          // 智能填表任务卡片
   question?: string;                // 收藏时记录的对应用户问题（仅收藏项使用）
 }

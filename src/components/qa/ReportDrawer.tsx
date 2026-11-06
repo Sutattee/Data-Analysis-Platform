@@ -1,14 +1,14 @@
 "use client";
 
-// 报告抽屉（右侧滑出，复用 ui/Drawer）：
+// 文档详情面板（与对话区并列，无蒙层；由 ChatPanel 双栏布局从右侧滑出）：
 // 生成中 = 流式输出页（顶部阶段状态条 + 正文逐字增长 + 末尾闪烁光标；AI撰写中.../停止生成）；
 // 完成 = 报告页（正文 markdown 渲染 + 按章节标题关键词随文插入柱状/折线图表；
 //        左侧悬浮目录按钮 hover 展开点击定位；
-//        右上角：下载 / 分享——思考过程在对话页消息卡片上方查看，抽屉内不再提供入口）；
+//        右上角：下载 / 分享——思考过程在对话页消息卡片上方查看，面板内不再提供入口）；
 // 失败 = 失败原因 + 重新生成。
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Drawer } from "@/components/ui/Drawer";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { parseMarkdownTable } from "@/lib/qa/parse-table";
@@ -170,7 +170,8 @@ function ReportChartCard({ rule }: { rule: ReportChartRule }) {
   );
 }
 
-function MiniMarkdown({ md, withCharts = false }: { md: string; withCharts?: boolean }) {
+// 导出供 MessageBubble 报告内容预览复用（与面板内渲染保持一致，含随文图表）
+export function MiniMarkdown({ md, withCharts = false }: { md: string; withCharts?: boolean }) {
   const blocks = useMemo(() => splitMdBlocks(md), [md]);
   // 随文图表插入点（仅完成态启用；流式生成中不插，避免图表随文字闪动）
   const charts = useMemo(() => (withCharts ? chartForBlocks(md) : null), [md, withCharts]);
@@ -272,7 +273,59 @@ function ExportDocModal({
   );
 }
 
-// ---------- 报告抽屉主体 ----------
+// ---------- 内联面板容器：与对话区并列（无蒙层、不锁定滚动），接口与 ui/Drawer 同构 ----------
+// 标题栏 + 内容区 + 底部操作条；ESC 关闭保留。
+function InlinePanel({
+  open,
+  onClose,
+  title,
+  width = 480,
+  padding = true,
+  headerExtra,
+  footer,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  width?: number;
+  padding?: boolean;
+  headerExtra?: ReactNode;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape" && open) onClose();
+    }
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <aside role="region" aria-label="文档详情面板" className="h-full flex flex-col bg-white" style={{ width: `min(${width}px, 100vw)` }}>
+      {title && (
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 gap-3">
+          <h3 className="font-semibold text-gray-800 truncate flex-1 min-w-0" title={title}>{title}</h3>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {headerExtra}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+      <div className={`flex-1 min-h-0 overflow-auto ${padding ? "p-6" : ""}`}>{children}</div>
+      {footer && <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">{footer}</div>}
+    </aside>
+  );
+}
+
+// ---------- 文档详情面板主体 ----------
 export function ReportDrawer({
   open,
   onClose,
@@ -286,7 +339,7 @@ export function ReportDrawer({
   onClose: () => void;
   data: ReportCardData | null;
   reportId: string;
-  autoExport?: boolean; // 打开抽屉后直接弹出导出文档弹窗（对话卡片「下载」入口）
+  autoExport?: boolean; // 打开面板后直接弹出导出文档弹窗（对话卡片「下载」入口）
   onStop: () => void;
   onRetry: () => void;
 }) {
@@ -325,7 +378,7 @@ export function ReportDrawer({
 
   return (
     <>
-      <Drawer
+      <InlinePanel
         open={open}
         onClose={onClose}
         title={drawerTitle}
@@ -455,7 +508,7 @@ export function ReportDrawer({
             </div>
           </div>
         )}
-      </Drawer>
+      </InlinePanel>
 
       {/* 导出内容取当前报告正文 */}
       <ExportDocModal open={showExport} defaultName={task?.title ?? "报告"} content={task?.content ?? ""} onClose={() => setShowExport(false)} />

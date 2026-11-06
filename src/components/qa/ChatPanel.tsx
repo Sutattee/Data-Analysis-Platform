@@ -194,14 +194,28 @@ export function ChatPanel({
       ...outline.sections.map((s, i) => `正在生成第${i + 1}章：${s.title}`),
       "正在整合报告",
     ];
+    // 执行日志目标文本：已完成步骤逐行编号（对话页流式逐字打出）
+    const logTarget = (doneCount: number) =>
+      progressReportNodes(outline, mode, doneCount)
+        .filter((n) => n.status === "completed")
+        .map((n, i) => `${String(i + 1).padStart(2, "0")} ${n.label}`)
+        .join("\n");
+    // 逐字推进消息上的 streamLog（向目标文本靠近，每次 pace 字符）
+    const pushStreamLog = (target: string, pace: number) => {
+      setMessages((prev) => prev.map((m) => {
+        if (m.id !== reportMsgId) return m;
+        const cur = m.streamLog ?? "";
+        if (cur.length >= target.length) return m;
+        return { ...m, streamLog: target.slice(0, Math.min(target.length, cur.length + pace)) };
+      }));
+    };
     let step = 0;
     const tick = () => {
       if (step < stages.length) {
+        const doneCount = Math.min(STAGE_NODES, Math.round(((step + 1) / stages.length) * STAGE_NODES));
         updateReportTask(reportMsgId, { stage: stages[step] });
-        setMsgThinking(
-          reportMsgId,
-          progressReportNodes(outline, mode, Math.min(STAGE_NODES, Math.round(((step + 1) / stages.length) * STAGE_NODES)))
-        );
+        setMsgThinking(reportMsgId, progressReportNodes(outline, mode, doneCount));
+        pushStreamLog(logTarget(doneCount), 24);
         step += 1;
         const t = setTimeout(tick, 500);
         reportTimers.current.push(t);
@@ -215,7 +229,7 @@ export function ChatPanel({
           pos = Math.min(full.length, pos + chunk);
           updateReportTask(reportMsgId, { content: full.slice(0, pos) });
           if (pos >= full.length) {
-            // 输出完成：报告任务收尾 + 思考节点全绿
+            // 输出完成：报告任务收尾 + 思考节点全绿（对话页日志区随之收起，正文预览接管）
             updateReportTask(reportMsgId, {
               status: "done",
               stage: undefined,
@@ -228,6 +242,7 @@ export function ChatPanel({
             reportMsgId,
             progressReportNodes(outline, mode, STAGE_NODES + Math.round((pos / full.length) * (flowLen - STAGE_NODES)))
           );
+          pushStreamLog(logTarget(STAGE_NODES + Math.round((pos / full.length) * (flowLen - STAGE_NODES))), 3);
           const t = setTimeout(stream, 16);
           reportTimers.current.push(t);
         };
@@ -237,7 +252,8 @@ export function ChatPanel({
     tick();
   }, [updateReportTask, setMsgThinking]);
 
-  // 启动报告生成：push 报告任务卡片（含 Agent 执行流程节点，随进度推进）+ 自动打开抽屉 + 阶段轮换与流式输出
+  // 启动报告生成：push 报告任务卡片（含 Agent 执行流程节点，随进度推进）。
+  // 不自动打开文档面板——思考过程与执行日志在对话页流式展示，完成后由「打开文件」打开并列详情面板。
   const startReportFlow = useCallback((outline: ReportOutline, opts: { templateId?: string; turnCount: number; mode?: ReportGenMode }) => {
     const reportMsgId = generateId();
     const mode = opts.mode ?? "outline";
@@ -250,13 +266,13 @@ export function ChatPanel({
         content: "",
         timestamp: Date.now(),
         executionNodes: progressReportNodes(outline, mode, 0),
+        streamLog: "",
         reportCard: {
           kind: "report",
           task: { title: outline.title, status: "generating", stage: "正在查询数据", templateId: opts.templateId },
         },
       },
     ]);
-    setReportDrawer({ open: true, msgId: reportMsgId, autoExport: false });
     runReportStages(reportMsgId, outline, opts.turnCount, mode);
   }, [runReportStages]);
 
@@ -280,10 +296,10 @@ export function ChatPanel({
       showToast("未找到生成上下文，请重新发起报告生成");
       return;
     }
-    // 重置正文与思考节点（从第 1 步重新开始）后重跑
+    // 重置正文与思考节点（从第 1 步重新开始）后重跑（同样不自动开面板，对话页流式展示）
     updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据", content: "" });
+    setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, streamLog: "" } : m))); // 执行日志从头流式
     setMsgThinking(msgId, progressReportNodes(rec.outline, rec.mode, 0));
-    setReportDrawer({ open: true, msgId, autoExport: false });
     runReportStages(msgId, rec.outline, rec.turnCount, rec.mode);
   }, [runReportStages, showToast, updateReportTask, setMsgThinking]);
 
@@ -604,6 +620,11 @@ export function ChatPanel({
         showToast("智能填表生成可能需要较长时间，您可以暂时离开，稍后回来查看");
         return;
       }
+      // 报告生成中：对话页流式展示思考与执行过程（输入框发送按钮此时为停止态）
+      if (messages.some((m) => m.reportCard?.task?.status === "generating")) {
+        showToast("报告正在生成，执行过程见对话页，可点击停止按钮中断");
+        return;
+      }
 
       // ===== 上传填报文件分支（工具条「+」入口）：上传的 XLSX 即填报依据，
       // 不依赖技能与模板选择，按通用对标表结构智能填表（文件发送后消费，恢复「+」）=====
@@ -894,58 +915,7 @@ export function ChatPanel({
   // ========== 底部工具条：技能（下拉菜单在按钮下方弹出，无遮罩层） + 模型 ==========
   const ToolBar = () => (
     <div className="flex items-center gap-2 flex-wrap">
-      <div className="relative" ref={(el) => { menuRefs.current.skill = el; }}>
-        {selectedSkillTag ? (
-          /* 已选技能：标签展示在「技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
-          <span
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-green-50 text-green-600"
-            title={`已选技能：${selectedSkillTag.name}`}
-          >
-            <Sparkles size={13} className="flex-shrink-0" /> {selectedSkillTag.name}
-            <button
-              onClick={() => setSelectedSkillTag(null)}
-              className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"
-              title="移除技能"
-            >
-              ×
-            </button>
-          </span>
-        ) : (
-          <button
-            onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
-          >
-            <Sparkles size={13} className="text-gray-600" /> 技能
-          </button>
-        )}
-        {openMenu === "skill" && (
-          <div className="absolute left-0 bottom-full z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
-            <div className="max-h-64 space-y-1 overflow-auto">
-              {skillList.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">暂无可用技能</p>
-              ) : (
-                skillList.map((skill) => (
-                  <button
-                    key={skill.id}
-                    onClick={() => {
-                      setSelectedSkillTag({ id: skill.id, name: skill.name });
-                      setOpenMenu(null);
-                    }}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
-                      selectedSkillTag?.id === skill.id
-                        ? "border-green-400 bg-green-50"
-                        : "border-gray-100 hover:border-gray-300 active:scale-[0.99]"
-                    }`}
-                  >
-                    <div className="text-sm font-medium text-gray-800">{skill.name}</div>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      {/* 「+」上传填报文件：位于技能与模板之间；选中后展示文件名标签，可移除，发送后按通用对标表结构智能填表 */}
+      {/* 「+」上传填报文件：工具条首项；选中后展示文件名标签，可移除，发送后按通用对标表结构智能填表 */}
       {uploadFile ? (
         <span
           className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-amber-50 text-amber-600 max-w-[220px]"
@@ -1005,6 +975,58 @@ export function ChatPanel({
           <FileText size={13} className="text-gray-600" /> 模板
         </button>
       )}
+      {/* 技能：位于模板之后（下拉菜单向上弹出）；选中后展示技能名标签，可 × 移除 */}
+      <div className="relative" ref={(el) => { menuRefs.current.skill = el; }}>
+        {selectedSkillTag ? (
+          /* 已选技能：标签展示在「技能」按钮位置（技能名 + × 移除，主体不可点，与模板标签同构） */
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-green-50 text-green-600"
+            title={`已选技能：${selectedSkillTag.name}`}
+          >
+            <Sparkles size={13} className="flex-shrink-0" /> {selectedSkillTag.name}
+            <button
+              onClick={() => setSelectedSkillTag(null)}
+              className="ml-0.5 text-green-500 hover:text-green-700 font-bold leading-none"
+              title="移除技能"
+            >
+              ×
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setOpenMenu(openMenu === "skill" ? null : "skill")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-white text-gray-500 hover:bg-gray-50 active:scale-95 transition-colors"
+          >
+            <Sparkles size={13} className="text-gray-600" /> 技能
+          </button>
+        )}
+        {openMenu === "skill" && (
+          <div className="absolute left-0 bottom-full z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+            <div className="max-h-64 space-y-1 overflow-auto">
+              {skillList.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">暂无可用技能</p>
+              ) : (
+                skillList.map((skill) => (
+                  <button
+                    key={skill.id}
+                    onClick={() => {
+                      setSelectedSkillTag({ id: skill.id, name: skill.name });
+                      setOpenMenu(null);
+                    }}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                      selectedSkillTag?.id === skill.id
+                        ? "border-green-400 bg-green-50"
+                        : "border-gray-100 hover:border-gray-300 active:scale-[0.99]"
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-800">{skill.name}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       {/* 切换大模型：按钮上方滑出菜单（与技能菜单同构，无中央弹窗） */}
       <div className="relative" ref={(el) => { menuRefs.current.modelSwitch = el; }}>
         <button
@@ -1044,6 +1066,8 @@ export function ChatPanel({
   // ========== 输入区域 ==========
   // 智能填表后台执行中：输入框发送按钮切换为停止态（点击停止填表任务）
   const fillGenerating = messages.some((m) => m.fillCard?.status === "generating");
+  // 报告生成中：发送按钮同样切换为停止态（停止后任务标记失败，可重新生成）
+  const reportGenerating = messages.some((m) => m.reportCard?.task?.status === "generating");
   const InputArea = () => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -1068,16 +1092,16 @@ export function ChatPanel({
           />
           {/* 圆形发送按钮（输入框内右下角）：大纲/填表生成中变为停止按钮（点击停止任务），其余为发送 */}
           <button
-            onClick={() => (outlineBusy ? stopOutlineGeneration() : fillGenerating ? stopFillGeneration() : sendMessage(input))}
-            disabled={!outlineBusy && !fillGenerating && (loading || !input.trim())}
+            onClick={() => (outlineBusy ? stopOutlineGeneration() : fillGenerating ? stopFillGeneration() : reportGenerating ? stopReportGeneration() : sendMessage(input))}
+            disabled={!outlineBusy && !fillGenerating && !reportGenerating && (loading || !input.trim())}
             className={`absolute right-2 bottom-2 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-sm ${
-              outlineBusy || fillGenerating
+              outlineBusy || fillGenerating || reportGenerating
                 ? "bg-gray-700 text-white hover:bg-gray-800"
                 : "bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed"
             }`}
-            title={outlineBusy || fillGenerating ? "停止生成" : "发送"}
+            title={outlineBusy || fillGenerating || reportGenerating ? "停止生成" : "发送"}
           >
-            {outlineBusy || fillGenerating ? (
+            {outlineBusy || fillGenerating || reportGenerating ? (
               <span className="block w-2.5 h-2.5 bg-white rounded-[2px]" aria-hidden />
             ) : (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -1099,8 +1123,10 @@ export function ChatPanel({
   );
 
   // ========== 渲染 ==========
+  // 双栏布局：左对话区（始终可见、可操作）+ 右文档详情面板（点「打开文件」滑出，无蒙层并列展示）
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-w-0">
+      <div className="flex flex-col h-full flex-1 min-w-0">
       {/* Toast 通知 */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-gray-800 text-white text-sm rounded-lg shadow-lg animate-pulse">
@@ -1117,17 +1143,6 @@ export function ChatPanel({
           setShowTemplateModal(false);
         }}
         kindFilter={fillSkillOn ? "excel" : reportSkillOn ? "analysis" : undefined}
-      />
-
-      {/* 报告抽屉（进度/报告内容/思考过程/导出/分享） */}
-      <ReportDrawer
-        open={reportDrawer.open}
-        onClose={() => setReportDrawer({ open: false, msgId: null, autoExport: false })}
-        data={messages.find((m) => m.id === reportDrawer.msgId)?.reportCard ?? null}
-        reportId={reportDrawer.msgId ?? "report"}
-        autoExport={reportDrawer.autoExport}
-        onStop={stopReportGeneration}
-        onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
       />
 
       {/* 填表抽屉（流式填充/报表预览/分享；下载直接导出不经抽屉） */}
@@ -1256,6 +1271,24 @@ export function ChatPanel({
       <div className="flex-shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-4">
         <div className="max-w-3xl mx-auto w-full">
           {InputArea()}
+        </div>
+      </div>
+      </div>
+
+      {/* ===== 右侧文档详情面板：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出 ===== */}
+      <div
+        className={`flex-shrink-0 h-full transition-[width] duration-300 overflow-hidden ${reportDrawer.open ? "w-[720px]" : "w-0"}`}
+      >
+        <div className="w-[720px] h-full border-l border-gray-100 bg-white">
+          <ReportDrawer
+            open={reportDrawer.open}
+            onClose={() => setReportDrawer({ open: false, msgId: null, autoExport: false })}
+            data={messages.find((m) => m.id === reportDrawer.msgId)?.reportCard ?? null}
+            reportId={reportDrawer.msgId ?? "report"}
+            autoExport={reportDrawer.autoExport}
+            onStop={stopReportGeneration}
+            onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
+          />
         </div>
       </div>
     </div>

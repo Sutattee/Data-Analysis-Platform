@@ -67,7 +67,17 @@ export function ReportCard({
         </p>
       )}
       {task.status === "done" && (
-        <p className="mt-1 pl-7 text-xs text-gray-400">生成已完成{task.edited ? " ｜ 已按对话修改" : ""}</p>
+        <div className="mt-1 pl-7 flex items-center gap-2 text-xs text-gray-400">
+          <span>生成已完成{task.edited ? " ｜ 已按对话修改" : ""}</span>
+          {/* 打开文件：右侧滑出文档详情面板（与对话区并列展示） */}
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpen(); }}
+            className="px-2 py-0.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
+            title="打开文档详情面板"
+          >
+            📄 打开文件
+          </button>
+        </div>
       )}
 
       {task.status === "failed" && (
