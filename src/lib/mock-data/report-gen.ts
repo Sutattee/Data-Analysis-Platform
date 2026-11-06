@@ -753,13 +753,15 @@ export function outlineThinkingNodes(outline: ReportOutline): ExecutionNode[] {
 }
 
 // 报告生成进度版思考节点（对话页报告任务卡片上方实时展示）：
-// 前 doneCount 步已完成、下一步执行中、其余待执行；detail 与抽屉思考页一致
+// 前 doneCount 步已完成、下一步执行中、其余待执行；detail 与抽屉思考页一致；
+// 各步带耗时（完成后思考面板标题汇总展示总用时）
 export function progressReportNodes(outline: ReportOutline, mode: ReportGenMode, doneCount: number): ExecutionNode[] {
   const flow = REPORT_AGENT_FLOWS[mode];
   return flow.map((step, i) => ({
     id: `rt-${i + 1}`,
     label: step,
     status: i < doneCount ? ("completed" as const) : i === doneCount ? ("running" as const) : ("pending" as const),
+    duration: 80 + i * 130,
     detail: reportStepDetail(step, outline, mode),
   }));
 }

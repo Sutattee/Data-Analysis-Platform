@@ -33,11 +33,8 @@ export function ReportCard({
         >
           {task.title}
         </button>
-        {/* 行尾组：模板徽章常显 + hover 浮现下载/分享（与标题同行，卡片高度不变） */}
+        {/* 行尾组：hover 浮现下载/分享（与标题同行，卡片高度不变） */}
         <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
-          {task.templateId && (
-            <span className="text-xs text-gray-400 border border-gray-200 rounded px-1.5 py-0.5">模板</span>
-          )}
           {task.status === "done" && (
             <>
               <button

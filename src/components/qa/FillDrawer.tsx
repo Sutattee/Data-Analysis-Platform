@@ -3,15 +3,16 @@
 // 填表抽屉（右侧滑出，复用 ui/Drawer）：
 // 生成中 = 流式填充页（顶部状态条：当前阶段 + 后台运行提示；表格区按填充进度逐行展示，
 //          工作表页签可切换；底部「正在生成...」+ 停止生成）；
-// 完成 = 报表预览页（统计周期 + 工作表页签 + 完整表格，横向纵向滚动；顶部：执行过程 / 下载 / 分享）；
-//        执行过程页（Agent 各步骤状态、耗时及处理结果，可切回预览）；
+// 完成 = 报表预览页（统计周期 + 工作表页签 + 完整表格；表格为 Excel 网格样式、保留模板版式；
+//        顶部：执行过程 / 下载 / 分享）；执行过程页（Agent 各步骤状态、耗时及处理结果，可切回预览）；
 // 已停止 = 已填充部分内容保留预览 + 「已停止」标记 + 重新生成；失败 = 失败原因 + 重新生成。
 // 下载 → 内嵌「导出报表」弹窗（文件名可改，格式 Excel(.xlsx)）；分享 → 浮出分享卡片复制链接。
 import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
-import type { FillCardData, FillTable } from "@/types";
+import { SheetGrid } from "@/components/shared/ExcelPreview";
+import type { ExcelSheetPreview, FillCardData, FillTable } from "@/types";
 
 // ---------- 导出报表弹窗（叠加于抽屉之上）：修改文件名，格式固定 Excel(.xlsx) ----------
 function ExportXlsxModal({
@@ -85,28 +86,34 @@ function filledRowsOf(tables: FillTable[], progress: number): number[] {
   });
 }
 
-// ---------- 报表表格（生成中按进度截断 / 完整展示；横向纵向滚动） ----------
+// 数字单元格：整数/小数/千分位/百分比（Excel 中数字与百分比均右对齐）
+const NUM_CELL_RE = /^-?[\d,]+(\.\d+)?%?$/;
+
+// FillTable → Excel 工作表结构（复用 SheetGrid 渲染，与模板预览同款观感）：
+// 表头行作灰底表头区；多数值为数字的列自动右对齐（tabular-nums）
+function tableToSheet(tb: FillTable, filled: number): ExcelSheetPreview {
+  const numericCols = tb.headers
+    .map((_, c) => c)
+    .filter((c) => {
+      const vals = tb.rows.slice(0, Math.max(1, filled)).map((r) => (r[c] ?? "").trim()).filter(Boolean);
+      return vals.length > 0 && vals.filter((v) => NUM_CELL_RE.test(v)).length >= vals.length / 2;
+    });
+  return {
+    name: tb.title,
+    cells: [tb.headers, ...tb.rows.slice(0, filled)],
+    headerRows: 1,
+    numericCols,
+    merges: [],
+  };
+}
+
+// ---------- 报表表格（Excel 网格样式，保留模板版式；生成中按进度截断 / 完整展示；横向纵向滚动） ----------
 function SheetTable({ table, filled }: { table: FillTable; filled: number }) {
   return (
-    <div className="overflow-auto border border-gray-100 rounded-lg max-h-[52vh]">
-      <table className="text-sm border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200 sticky top-0">
-            {table.headers.map((h, i) => (
-              <th key={i} className="text-left py-1.5 px-3 font-medium text-gray-600 whitespace-nowrap border border-gray-100">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.slice(0, filled).map((row, ri) => (
-            <tr key={ri} className="border-b border-gray-50 last:border-0">
-              {row.map((cell, ci) => (
-                <td key={ci} className={`py-1.5 px-3 whitespace-nowrap border border-gray-100 ${ci === 0 ? "text-gray-800 font-medium" : "text-gray-700"}`}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="overflow-auto border border-gray-200 rounded-lg max-h-[52vh]">
+      <div className="p-2 bg-white">
+        <SheetGrid sheet={tableToSheet(table, filled)} />
+      </div>
     </div>
   );
 }

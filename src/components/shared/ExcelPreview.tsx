@@ -1,9 +1,9 @@
 "use client";
 
-// Excel 工作表形式的只读预览（选择模板弹窗 / 管理后台报告模板预览共用）：
+// Excel 工作表形式的只读预览（选择模板弹窗 / 管理后台报告模板预览 / 智能填表抽屉共用）：
 // 顶部说明 + 缩放控件（−/百分比/+/重置，60%~150%）；滚动区支持横向、纵向滚动；
 // 表格按模板版式渲染——表头区灰底加粗、合并单元格（rowSpan/colSpan）、细边框、数字列右对齐；
-// 多 Sheet 时底部页签切换（Excel 风格标签条）。
+// 多 Sheet 时底部页签切换（Excel 风格标签条）。SheetGrid 单独导出供仅需网格渲染的场景复用。
 import { useEffect, useMemo, useState } from "react";
 import type { ExcelSheetPreview } from "@/types";
 
@@ -26,7 +26,8 @@ function buildMergeMap(sheet: ExcelSheetPreview) {
   return { anchor, covered };
 }
 
-function SheetGrid({ sheet }: { sheet: ExcelSheetPreview }) {
+// Excel 风格网格（表头区灰底加粗居中、细边框、数字列右对齐、合并单元格）
+export function SheetGrid({ sheet }: { sheet: ExcelSheetPreview }) {
   const { anchor, covered } = useMemo(() => buildMergeMap(sheet), [sheet]);
   const headerRows = sheet.headerRows ?? 0;
   const numericCols = sheet.numericCols ?? [];

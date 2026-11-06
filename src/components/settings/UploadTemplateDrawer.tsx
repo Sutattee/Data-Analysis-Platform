@@ -2,6 +2,7 @@
 
 // 上传模板抽屉：分析报告页上传 DOCX/PDF 文档，Excel 报表页上传 XLSX 文件；
 // 支持点击与拖拽，选择即校验（格式 / 大小 / 0 字节损坏），不通过则红字说明并阻止提交。
+// 业务域：下拉单选（默认「通用」），供问数「选择模板」按业务域筛选。
 import { useEffect, useRef, useState } from "react";
 import type { UploadedTemplate } from "@/types";
 import { useApp } from "@/lib/store/AppContext";
@@ -9,6 +10,9 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { useToast } from "@/components/ui/Toast";
 import { extOf, formatFileSize, nameOf, validateUploadFile } from "@/lib/mock-data/report-templates-admin";
+
+// 业务域候选（与预置模板的业务域口径一致；「通用」表示不限定业务域）
+const DOMAIN_OPTIONS = ["生产管理", "能源消耗", "工艺质量", "通用"];
 
 function formatNow(): string {
   const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -33,6 +37,7 @@ export function UploadTemplateDrawer({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [domain, setDomain] = useState<string>("通用");
 
   // 关闭或切换页签时清空已选，避免跨类型残留
   useEffect(() => {
@@ -40,6 +45,7 @@ export function UploadTemplateDrawer({
       setFile(null);
       setError(null);
       setDragging(false);
+      setDomain("通用");
     }
   }, [open, kind]);
 
@@ -68,6 +74,7 @@ export function UploadTemplateDrawer({
       enabled: true,
       uploader: state.user?.username ?? "admin",
       uploadedAt: formatNow(),
+      domain,
     });
   }
 
@@ -122,6 +129,22 @@ export function UploadTemplateDrawer({
             e.target.value = ""; // 允许再次选择同名文件
           }}
         />
+
+        {/* 业务域：下拉单选（问数「选择模板」按业务域筛选时生效） */}
+        <div>
+          <label htmlFor="upload-domain" className="text-xs text-gray-500 font-medium">业务域</label>
+          <select
+            id="upload-domain"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            aria-label="业务域"
+            className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300"
+          >
+            {DOMAIN_OPTIONS.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
 
         {/* 校验不通过：说明原因并阻止提交 */}
         {error && <p className="text-xs text-red-500">{error}</p>}
