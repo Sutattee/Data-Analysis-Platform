@@ -1,6 +1,6 @@
 "use client";
 
-// 对话内报告任务卡片：生成中（标题 + 标题下灰字「正在生成... · 阶段」）/ 已完成（标题下灰字「生成已完成」，
+// 对话内报告任务卡片：生成中（标题 + 标题下灰字「生成中... · 阶段」）/ 已完成（标题下灰字「生成已完成」，
 // 点击卡片区域打开右侧文档详情面板；hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（已生成部分
 // 内容保留，可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
 import { FileText } from "lucide-react";
@@ -65,21 +65,13 @@ export function ReportCard({
       {/* 状态：标题下灰色文字（生成中含当前阶段；完成含对话修改标记） */}
       {task.status === "generating" && (
         <p className="mt-1 pl-7 flex items-center gap-1.5 text-xs text-gray-400">
-          <Spinner size="sm" /> 正在生成... {task.stage ? `· ${task.stage}` : ""}
+          <Spinner size="sm" /> 生成中... {task.stage ? `· ${task.stage}` : ""}
         </p>
       )}
       {task.status === "done" && (
-        <div className="mt-1 pl-7 flex items-center gap-2 text-xs text-gray-400">
-          <span>生成已完成{task.edited ? " ｜ 已按对话修改" : ""}</span>
-          {/* 打开文件：右侧滑出文档详情面板（与对话区并列展示） */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onOpen(); }}
-            className="px-2 py-0.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
-            title="打开文档详情面板"
-          >
-            📄 打开文件
-          </button>
-        </div>
+        <p className="mt-1 pl-7 text-xs text-gray-400">
+          生成已完成{task.edited ? " ｜ 已按对话修改" : ""}
+        </p>
       )}
 
       {task.status === "stopped" && (

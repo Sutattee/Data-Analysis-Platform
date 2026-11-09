@@ -1205,7 +1205,18 @@ export function ChatPanel({
             </>
           ) : (
             /* 消息列表 */
-            <div className="space-y-4 pb-4">
+            <>
+              {/* 生成中提示条：报告/填表任一任务生成中时展示于对话区上方（吸顶），生成结束自动消失 */}
+              {messages.some((m) => m.reportCard?.task?.status === "generating" || m.fillCard?.status === "generating") && (
+                <div
+                  className="sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/95 backdrop-blur px-3.5 py-2"
+                  role="status"
+                >
+                  <span className="text-sm leading-none">⏳</span>
+                  <span className="text-xs text-blue-700">生成可能需要较长时间，您可以暂时离开，稍后回来查看。</span>
+                </div>
+              )}
+              <div className="space-y-4 pb-4">
               {messages.map((msg) => (
                 <MessageBubble
                   key={msg.id}
@@ -1267,7 +1278,8 @@ export function ChatPanel({
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -46,7 +46,9 @@ function nodeIcon(status: string): string {
 // 思考过程折叠面板（普通回答 / 大纲卡片 / 报告卡片共用）：Agent 执行流程时间线，
 // 生成中标题「思考中...」且自动展开（流式展示各步骤状态与耗时），执行结束自动折叠（支持手动展开查看）；
 // 其余「思考过程」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
-function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: boolean }) {
+// avatar：AI 头像与标题同一行；streamLog：生成中的执行日志在面板内逐字逐行流式输出（替代独立日志区），
+// 结束后（可手动展开）仍显示节点时间线。
+function ThinkingPanel({ nodes, running, avatar, streamLog }: { nodes: ExecutionNode[]; running?: boolean; avatar?: ReactNode; streamLog?: string }) {
   const [show, setShow] = useState(!!running);
   // 执行结束自动折叠（running true→false 收起；之后可点击展开查看）
   useEffect(() => { if (!running) setShow(false); }, [running]);
@@ -58,9 +60,12 @@ function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: b
         onClick={() => setShow(!show)}
         className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
       >
-        <span className="text-gray-700 flex items-center gap-1">
-          {QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "思考过程"}
-          {!running && totalMs > 0 && <span className="text-gray-400"> · 用时{(totalMs / 1000).toFixed(2)}秒</span>}
+        <span className="text-gray-700 flex items-center gap-1.5 min-w-0">
+          {avatar}
+          <span className="flex items-center gap-1 truncate">
+            {QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "思考过程"}
+            {!running && totalMs > 0 && <span className="text-gray-400"> · 用时{(totalMs / 1000).toFixed(2)}秒</span>}
+          </span>
         </span>
         <span
           className={`text-gray-400 transition-transform text-xs ${
@@ -72,6 +77,13 @@ function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: b
       </button>
       {show && (
         <div className="px-4 pb-3 pt-1 border-t border-gray-100">
+          {/* 生成中：执行日志在思考面板内逐字逐行流式输出（编号步骤逐行出现，末尾闪烁光标） */}
+          {running && streamLog ? (
+            <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono leading-relaxed m-0" aria-label="执行过程流式输出">
+              {streamLog}
+              <span className="inline-block w-1.5 h-3.5 align-text-bottom bg-primary-500 animate-pulse ml-0.5 rounded-sm" />
+            </pre>
+          ) : (
           <div className="relative pl-6">
             <div className="absolute left-[7px] top-1 bottom-1 w-0.5 bg-gray-200" />
             <div className="space-y-2">
@@ -100,9 +112,188 @@ function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: b
               ))}
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+// 评价操作行（收藏 / 点赞 / 点踩 互斥）+ 点踩原因弹窗：普通回答操作栏与报告/填表卡片下方共用。
+// right：行尾插槽（普通回答传入导出 Excel 等按钮）。
+function FeedbackActions({
+  msgId,
+  feedback,
+  isFavorited,
+  onToggleFavorite,
+  onFeedback,
+  right,
+}: {
+  msgId: string;
+  feedback?: "like" | "dislike" | null;
+  isFavorited: boolean;
+  onToggleFavorite: () => void;
+  onFeedback?: (msgId: string, feedback: "like" | "dislike", reasons?: string[], note?: string) => void;
+  right?: ReactNode;
+}) {
+  // 点踩弹窗
+  const [showDislikeModal, setShowDislikeModal] = useState(false);
+  const [dislikeSelected, setDislikeSelected] = useState<string[]>([]);
+  const [dislikeNote, setDislikeNote] = useState("");
+  const [showDislikeNoteInput, setShowDislikeNoteInput] = useState(false);
+
+  // ========== 评价互斥逻辑 ==========
+  const handleLike = () => {
+    if (feedback === "like") {
+      // 取消点赞
+      onFeedback?.(msgId, "like");
+    } else {
+      // 点赞（覆盖点踩）
+      onFeedback?.(msgId, "like", [], "");
+    }
+  };
+
+  const handleDislikeToggle = () => {
+    if (feedback === "dislike") {
+      // 取消点踩
+      onFeedback?.(msgId, "like");
+    } else {
+      // 打开点踩弹窗
+      setDislikeSelected([]);
+      setDislikeNote("");
+      setShowDislikeNoteInput(false);
+      setShowDislikeModal(true);
+    }
+  };
+
+  // 点踩提交
+  const handleDislikeSubmit = () => {
+    const reasons = dislikeSelected.filter((r) => r !== "other");
+    if (dislikeSelected.includes("other")) reasons.push("other");
+    onFeedback?.(msgId, "dislike", reasons, dislikeSelected.includes("other") ? dislikeNote : undefined);
+    setShowDislikeModal(false);
+    setDislikeSelected([]);
+    setDislikeNote("");
+    setShowDislikeNoteInput(false);
+  };
+
+  const toggleDislikeReason = (id: string) => {
+    setDislikeSelected((prev) => {
+      if (prev.includes(id)) {
+        const next = prev.filter((r) => r !== id);
+        if (id === "other") setShowDislikeNoteInput(false);
+        return next;
+      }
+      if (id === "other") setShowDislikeNoteInput(true);
+      return [...prev, id];
+    });
+  };
+
+  const canSubmitDislike =
+    dislikeSelected.length > 0 &&
+    (!dislikeSelected.includes("other") || dislikeNote.trim().length > 0);
+
+  return (
+    <>
+      {/* 评价 + 收藏 */}
+      <div className="flex items-center gap-3">
+        {/* 收藏 */}
+        <button
+          onClick={onToggleFavorite}
+          className={`flex items-center gap-1 text-xs ${
+            isFavorited
+              ? "text-yellow-500"
+              : "text-gray-400 hover:text-yellow-500 active:scale-90"
+          } transition-all duration-200`}
+          title={isFavorited ? "取消收藏" : "收藏"}
+        >
+          {isFavorited ? QA_BUBBLE_ICONS.favorite : QA_BUBBLE_ICONS.unfavorite}
+          {isFavorited ? "已收藏" : "收藏"}
+        </button>
+
+        <span className="text-gray-200">|</span>
+
+        {/* 点赞（互斥） */}
+        <button
+          onClick={handleLike}
+          className={`inline-flex items-center gap-1 text-xs transition-colors ${
+            feedback === "like"
+              ? "text-primary-600"
+              : "text-gray-400 hover:text-primary-600 active:scale-90"
+          }`}
+        >
+          <ThumbsUp size={14} />
+          {feedback === "like" && "有帮助"}
+        </button>
+
+        {/* 点踩（互斥） */}
+        <button
+          onClick={handleDislikeToggle}
+          className={`inline-flex items-center gap-1 text-xs transition-colors ${
+            feedback === "dislike"
+              ? "text-red-500"
+              : "text-gray-400 hover:text-red-500 active:scale-90"
+          }`}
+        >
+          <ThumbsDown size={14} />
+          {feedback === "dislike" && "已反馈"}
+        </button>
+
+        {right && <div className="ml-auto flex items-center gap-3">{right}</div>}
+      </div>
+
+      {/* 点踩原因弹窗 */}
+      {showDislikeModal && (
+        <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm space-y-3">
+          <p className="text-xs text-gray-500 font-medium">请选择不满意的原因（可多选）：</p>
+          <div className="flex flex-wrap gap-1.5">
+            {DISLIKE_REASONS.map((reason) => (
+              <button
+                key={reason.id}
+                onClick={() => toggleDislikeReason(reason.id)}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
+                  dislikeSelected.includes(reason.id)
+                    ? "bg-red-50 text-red-600 border-red-300"
+                    : "bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100"
+                }`}
+              >
+                {reason.label}
+              </button>
+            ))}
+          </div>
+          {showDislikeNoteInput && (
+            <textarea
+              value={dislikeNote}
+              onChange={(e) => setDislikeNote(e.target.value)}
+              placeholder="请描述具体原因..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+              autoFocus
+            />
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={handleDislikeSubmit}
+              disabled={!canSubmitDislike}
+              className="px-4 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              提交
+            </button>
+            <button
+              onClick={() => {
+                setShowDislikeModal(false);
+                setDislikeSelected([]);
+                setDislikeNote("");
+                setShowDislikeNoteInput(false);
+              }}
+              className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -179,86 +370,48 @@ export function MessageBubble({
     .filter(Boolean)
     .join("\n");
 
-  // 点踩弹窗
-  const [showDislikeModal, setShowDislikeModal] = useState(false);
-  const [dislikeSelected, setDislikeSelected] = useState<string[]>([]);
-  const [dislikeNote, setDislikeNote] = useState("");
-  const [showDislikeNoteInput, setShowDislikeNoteInput] = useState(false);
-
-  // ========== 评价互斥逻辑 ==========
-  const handleLike = () => {
-    if (message.feedback === "like") {
-      // 取消点赞
-      onFeedback?.(message.id, "like");
-    } else {
-      // 点赞（覆盖点踩）
-      onFeedback?.(message.id, "like", [], "");
-    }
-  };
-
-  const handleDislikeToggle = () => {
-    if (message.feedback === "dislike") {
-      // 取消点踩
-      onFeedback?.(message.id, "like");
-    } else {
-      // 打开点踩弹窗
-      setDislikeSelected([]);
-      setDislikeNote("");
-      setShowDislikeNoteInput(false);
-      setShowDislikeModal(true);
-    }
-  };
-
-  // 点踩提交
-  const handleDislikeSubmit = () => {
-    const reasons = dislikeSelected.filter((r) => r !== "other");
-    if (dislikeSelected.includes("other")) reasons.push("other");
-    onFeedback?.(message.id, "dislike", reasons, dislikeSelected.includes("other") ? dislikeNote : undefined);
-    setShowDislikeModal(false);
-    setDislikeSelected([]);
-    setDislikeNote("");
-    setShowDislikeNoteInput(false);
-  };
-
-  const toggleDislikeReason = (id: string) => {
-    setDislikeSelected((prev) => {
-      if (prev.includes(id)) {
-        const next = prev.filter((r) => r !== id);
-        if (id === "other") setShowDislikeNoteInput(false);
-        return next;
-      }
-      if (id === "other") setShowDislikeNoteInput(true);
-      return [...prev, id];
-    });
-  };
-
-  const canSubmitDislike =
-    dislikeSelected.length > 0 &&
-    (!dislikeSelected.includes("other") || dislikeNote.trim().length > 0);
+  // AI 头像：带思考面板的 AI 消息中并入 ThinkingPanel 标题行（与「思考过程 · 用时xxx秒」同一行），
+  // 其余消息保持顶部独立头像行
+  const aiAvatar = (
+    <span className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-medium bg-gray-200 text-gray-600">
+      AI
+    </span>
+  );
+  const hasThinkingPanel = !!(
+    (message.reportCard && message.executionNodes?.length) ||
+    message.fillCard?.thinking?.length ||
+    hasThinking
+  );
+  const inlineAvatar = !isUser && !isWelcome && hasThinkingPanel;
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       {/* 大纲确认卡片铺满中间内容区；报告/填表卡片固定 95% 宽（不随 hover 按钮出现变宽）；普通气泡仍 78% */}
       <div className={`${message.reportCard?.kind === "outline" ? "w-full" : message.reportCard || message.fillCard ? "w-[95%]" : "max-w-[78%]"} min-w-0 ${isUser ? "order-1" : ""}`}>
-        {/* 头像（无时间戳） */}
-        <div className="flex items-center gap-2 mb-1">
-          <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-              isUser ? "bg-primary-100 text-primary-600" : "bg-gray-200 text-gray-600"
-            }`}
-          >
-            {isUser ? "我" : "AI"}
-          </span>
-        </div>
+        {/* 头像（无时间戳）：带思考面板的 AI 消息头像并入思考标题行，不在此独立成行 */}
+        {!inlineAvatar && (
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                isUser ? "bg-primary-100 text-primary-600" : "bg-gray-200 text-gray-600"
+              }`}
+            >
+              {isUser ? "我" : "AI"}
+            </span>
+          </div>
+        )}
 
         {/* ===== 报告卡片消息（大纲确认 / 报告任务）：不套普通气泡与操作栏 ===== */}
         {!isUser && message.reportCard && (
           <div className="space-y-1.5">
-            {/* Agent 执行流程：大纲/报告卡片上方同样展示思考过程（报告生成中标题为「思考中...」，节点实时推进） */}
+            {/* Agent 执行流程：大纲/报告卡片上方同样展示思考过程（报告生成中标题为「思考中...」，
+                执行日志在面板内逐字逐行流式输出，节点实时推进） */}
             {message.executionNodes?.length ? (
               <ThinkingPanel
                 nodes={message.executionNodes}
                 running={message.reportCard.kind === "report" && message.reportCard.task?.status === "generating"}
+                avatar={aiAvatar}
+                streamLog={message.reportCard.kind === "report" ? message.streamLog : undefined}
               />
             ) : null}
             {message.reportCard.kind === "outline" ? (
@@ -270,28 +423,25 @@ export function MessageBubble({
               />
             ) : (
               <>
-                {/* 生成中：执行日志在对话页流式逐字打出（编号步骤逐行出现，末尾闪烁光标） */}
-                {message.reportCard.task?.status === "generating" && message.streamLog ? (
-                  <div className="rounded-lg bg-gray-50 border border-gray-100 px-3.5 py-2.5" aria-label="执行过程流式输出">
-                    <pre className="text-xs text-gray-500 whitespace-pre-wrap font-mono leading-relaxed m-0">
-                      {message.streamLog}
-                      <span className="inline-block w-1.5 h-3.5 align-text-bottom bg-primary-500 animate-pulse ml-0.5 rounded-sm" />
-                    </pre>
-                  </div>
-                ) : null}
-                {/* 生成中：后台执行提示（任务不中断，可离开稍后回来查看） */}
-                {message.reportCard.task?.status === "generating" && (
-                  <p className="text-xs text-gray-400 px-1">生成可能需要较长时间，您可以暂时离开，稍后回来查看。</p>
-                )}
                 {/* 任务卡片：思考期隐藏，开始生成正文（文档）时才展示——位于执行过程步骤下方 */}
                 {!message.reportCard.task?.hidden && (
-                  <ReportCard
-                    data={message.reportCard}
-                    onOpen={() => onOpenReport?.(message.id)}
-                    onDownload={() => onDownloadReport?.(message.id)}
-                    onShare={() => onShareReport?.(message.id)}
-                    onRetry={() => onRetryReport?.(message.id)}
-                  />
+                  <>
+                    <ReportCard
+                      data={message.reportCard}
+                      onOpen={() => onOpenReport?.(message.id)}
+                      onDownload={() => onDownloadReport?.(message.id)}
+                      onShare={() => onShareReport?.(message.id)}
+                      onRetry={() => onRetryReport?.(message.id)}
+                    />
+                    {/* 卡片下方：收藏 / 点赞 / 点踩 */}
+                    <FeedbackActions
+                      msgId={message.id}
+                      feedback={message.feedback}
+                      isFavorited={isFavorited}
+                      onToggleFavorite={onToggleFavorite}
+                      onFeedback={onFeedback}
+                    />
+                  </>
                 )}
               </>
             )}
@@ -305,17 +455,28 @@ export function MessageBubble({
               <ThinkingPanel
                 nodes={message.fillCard.thinking}
                 running={message.fillCard.status === "generating"}
+                avatar={aiAvatar}
               />
             ) : null}
             {/* 任务卡片：思考期隐藏，开始填充数据时才展示——位于执行过程步骤下方 */}
             {!message.fillCard.hidden && (
-              <FillCard
-                data={message.fillCard}
-                onOpen={() => onOpenFill?.(message.id)}
-                onDownload={() => onDownloadFill?.(message.id)}
-                onShare={() => onShareFill?.(message.id)}
-                onRetry={() => onRetryFill?.(message.id)}
-              />
+              <>
+                <FillCard
+                  data={message.fillCard}
+                  onOpen={() => onOpenFill?.(message.id)}
+                  onDownload={() => onDownloadFill?.(message.id)}
+                  onShare={() => onShareFill?.(message.id)}
+                  onRetry={() => onRetryFill?.(message.id)}
+                />
+                {/* 卡片下方：收藏 / 点赞 / 点踩 */}
+                <FeedbackActions
+                  msgId={message.id}
+                  feedback={message.feedback}
+                  isFavorited={isFavorited}
+                  onToggleFavorite={onToggleFavorite}
+                  onFeedback={onFeedback}
+                />
+              </>
             )}
           </div>
         )}
@@ -324,7 +485,7 @@ export function MessageBubble({
         {!isUser && !isWelcome && !message.reportCard && !message.fillCard && (
           <div className="space-y-3">
             {/* 思考过程：可折叠（与大纲/报告卡片共用 ThinkingPanel） */}
-            {hasThinking && <ThinkingPanel nodes={message.executionNodes!} />}
+            {hasThinking && <ThinkingPanel nodes={message.executionNodes!} avatar={aiAvatar} />}
 
             {/* 回答内容 / 结构化回答 */}
             {message.smartAnswer ? (
@@ -380,128 +541,43 @@ export function MessageBubble({
               </div>
             )}
 
-            {/* 评价 + 收藏 */}
-            <div className="flex items-center gap-3">
-              {/* 收藏 */}
-              <button
-                onClick={onToggleFavorite}
-                className={`flex items-center gap-1 text-xs ${
-                  isFavorited
-                    ? "text-yellow-500"
-                    : "text-gray-400 hover:text-yellow-500 active:scale-90"
-                } transition-all duration-200`}
-                title={isFavorited ? "取消收藏" : "收藏"}
-              >
-                {isFavorited ? QA_BUBBLE_ICONS.favorite : QA_BUBBLE_ICONS.unfavorite}
-                {isFavorited ? "已收藏" : "收藏"}
-              </button>
-
-              <span className="text-gray-200">|</span>
-
-              {/* 点赞（互斥） */}
-              <button
-                onClick={handleLike}
-                className={`inline-flex items-center gap-1 text-xs transition-colors ${
-                  message.feedback === "like"
-                    ? "text-primary-600"
-                    : "text-gray-400 hover:text-primary-600 active:scale-90"
-                }`}
-              >
-                <ThumbsUp size={14} />
-                {message.feedback === "like" && "有帮助"}
-              </button>
-
-              {/* 点踩（互斥） */}
-              <button
-                onClick={handleDislikeToggle}
-                className={`inline-flex items-center gap-1 text-xs transition-colors ${
-                  message.feedback === "dislike"
-                    ? "text-red-500"
-                    : "text-gray-400 hover:text-red-500 active:scale-90"
-                }`}
-              >
-                <ThumbsDown size={14} />
-                {message.feedback === "dislike" && "已反馈"}
-              </button>
-
-              {/* 导出 Excel：操作栏最右侧，仅含数据结果表的回答显示；
-                  生成中展示加载状态，失败提示后可重试 */}
-              {canExport && (
-                <button
-                  onClick={handleExport}
-                  disabled={exporting}
-                  className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
-                  title="将该回答的全部结果表导出为 Excel 文件（每张表一个 Sheet）"
-                >
-                  {exporting ? <Spinner size="sm" /> : "📥"}
-                  {exporting ? "导出中..." : "导出Excel"}
-                </button>
-              )}
-
-              {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐。
-                  功能暂时隐藏（按钮与弹窗代码保留，置 true 可恢复展示） */}
-              {SHOW_CALC_PROCESS && (
-                <button
-                  onClick={() => setCalcOpen(true)}
-                  className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
-                  title="查看指标计算过程（溯源链路与详细解释）"
-                >
-                  {QA_BUBBLE_ICONS.calculation} 计算过程
-                </button>
-              )}
-            </div>
-
-            {/* 点踩原因弹窗 */}
-            {showDislikeModal && (
-              <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm space-y-3">
-                <p className="text-xs text-gray-500 font-medium">请选择不满意的原因（可多选）：</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {DISLIKE_REASONS.map((reason) => (
+            {/* 评价 + 收藏（含点踩原因弹窗）：普通回答与卡片消息共用 FeedbackActions */}
+            <FeedbackActions
+              msgId={message.id}
+              feedback={message.feedback}
+              isFavorited={isFavorited}
+              onToggleFavorite={onToggleFavorite}
+              onFeedback={onFeedback}
+              right={
+                <>
+                  {/* 导出 Excel：操作栏最右侧，仅含数据结果表的回答显示；
+                      生成中展示加载状态，失败提示后可重试 */}
+                  {canExport && (
                     <button
-                      key={reason.id}
-                      onClick={() => toggleDislikeReason(reason.id)}
-                      className={`px-2.5 py-1 text-xs rounded-full border transition-all ${
-                        dislikeSelected.includes(reason.id)
-                          ? "bg-red-50 text-red-600 border-red-300"
-                          : "bg-gray-50 text-gray-600 border-gray-100 hover:bg-gray-100"
-                      }`}
+                      onClick={handleExport}
+                      disabled={exporting}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                      title="将该回答的全部结果表导出为 Excel 文件（每张表一个 Sheet）"
                     >
-                      {reason.label}
+                      {exporting ? <Spinner size="sm" /> : "📥"}
+                      {exporting ? "导出中..." : "导出Excel"}
                     </button>
-                  ))}
-                </div>
-                {showDislikeNoteInput && (
-                  <textarea
-                    value={dislikeNote}
-                    onChange={(e) => setDislikeNote(e.target.value)}
-                    placeholder="请描述具体原因..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
-                    autoFocus
-                  />
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleDislikeSubmit}
-                    disabled={!canSubmitDislike}
-                    className="px-4 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    提交
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowDislikeModal(false);
-                      setDislikeSelected([]);
-                      setDislikeNote("");
-                      setShowDislikeNoteInput(false);
-                    }}
-                    className="px-4 py-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            )}
+                  )}
+
+                  {/* 计算过程（指标溯源）：右对齐，与文本区域右边缘对齐。
+                      功能暂时隐藏（按钮与弹窗代码保留，置 true 可恢复展示） */}
+                  {SHOW_CALC_PROCESS && (
+                    <button
+                      onClick={() => setCalcOpen(true)}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-primary-600 active:scale-90 transition-all duration-200"
+                      title="查看指标计算过程（溯源链路与详细解释）"
+                    >
+                      {QA_BUBBLE_ICONS.calculation} 计算过程
+                    </button>
+                  )}
+                </>
+              }
+            />
 
             {/* 推荐追问 */}
             {message.followUpQuestions && message.followUpQuestions.length > 0 && (

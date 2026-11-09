@@ -1,6 +1,6 @@
 "use client";
 
-// 对话内填表任务卡片：生成中（标题 + 标题下灰字「正在生成... · 阶段」）/ 已完成（标题下灰字
+// 对话内填表任务卡片：生成中（标题 + 标题下灰字「生成中... · 阶段」）/ 已完成（标题下灰字
 // 「生成已完成」，hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（保留已填充部分，
 // 可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
 import { Table } from "lucide-react";
@@ -63,7 +63,7 @@ export function FillCard({
       {/* 状态：标题下灰色文字（生成中含当前阶段；完成态不再展示统计周期） */}
       {task.status === "generating" && (
         <p className="mt-1 pl-7 flex items-center gap-1.5 text-xs text-gray-400">
-          <Spinner size="sm" /> 正在生成... {task.stage ? `· ${task.stage}` : ""}
+          <Spinner size="sm" /> 生成中... {task.stage ? `· ${task.stage}` : ""}
         </p>
       )}
       {task.status === "done" && (
