@@ -2,10 +2,9 @@
 
 // 对话内报告任务卡片：生成中（标题 + 标题下灰字「生成中... · 阶段」）/ 已完成（标题下灰字「生成已完成」，
 // 点击卡片区域打开右侧文档详情面板；hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（已生成部分
-// 内容保留，可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
+// 内容保留，可重新生成）/ 失败（「生成失败」+ 重试按钮）。作为会话记录的一部分常驻消息流。
 import { FileText } from "lucide-react";
 import type { ReportCardData } from "@/types";
-import { Spinner } from "@/components/ui/Spinner";
 
 export function ReportCard({
   data,
@@ -64,8 +63,8 @@ export function ReportCard({
 
       {/* 状态：标题下灰色文字（生成中含当前阶段；完成含对话修改标记） */}
       {task.status === "generating" && (
-        <p className="mt-1 pl-7 flex items-center gap-1.5 text-xs text-gray-400">
-          <Spinner size="sm" /> 生成中... {task.stage ? `· ${task.stage}` : ""}
+        <p className="mt-1 pl-7 text-xs text-gray-400">
+          生成中... {task.stage ? `· ${task.stage}` : ""}
         </p>
       )}
       {task.status === "done" && (
@@ -87,13 +86,13 @@ export function ReportCard({
       )}
 
       {task.status === "failed" && (
-        <div className="mt-2 flex items-center gap-2 pl-7 text-xs">
-          <span className="text-red-500">生成失败：{task.failReason ?? "任务执行异常"}</span>
+        <div className="mt-1 pl-7 flex items-center gap-2 text-xs">
+          <span className="text-red-500">生成失败</span>
           <button
-            onClick={onRetry}
+            onClick={(e) => { e.stopPropagation(); onRetry(); }}
             className="px-2.5 py-1 text-xs text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
           >
-            重新生成
+            重试
           </button>
         </div>
       )}
