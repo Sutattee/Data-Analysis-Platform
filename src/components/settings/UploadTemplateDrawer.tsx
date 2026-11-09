@@ -2,7 +2,7 @@
 
 // 上传模板抽屉：分析报告页上传 DOCX/PDF 文档，Excel 报表页上传 XLSX 文件；
 // 支持点击与拖拽，选择即校验（格式 / 大小 / 0 字节损坏），不通过则红字说明并阻止提交。
-// 业务域：下拉单选（默认「通用」），供问数「选择模板」按业务域筛选。
+// 业务域：下拉单选（默认「生产管理」），供问数「选择模板」按业务域筛选。
 import { useEffect, useRef, useState } from "react";
 import type { UploadedTemplate } from "@/types";
 import { useApp } from "@/lib/store/AppContext";
@@ -11,8 +11,8 @@ import { Drawer } from "@/components/ui/Drawer";
 import { useToast } from "@/components/ui/Toast";
 import { extOf, formatFileSize, nameOf, validateUploadFile } from "@/lib/mock-data/report-templates-admin";
 
-// 业务域候选（与预置模板的业务域口径一致；「通用」表示不限定业务域）
-const DOMAIN_OPTIONS = ["生产管理", "能源消耗", "工艺质量", "通用"];
+// 业务域候选（平台业务域口径，与选择模板弹窗筛选一致）
+const DOMAIN_OPTIONS = ["生产管理", "能源消耗", "工艺质量", "费用预算执行"];
 
 function formatNow(): string {
   const p = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -37,7 +37,7 @@ export function UploadTemplateDrawer({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [domain, setDomain] = useState<string>("通用");
+  const [domain, setDomain] = useState<string>("生产管理");
 
   // 关闭或切换页签时清空已选，避免跨类型残留
   useEffect(() => {
@@ -45,7 +45,7 @@ export function UploadTemplateDrawer({
       setFile(null);
       setError(null);
       setDragging(false);
-      setDomain("通用");
+      setDomain("生产管理");
     }
   }, [open, kind]);
 

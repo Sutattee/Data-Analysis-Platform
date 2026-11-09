@@ -30,7 +30,7 @@ export function SettingsSidebar() {
   return (
     <nav className="flex-1 overflow-auto py-3">
       {SETTINGS_NAV.map((group) => {
-        // 单项目分组：平铺为一级链接直达，无需折叠展开下级目录（如「归因配置」）
+        // 单项目分组：平铺为一级链接直达，无需折叠展开下级目录（当前导航均为多项目分组）
         if (group.items.length === 1) {
           const item = group.items[0];
           const active = pathname === item.href;

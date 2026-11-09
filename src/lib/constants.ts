@@ -95,18 +95,8 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
       { label: "指标值管理", href: "/settings/metric-value" },
       { label: "标准问答",   href: "/settings/standard-qa" },
       { label: "对话管理",   href: "/settings/conversation" },
-    ],
-  },
-  {
-    group: "归因配置",
-    items: [
-      { label: "归因配置", href: "/settings/attribution" },
-    ],
-  },
-  {
-    group: "报告模板",
-    items: [
-      { label: "报告模板", href: "/settings/report-templates" },
+      { label: "归因配置",   href: "/settings/attribution" },
+      { label: "报告模板",   href: "/settings/report-templates" },
     ],
   },
 ];

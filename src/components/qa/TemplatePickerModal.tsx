@@ -61,8 +61,8 @@ export function TemplatePickerModal({
     ...(kind === "analysis" ? REPORT_TEMPLATES_ANALYSIS : REPORT_TEMPLATES_EXCEL),
     ...listUploadedTemplates(kind).filter((t) => t.enabled).map(uploadedToTemplateItem),
   ];
-  // 业务域筛选：候选 = 当前 tab 可见模板的域去重；「全部」不过滤
-  const domainOptions = Array.from(new Set(allOfKind.map((t) => t.domain ?? "通用")));
+  // 业务域筛选：固定候选 = 平台四个业务域（「全部」由 DomainFilter 前置）；「全部」不过滤
+  const domainOptions = ["生产管理", "能源消耗", "工艺质量", "费用预算执行"];
   const list = domain === "全部" ? allOfKind : allOfKind.filter((t) => (t.domain ?? "通用") === domain);
 
   return (

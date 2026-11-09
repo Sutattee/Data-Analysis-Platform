@@ -85,7 +85,7 @@ export interface ReportTemplateItem {
   kind: "analysis" | "excel";
   name: string;         // 模板名（关键词触发源，如「能耗分析报告」）
   category: string;
-  domain?: string;      // 业务域（板块全名：生产管理/能源消耗/工艺质量/设备管理/成本费用/安全环保/通用）
+  domain?: string;      // 业务域（生产管理/能源消耗/工艺质量/费用预算执行；未填写按「通用」展示）
   keywords: string[];   // 高区分度触发词（建议录入不易与其他问题混淆的词）
   description: string;
   refFile?: string;     // 模板自带参考文件（样例文档名，展示在大纲卡片）
