@@ -123,13 +123,14 @@ export interface ReportCardData {
   outlineLocked?: boolean;   // 用户点击「生成报告」后锁定（收起只读，避免任务期间继续修改）
   task?: {                   // kind=report：报告任务卡片
     title: string;
-    status: "generating" | "done" | "failed";
+    status: "generating" | "done" | "stopped" | "failed";
     stage?: string;             // 当前阶段（正在查询数据 / 正在生成第N章 / 正在整合报告）
     failReason?: string;        // 失败或手动停止的原因
     templateId?: string;        // 使用的模板（方式一）
     content?: string;           // 报告正文（markdown）
     thinking?: ExecutionNode[]; // 报告创作思考过程（抽屉内查看）
     edited?: boolean;           // 生成后经对话修改过
+    hidden?: boolean;           // 思考期隐藏卡片（开始生成正文时才在对话中展示）
   };
 }
 
@@ -154,6 +155,7 @@ export interface FillCardData {
   tables?: FillTable[];       // 填好的表（生成开始即挂载，抽屉按 progress 逐步展示）
   thinking?: ExecutionNode[]; // 智能填表 Agent 执行流程（抽屉内查看）
   edited?: boolean;           // 生成后经对话修改过
+  hidden?: boolean;           // 思考期隐藏卡片（开始填充数据时才在对话中展示）
 }
 
 

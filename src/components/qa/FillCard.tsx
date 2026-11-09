@@ -23,7 +23,8 @@ export function FillCard({
   const task = data;
   return (
     <div
-      className="group border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0"
+      onClick={onOpen}
+      className="group border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0 cursor-pointer"
       aria-label="填表任务卡片"
     >
       <div className="flex items-center gap-2.5">
@@ -74,7 +75,7 @@ export function FillCard({
         <div className="mt-1 pl-7 flex items-center gap-2 text-xs">
           <span className="text-gray-400">已停止 ｜ 已填充部分内容，可预览或重新生成</span>
           <button
-            onClick={onRetry}
+            onClick={(e) => { e.stopPropagation(); onRetry(); }}
             className="px-2.5 py-1 text-xs text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
           >
             重新生成
@@ -86,7 +87,7 @@ export function FillCard({
         <div className="mt-2 flex items-center gap-2 pl-7 text-xs">
           <span className="text-red-500">生成失败：{task.failReason ?? "任务执行异常"}</span>
           <button
-            onClick={onRetry}
+            onClick={(e) => { e.stopPropagation(); onRetry(); }}
             className="px-2.5 py-1 text-xs text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
           >
             重新生成

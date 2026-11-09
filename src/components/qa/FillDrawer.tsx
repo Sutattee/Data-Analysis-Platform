@@ -1,6 +1,6 @@
 "use client";
 
-// 填表抽屉（右侧滑出，复用 ui/Drawer）：
+// 表格详情面板（与对话区并列，无蒙层；由 ChatPanel 双栏布局从右侧滑出，复用 ReportDrawer 的 InlinePanel）：
 // 生成中 = 流式填充页（顶部状态条：当前阶段 + 后台运行提示；表格区按填充进度逐行展示，
 //          工作表页签可切换；底部「正在生成...」+ 停止生成）；
 // 完成 = 报表预览页（表格上方常规黑字说明统计周期与回填情况 + 工作表页签 + 完整表格；
@@ -8,7 +8,7 @@
 // 已停止 = 已填充部分内容保留预览 + 「已停止」标记 + 重新生成；失败 = 失败原因 + 重新生成。
 // 下载 → 直接导出 XLSX（浏览器下载，无弹窗）；分享 → 浮出分享卡片复制链接。
 import { useEffect, useState } from "react";
-import { Drawer } from "@/components/ui/Drawer";
+import { InlinePanel } from "./ReportDrawer";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { SheetGrid } from "@/components/shared/ExcelPreview";
@@ -99,12 +99,13 @@ export function FillDrawer({
   };
 
   return (
-    <Drawer
+    <InlinePanel
       open={open}
       onClose={onClose}
       title={task?.title ?? "智能填表"}
       width={720}
       padding={false}
+      label="表格详情面板"
       headerExtra={
         task?.status === "done" ? (
           <div className="flex items-center gap-1 relative">
@@ -268,6 +269,6 @@ export function FillDrawer({
           </div>
         </div>
       )}
-    </Drawer>
+    </InlinePanel>
   );
 }

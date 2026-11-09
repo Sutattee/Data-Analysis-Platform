@@ -220,11 +220,12 @@ export function ChatPanel({
         const t = setTimeout(tick, 500);
         reportTimers.current.push(t);
       } else {
-        // 阶段轮换完成 → 流式逐字输出标题与正文：预生成全文，16ms/跳按片推进（全文约 2.5s 输出完）
+        // 阶段轮换完成 → 流式逐字输出标题与正文：预生成全文，16ms/跳按片推进（全文约 2.5s 输出完）。
+        // 开始生成正文（文档）时才在对话中展示任务卡片（此前仅展示思考过程与执行日志）
         const full = generateReportContent(outline, { turnCount });
         const chunk = Math.max(4, Math.ceil(full.length / 160));
         let pos = 0;
-        updateReportTask(reportMsgId, { stage: "正在生成正文" });
+        updateReportTask(reportMsgId, { stage: "正在生成正文", hidden: false });
         const stream = () => {
           pos = Math.min(full.length, pos + chunk);
           updateReportTask(reportMsgId, { content: full.slice(0, pos) });
@@ -269,21 +270,22 @@ export function ChatPanel({
         streamLog: "",
         reportCard: {
           kind: "report",
-          task: { title: outline.title, status: "generating", stage: "正在查询数据", templateId: opts.templateId },
+          task: { title: outline.title, status: "generating", stage: "正在查询数据", templateId: opts.templateId, hidden: true },
         },
       },
     ]);
     runReportStages(reportMsgId, outline, opts.turnCount, mode);
   }, [runReportStages]);
 
-  // 停止生成：清全部阶段计时器，标记当前生成中的任务为失败
+  // 停止生成：清全部阶段计时器，冻结为「已停止」——已生成内容保留预览，可重新生成；
+  // 思考期停止时同步展示卡片（已停止态）
   const stopReportGeneration = useCallback(() => {
     reportTimers.current.forEach(clearTimeout);
     reportTimers.current = [];
     setMessages((prev) =>
       prev.map((m) =>
         m.reportCard?.task?.status === "generating"
-          ? { ...m, reportCard: { ...m.reportCard, task: { ...m.reportCard.task!, status: "failed", failReason: "已手动停止生成" } } }
+          ? { ...m, reportCard: { ...m.reportCard, task: { ...m.reportCard.task!, status: "stopped", stage: undefined, hidden: false } } }
           : m
       )
     );
@@ -296,8 +298,9 @@ export function ChatPanel({
       showToast("未找到生成上下文，请重新发起报告生成");
       return;
     }
-    // 重置正文与思考节点（从第 1 步重新开始）后重跑（同样不自动开面板，对话页流式展示）
-    updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据", content: "" });
+    // 重置正文与思考节点（从第 1 步重新开始）后重跑（同样不自动开面板，对话页流式展示）；
+    // 卡片回到隐藏态，开始生成正文时再次展示
+    updateReportTask(msgId, { status: "generating", failReason: undefined, stage: "正在查询数据", content: "", hidden: true });
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, streamLog: "" } : m))); // 执行日志从头流式
     setMsgThinking(msgId, progressReportNodes(rec.outline, rec.mode, 0));
     runReportStages(msgId, rec.outline, rec.turnCount, rec.mode);
@@ -351,7 +354,8 @@ export function ChatPanel({
     );
   }, []);
 
-  // 重置填表任务为生成中初始态（重试/对话修改共用）：挂全量表结构 + 初始思考节点
+  // 重置填表任务为生成中初始态（重试/对话修改共用）：挂全量表结构 + 初始思考节点；
+  // 思考期隐藏卡片（hidden），开始填充数据后由 runFillStages 展示
   const beginFillRun = useCallback((msgId: string, template: ReportTemplateItem, period: string, text: string) => {
     const tables = generateFillTables(template);
     updateFillCard(msgId, {
@@ -359,6 +363,7 @@ export function ChatPanel({
       stage: FILL_STAGES[0],
       failReason: undefined,
       progress: 0,
+      hidden: true,
       tables,
       thinking: progressFillNodes(template, period, text, tables, 0),
     });
@@ -385,6 +390,7 @@ export function ChatPanel({
         updateFillCard(fillMsgId, {
           progress,
           stage,
+          hidden: false, // 开始填充数据：对话中展示任务卡片（执行过程步骤下方）
           thinking: progressFillNodes(template, period, text, tables, doneCount),
         });
         const t = setTimeout(tick, 300);
@@ -397,7 +403,9 @@ export function ChatPanel({
         });
       }
     };
-    tick();
+    // 首个 tick 前保留思考期窗口（约 300ms）：卡片保持隐藏，开始填充数据后才展示（与报告链一致）
+    const t0 = setTimeout(tick, 300);
+    fillTimers.current.push(t0);
   }, [updateFillCard]);
 
   // 「+」选择填报文件：校验 XLSX 格式/大小；与已选模板互斥（最近选择的填报依据优先）
@@ -412,7 +420,8 @@ export function ChatPanel({
     setUploadFile(f);
   };
 
-  // 启动智能填表：push 填表任务卡片（预挂全量表结构，progress 从 0 流式推进）+ 自动打开抽屉
+  // 启动智能填表：push 填表任务消息（思考期隐藏卡片，预挂全量表结构，progress 从 0 流式推进）。
+  // 不自动打开表格详情面板——思考过程在对话页流式展示，点卡片打开右侧并列面板
   const startFillFlow = useCallback((template: ReportTemplateItem, text: string) => {
     const period = defaultPeriodOf(text);
     const tables = generateFillTables(template);
@@ -432,23 +441,23 @@ export function ChatPanel({
           templateId: template.id,
           period,
           progress: 0,
+          hidden: true,
           tables,
           thinking: progressFillNodes(template, period, text, tables, 0),
         },
       },
     ]);
-    setFillDrawer({ open: true, msgId: fillMsgId });
     runFillStages(fillMsgId, template, period, text);
   }, [runFillStages]);
 
-  // 停止填表：清计时器，冻结进度保留已填充部分（标记已停止，可重新生成）
+  // 停止填表：清计时器，冻结进度保留已填充部分（标记已停止，可重新生成；思考期停止时同步展示卡片）
   const stopFillGeneration = useCallback(() => {
     fillTimers.current.forEach(clearTimeout);
     fillTimers.current = [];
     setMessages((prev) =>
       prev.map((m) =>
         m.fillCard?.status === "generating"
-          ? { ...m, fillCard: { ...m.fillCard, status: "stopped", stage: undefined } }
+          ? { ...m, fillCard: { ...m.fillCard, status: "stopped", stage: undefined, hidden: false } }
           : m
       )
     );
@@ -462,7 +471,6 @@ export function ChatPanel({
       return;
     }
     beginFillRun(msgId, rec.template, rec.period, rec.text);
-    setFillDrawer({ open: true, msgId });
     runFillStages(msgId, rec.template, rec.period, rec.text);
   }, [beginFillRun, runFillStages, showToast]);
 
@@ -673,7 +681,6 @@ export function ChatPanel({
           fillFlows.current[doneFill.id] = { ...rec, period: nextPeriod, text };
           beginFillRun(doneFill.id, rec.template, nextPeriod, text);
           updateFillCard(doneFill.id, { period: nextPeriod, edited: true });
-          setFillDrawer({ open: true, msgId: doneFill.id });
           runFillStages(doneFill.id, rec.template, nextPeriod, text);
           showToast(note);
           return;
@@ -1145,17 +1152,6 @@ export function ChatPanel({
         kindFilter={fillSkillOn ? "excel" : reportSkillOn ? "analysis" : undefined}
       />
 
-      {/* 填表抽屉（流式填充/报表预览/分享；下载直接导出不经抽屉） */}
-      <FillDrawer
-        open={fillDrawer.open}
-        onClose={() => setFillDrawer({ open: false, msgId: null })}
-        data={messages.find((m) => m.id === fillDrawer.msgId)?.fillCard ?? null}
-        fillId={fillDrawer.msgId ?? "fill"}
-        onStop={stopFillGeneration}
-        onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
-        onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}
-      />
-
       {/* ===== 内容区（唯一滚动区）：欢迎模式 / 消息列表 ===== */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         <div className={`max-w-3xl mx-auto w-full px-4 ${compact ? "pt-6" : "pt-8"}`}>
@@ -1228,14 +1224,23 @@ export function ChatPanel({
                   onChartTypeChange={(t) => handleChartTypeChange(msg.id, t)}
                   onReportOutlineConfirm={handleOutlineConfirm}
                   onReportOutlineRegenerate={handleOutlineRegenerate}
-                  onOpenReport={(id) => setReportDrawer({ open: true, msgId: id, autoExport: false })}
-                  onDownloadReport={(id) => setReportDrawer({ open: true, msgId: id, autoExport: true })}
+                  onOpenReport={(id) => {
+                    setFillDrawer({ open: false, msgId: null }); // 右栏互斥：打开文档面板时关表格面板
+                    setReportDrawer({ open: true, msgId: id, autoExport: false });
+                  }}
+                  onDownloadReport={(id) => {
+                    setFillDrawer({ open: false, msgId: null });
+                    setReportDrawer({ open: true, msgId: id, autoExport: true });
+                  }}
                   onShareReport={(id) => {
                     try { navigator.clipboard?.writeText(`https://shifang.example.com/r/${id}`); } catch { /* 剪贴板不可用时静默 */ }
                     showToast("链接已复制");
                   }}
                   onRetryReport={retryReportGeneration}
-                  onOpenFill={(id) => setFillDrawer({ open: true, msgId: id })}
+                  onOpenFill={(id) => {
+                    setReportDrawer({ open: false, msgId: null, autoExport: false }); // 右栏互斥：打开表格面板时关文档面板
+                    setFillDrawer({ open: true, msgId: id });
+                  }}
                   onDownloadFill={downloadFill}
                   onShareFill={shareFill}
                   onRetryFill={retryFillGeneration}
@@ -1275,11 +1280,14 @@ export function ChatPanel({
       </div>
       </div>
 
-      {/* ===== 右侧文档详情面板：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出 ===== */}
+      {/* ===== 右侧详情面板（文档/表格互斥）：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出 ===== */}
       <div
-        className={`flex-shrink-0 h-full transition-[width] duration-300 overflow-hidden ${reportDrawer.open ? "w-[720px]" : "w-0"}`}
+        className={`flex-shrink-0 h-full transition-[width] duration-300 overflow-hidden ${
+          reportDrawer.open || fillDrawer.open ? "w-[720px]" : "w-0"
+        }`}
       >
         <div className="w-[720px] h-full border-l border-gray-100 bg-white">
+          {/* 文档详情面板（报告） */}
           <ReportDrawer
             open={reportDrawer.open}
             onClose={() => setReportDrawer({ open: false, msgId: null, autoExport: false })}
@@ -1288,6 +1296,16 @@ export function ChatPanel({
             autoExport={reportDrawer.autoExport}
             onStop={stopReportGeneration}
             onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
+          />
+          {/* 表格详情面板（智能填表，与文档面板互斥展示） */}
+          <FillDrawer
+            open={fillDrawer.open}
+            onClose={() => setFillDrawer({ open: false, msgId: null })}
+            data={messages.find((m) => m.id === fillDrawer.msgId)?.fillCard ?? null}
+            fillId={fillDrawer.msgId ?? "fill"}
+            onStop={stopFillGeneration}
+            onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
+            onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}
           />
         </div>
       </div>

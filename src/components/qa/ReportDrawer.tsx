@@ -274,13 +274,14 @@ function ExportDocModal({
 }
 
 // ---------- 内联面板容器：与对话区并列（无蒙层、不锁定滚动），接口与 ui/Drawer 同构 ----------
-// 标题栏 + 内容区 + 底部操作条；ESC 关闭保留。
-function InlinePanel({
+// 标题栏 + 内容区 + 底部操作条；ESC 关闭保留。报告/填表两个详情面板共用（label 区分语义）。
+export function InlinePanel({
   open,
   onClose,
   title,
   width = 480,
   padding = true,
+  label = "文档详情面板",
   headerExtra,
   footer,
   children,
@@ -290,6 +291,7 @@ function InlinePanel({
   title?: string;
   width?: number;
   padding?: boolean;
+  label?: string;
   headerExtra?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
@@ -303,7 +305,7 @@ function InlinePanel({
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <aside role="region" aria-label="文档详情面板" className="h-full flex flex-col bg-white" style={{ width: `min(${width}px, 100vw)` }}>
+    <aside role="region" aria-label={label} className="h-full flex flex-col bg-white" style={{ width: `min(${width}px, 100vw)` }}>
       {title && (
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 gap-3">
           <h3 className="font-semibold text-gray-800 truncate flex-1 min-w-0" title={title}>{title}</h3>
@@ -450,6 +452,25 @@ export function ReportDrawer({
                 </>
               ) : (
                 <p className="text-sm text-gray-400 text-center pt-10">正在准备报告内容...</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== 已停止页：已生成部分内容保留预览 + 「已停止」标记 + 重新生成 ===== */}
+        {task?.status === "stopped" && (
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-amber-100 bg-amber-50/60 flex-shrink-0">
+              <p className="text-xs text-amber-700">已停止生成 ｜ 已生成部分内容保留预览，可重新生成完整报告</p>
+              <button onClick={onRetry} className="flex-shrink-0 px-3 py-1 text-xs text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors">
+                重新生成
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-8 py-5">
+              {task.content ? (
+                <MiniMarkdown md={task.content} withCharts />
+              ) : (
+                <p className="text-sm text-gray-400 text-center pt-10">尚未生成正文内容</p>
               )}
             </div>
           </div>

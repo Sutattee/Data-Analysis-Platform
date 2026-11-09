@@ -1,7 +1,8 @@
 "use client";
 
 // 对话内报告任务卡片：生成中（标题 + 标题下灰字「正在生成... · 阶段」）/ 已完成（标题下灰字「生成已完成」，
-// hover 在标题行尾浮现下载/分享，高度不变）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
+// 点击卡片区域打开右侧文档详情面板；hover 在标题行尾浮现下载/分享，高度不变）/ 已停止（已生成部分
+// 内容保留，可重新生成）/ 失败（原因 + 重新生成）。作为会话记录的一部分常驻消息流。
 import { FileText } from "lucide-react";
 import type { ReportCardData } from "@/types";
 import { Spinner } from "@/components/ui/Spinner";
@@ -22,7 +23,8 @@ export function ReportCard({
   const task = data.task!;
   return (
     <div
-      className="group border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0"
+      onClick={onOpen}
+      className="group border border-gray-200 bg-white hover:border-primary-200 rounded-xl p-3.5 transition-colors min-w-0 cursor-pointer"
       aria-label="报告任务卡片"
     >
       <div className="flex items-center gap-2.5">
@@ -76,6 +78,18 @@ export function ReportCard({
             title="打开文档详情面板"
           >
             📄 打开文件
+          </button>
+        </div>
+      )}
+
+      {task.status === "stopped" && (
+        <div className="mt-1 pl-7 flex items-center gap-2 text-xs">
+          <span className="text-gray-400">已停止 ｜ 已生成部分内容保留，可预览或重新生成</span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRetry(); }}
+            className="px-2.5 py-1 text-xs text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors"
+          >
+            重新生成
           </button>
         </div>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, ReactNode } from "react";
+import { useState, useMemo, useEffect, ReactNode } from "react";
 import { QaMessage, DISLIKE_REASONS, ExecutionNode, ReportOutline } from "@/types";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
@@ -8,7 +8,6 @@ import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
 import { OutlineCard } from "./OutlineCard";
 import { ReportCard } from "./ReportCard";
-import { MiniMarkdown } from "./ReportDrawer";
 import { FillCard } from "./FillCard";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 import { useToast } from "@/components/ui/Toast";
@@ -45,9 +44,12 @@ function nodeIcon(status: string): string {
 }
 
 // 思考过程折叠面板（普通回答 / 大纲卡片 / 报告卡片共用）：Agent 执行流程时间线，
-// 生成中标题「思考中...」，其余「思考过程」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
+// 生成中标题「思考中...」且自动展开（流式展示各步骤状态与耗时），执行结束自动折叠（支持手动展开查看）；
+// 其余「思考过程」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
 function ThinkingPanel({ nodes, running }: { nodes: ExecutionNode[]; running?: boolean }) {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(!!running);
+  // 执行结束自动折叠（running true→false 收起；之后可点击展开查看）
+  useEffect(() => { if (!running) setShow(false); }, [running]);
   // 总用时：各步骤耗时求和（节点未带耗时不展示）
   const totalMs = nodes.reduce((n, node) => n + (node.duration ?? 0), 0);
   return (
@@ -268,13 +270,6 @@ export function MessageBubble({
               />
             ) : (
               <>
-                <ReportCard
-                  data={message.reportCard}
-                  onOpen={() => onOpenReport?.(message.id)}
-                  onDownload={() => onDownloadReport?.(message.id)}
-                  onShare={() => onShareReport?.(message.id)}
-                  onRetry={() => onRetryReport?.(message.id)}
-                />
                 {/* 生成中：执行日志在对话页流式逐字打出（编号步骤逐行出现，末尾闪烁光标） */}
                 {message.reportCard.task?.status === "generating" && message.streamLog ? (
                   <div className="rounded-lg bg-gray-50 border border-gray-100 px-3.5 py-2.5" aria-label="执行过程流式输出">
@@ -284,24 +279,20 @@ export function MessageBubble({
                     </pre>
                   </div>
                 ) : null}
-                {/* 完成：报告内容预览（对话页直接输出文档；「打开文件」右侧滑出文档详情面板并列查看） */}
-                {message.reportCard.task?.status === "done" && message.reportCard.task.content ? (
-                  <div className="rounded-lg border border-gray-200 bg-white overflow-hidden" aria-label="报告内容预览">
-                    <div className="flex items-center justify-between px-3.5 py-2 border-b border-gray-100 bg-gray-50/60">
-                      <span className="text-xs font-medium text-gray-600">报告内容</span>
-                      <button
-                        onClick={() => onOpenReport?.(message.id)}
-                        className="px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium"
-                        title="打开文档详情面板"
-                      >
-                        📄 打开文件
-                      </button>
-                    </div>
-                    <div className="px-3.5 py-2.5 max-h-[420px] overflow-y-auto">
-                      <MiniMarkdown md={message.reportCard.task.content} withCharts />
-                    </div>
-                  </div>
-                ) : null}
+                {/* 生成中：后台执行提示（任务不中断，可离开稍后回来查看） */}
+                {message.reportCard.task?.status === "generating" && (
+                  <p className="text-xs text-gray-400 px-1">生成可能需要较长时间，您可以暂时离开，稍后回来查看。</p>
+                )}
+                {/* 任务卡片：思考期隐藏，开始生成正文（文档）时才展示——位于执行过程步骤下方 */}
+                {!message.reportCard.task?.hidden && (
+                  <ReportCard
+                    data={message.reportCard}
+                    onOpen={() => onOpenReport?.(message.id)}
+                    onDownload={() => onDownloadReport?.(message.id)}
+                    onShare={() => onShareReport?.(message.id)}
+                    onRetry={() => onRetryReport?.(message.id)}
+                  />
+                )}
               </>
             )}
           </div>
@@ -316,13 +307,16 @@ export function MessageBubble({
                 running={message.fillCard.status === "generating"}
               />
             ) : null}
-            <FillCard
-              data={message.fillCard}
-              onOpen={() => onOpenFill?.(message.id)}
-              onDownload={() => onDownloadFill?.(message.id)}
-              onShare={() => onShareFill?.(message.id)}
-              onRetry={() => onRetryFill?.(message.id)}
-            />
+            {/* 任务卡片：思考期隐藏，开始填充数据时才展示——位于执行过程步骤下方 */}
+            {!message.fillCard.hidden && (
+              <FillCard
+                data={message.fillCard}
+                onOpen={() => onOpenFill?.(message.id)}
+                onDownload={() => onDownloadFill?.(message.id)}
+                onShare={() => onShareFill?.(message.id)}
+                onRetry={() => onRetryFill?.(message.id)}
+              />
+            )}
           </div>
         )}
 
