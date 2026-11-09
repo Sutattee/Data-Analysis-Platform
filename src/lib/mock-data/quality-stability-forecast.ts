@@ -751,33 +751,34 @@ export function contextOf(code: string, machine: string): { batch: string; brand
 
 // ============ 参数展示派生 ============
 
-// 数值相对参考范围 / 基准值的方向：超上限或超容差 ↑ / 低于下限或低于容差 ↓ / 范围内容 → / 无基准或缺失不判断
+// 数值相对参考范围 / 基准值的偏差：超上限或超容差 ↑（偏差 = 相应边界差值）/ 低于下限或低于容差 ↓ /
+// 范围内 0（无箭头）/ 无基准或缺失 —；百分数参数（unit=%）的绝对差值以 pct 计（相对偏差公式才用 %）
 export function paramDirection(p: ForecastParamValue): {
   dir: "up" | "down" | "in" | "none";
-  deviation: string; // 偏差展示：+4 / -0.2 / 0 / +320 / —
+  deviation: string; // 偏差展示：+4pct / -0.2 / 0 / +320 / —
   rangeText: string; // 参考范围或基准展示
 } {
   const spec = PARAM_SPECS[p.key];
   if (p.value === null || !spec) return { dir: "none", deviation: "—", rangeText: "—" };
+  const pct = PARAM_DEFS[p.key]?.unit === "%";
+  const fmt = (d: number) => (pct ? `${Math.round(d * 100) / 100}pct` : `${Math.round(d * 100) / 100}`);
   if (spec.kind === "range") {
     const text = `${spec.low} ~ ${spec.high}`;
     if (p.value > spec.high) {
-      const d = Math.round((p.value - spec.high) * 100) / 100;
-      return { dir: "up", deviation: `+${d}`, rangeText: text };
+      return { dir: "up", deviation: `+${fmt(p.value - spec.high)}`, rangeText: text };
     }
     if (p.value < spec.low) {
-      const d = Math.round((p.value - spec.low) * 100) / 100;
-      return { dir: "down", deviation: `${d}`, rangeText: text };
+      return { dir: "down", deviation: `-${fmt(spec.low - p.value)}`, rangeText: text };
     }
     return { dir: "in", deviation: "0", rangeText: text };
   }
-  // 基准值型：偏差 = 实际值 − 基准值；有容差按容差判向，无容差不判向
+  // 基准值型：偏差 = 实际值 − 基准值；有容差按容差判向，容差内为 0，无容差不判向
   const dev = Math.round((p.value - spec.base) * 100) / 100;
   const text = `基准 ${spec.base}`;
   if (spec.tol === undefined) return { dir: "none", deviation: dev === 0 ? "0" : `${dev > 0 ? "+" : ""}${dev}`, rangeText: text };
-  if (dev > spec.tol) return { dir: "up", deviation: `+${dev}`, rangeText: text };
-  if (dev < -spec.tol) return { dir: "down", deviation: `${dev}`, rangeText: text };
-  return { dir: "in", deviation: `${dev > 0 ? "+" : ""}${dev}`, rangeText: text };
+  if (dev > spec.tol) return { dir: "up", deviation: `+${fmt(dev)}`, rangeText: text };
+  if (dev < -spec.tol) return { dir: "down", deviation: `-${fmt(-dev)}`, rangeText: text };
+  return { dir: "in", deviation: "0", rangeText: text };
 }
 
 // ============ 风险来源 ============

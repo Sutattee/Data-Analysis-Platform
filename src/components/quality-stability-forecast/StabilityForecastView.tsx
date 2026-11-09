@@ -2,9 +2,9 @@
 
 // 稳定性预测主视图：对象信息（仅指标筛选；机台不作筛选条件，由工作台深链 ?machine= 指定，
 // 默认「全部」综合曲线）→ 预测概况（无标题紧凑三区：左未来结论 / 中窗口预测极值 / 右模型信息，
-// 模型信息上概况卡第三区）→ 左列（预测趋势 + 来源工序参数，顶部指标筛选旁的牌号筛选切换牌号视角数据）
+// 模型信息上概况卡第三区）→ 左列（预测趋势 + 关联工序及环境参数表，顶部指标筛选旁的牌号筛选切换牌号视角数据）
 // 右列（智能风险解读 + 风险来源 + 来源工序分布）；解读区默认收起：
-// 点击「智能解读」后按 解读文字逐字 → 来源参数 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
+// 点击「智能解读」后按 解读文字逐字 → 关联参数表 → 风险来源 → 来源分布 的顺序流式生成，切换输入后重置回按钮态。
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -41,6 +41,9 @@ import { MetricTrendChart } from "./MetricTrendChart";
 import { StabilityAnomalyDrawer } from "./StabilityAnomalyDrawer";
 import { StabilityContributionChart } from "./StabilityContributionChart";
 
+// 关联工序及环境参数表格头样式（与缺陷预测页参数表同款）
+const th = "text-left px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
+
 // 延迟挂载：到时才渲染子节点（智能解读流式编排用；图表卡片延迟出现，挂载时播放自带入场生长动画）
 function Delayed({ delay, children }: { delay: number; children: ReactNode }) {
   const [show, setShow] = useState(false);
@@ -71,7 +74,7 @@ export function StabilityForecastView() {
   const [brand, setBrand] = useState("全部");
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
-  // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 来源工序参数），点击按钮后流式生成
+  // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 关联工序及环境参数），点击按钮后流式生成
   const [interpreting, setInterpreting] = useState(false);
 
   const metric = metricOf(code)!;
@@ -330,7 +333,7 @@ export function StabilityForecastView() {
         </div>
       </Card>
 
-      {/* 左右布局：左 = 预测趋势 + 来源工序参数；右 = AI 解读 + 风险来源 + 工序分布（紧凑一屏） */}
+      {/* 左右布局：左 = 预测趋势 + 关联工序及环境参数表；右 = AI 解读 + 风险来源 + 工序分布（紧凑一屏） */}
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
           {/* 指标预测趋势（牌号筛选已上移至顶部指标筛选旁） */}
@@ -339,51 +342,52 @@ export function StabilityForecastView() {
             <MetricTrendChart forecast={forecast} onAnomalyClick={openAnomalyDrawer} />
           </Card>
 
-          {/* 来源工序参数：智能解读生成后延迟出现，卡片阶梯浮现、内容逐字写入 */}
+          {/* 关联工序及环境参数：智能解读生成后延迟出现，表格按行逐字写入 */}
           {interpreting ? (
             <Delayed delay={aiDoneAt}>
-              <Card>
-                <h3 className="mb-3 text-sm font-semibold text-gray-800">来源工序参数</h3>
-                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3">
-                  {metric.params.map((def, i) => {
-                    const p = forecast.params.find((x) => x.key === def.key)!;
-                    const { dir, deviation, rangeText } = paramDirection(p);
-                    const devCls =
-                      dir === "up" ? "text-red-500" : dir === "down" ? "text-blue-500" : dir === "in" ? "text-gray-400" : "text-gray-300";
-                    const devText = dir === "up" ? `${deviation} ↑` : dir === "down" ? `${deviation} ↓` : dir === "in" ? `${deviation} →` : "—";
-                    return (
-                      <Delayed key={def.key} delay={i * 120}>
-                        <div
-                          className="h-full rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-3"
-                          title={`采集方式：${def.tip}`}
-                        >
-                          <div className="text-xs text-gray-500">
-                            <StreamText text={def.name} />
-                          </div>
-                          <div className="mt-1 flex items-baseline gap-1">
-                            {p.value === null ? (
-                              <span className="text-xl font-bold text-gray-300">—</span>
-                            ) : (
-                              <>
-                                <span className="text-xl font-bold tabular-nums text-gray-900">
-                                  <StreamText text={String(p.value)} />
-                                </span>
-                                <span className="text-xs text-gray-400">{def.unit}</span>
-                              </>
-                            )}
-                          </div>
-                          <div className="mt-1.5 flex items-center justify-between text-xs">
-                            <span className="text-gray-400">
-                              <StreamText text={rangeText} />
-                            </span>
-                            <span className={`font-medium ${devCls}`}>
-                              <StreamText text={devText} />
-                            </span>
-                          </div>
-                        </div>
-                      </Delayed>
-                    );
-                  })}
+              <Card title="关联工序及环境参数" padding={false}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="border-b border-gray-100">
+                        <th className={th}>参数名称</th>
+                        <th className={th}>来源工序及系统</th>
+                        <th className={`${th} text-right`}>数值</th>
+                        <th className={th}>单位</th>
+                        <th className={th}>取值时间/统计周期</th>
+                        <th className={th}>基准值/参考范围</th>
+                        <th className={`${th} text-right`}>偏差</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {metric.params.map((def, i) => {
+                        const p = forecast.params.find((x) => x.key === def.key)!;
+                        const { dir, deviation, rangeText } = paramDirection(p);
+                        const d = i * 90; // 同行单元格同拍输出 → 整行像被逐字写入
+                        // 偏差：超上限/超容差 ↑（红）/ 低于下限/低于容差 ↓（蓝）/ 范围内 0（灰）/ 缺失或无基准 —（浅灰）
+                        const devCls =
+                          dir === "up" ? "text-red-500" : dir === "down" ? "text-blue-500" : dir === "in" ? "text-gray-400" : "text-gray-300";
+                        const devText = dir === "up" ? `${deviation} ↑` : dir === "down" ? `${deviation} ↓` : deviation;
+                        // 来源工序及系统：工序参数 = 关联工序·数采，环境参数 = 车间环境
+                        const source = def.source === "env" ? "车间环境" : `${metric.process}·数采`;
+                        return (
+                          <tr key={def.key} className="transition-colors hover:bg-gray-50">
+                            <td className="px-3 py-2.5 whitespace-nowrap text-gray-700"><StreamText text={def.name} delay={d} /></td>
+                            <td className="px-3 py-2.5 whitespace-nowrap text-gray-600"><StreamText text={source} delay={d} /></td>
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap font-medium text-gray-800"><StreamText text={p.value === null ? "—" : String(p.value)} delay={d} /></td>
+                            <td className="px-3 py-2.5 whitespace-nowrap text-gray-500"><StreamText text={def.unit} delay={d} /></td>
+                            <td className="px-3 py-2.5 whitespace-nowrap text-gray-600"><StreamText text={def.tip} delay={d} /></td>
+                            <td className="px-3 py-2.5 whitespace-nowrap text-gray-600"><StreamText text={rangeText} delay={d} /></td>
+                            <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                              <span className={`font-medium ${devCls}`}>
+                                <StreamText text={devText} delay={d} />
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </Card>
             </Delayed>
@@ -401,7 +405,7 @@ export function StabilityForecastView() {
               <div className="flex flex-col items-center gap-3 py-10">
                 <Button onClick={() => setInterpreting(true)}>智能解读</Button>
                 <p className="max-w-[220px] text-center text-xs leading-5 text-gray-400">
-                  点击后，AI 将实时生成风险解读、风险来源、来源分布与来源工序参数分析。
+                  点击后，AI 将实时生成风险解读、风险来源、来源分布与关联工序参数分析。
                 </p>
               </div>
             ) : (

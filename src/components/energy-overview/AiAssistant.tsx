@@ -25,17 +25,20 @@ const headerBtnCls = (active?: boolean) =>
     active ? "bg-primary-50 font-medium text-primary-600" : "text-gray-500 hover:bg-primary-50 hover:text-primary-600"
   }`;
 
-// questions / inputPlaceholder：页面级定制推荐问题与输入框提示文字（透传 ChatPanel）
+// questions / inputPlaceholder / welcomeText：页面级定制推荐问题、输入框提示与欢迎语（透传 ChatPanel）；
+// insightCommand：传入门牌「✦ 智能解读」按钮（面板头部高亮入口，点击以新会话自动发送该指令）
 export function AiAssistant({
   children,
   questions,
   inputPlaceholder,
   welcomeText,
+  insightCommand,
 }: {
   children: React.ReactNode;
   questions?: string[];
   inputPlaceholder?: string;
   welcomeText?: string;
+  insightCommand?: string;
 }) {
   const { state, toggleFavorite } = useApp();
   const [open, setOpen] = useState(false);
@@ -102,7 +105,7 @@ export function AiAssistant({
             open ? "flex h-[calc(100vh-3.5rem)]" : "hidden"
           }`}
         >
-          {/* 标题栏：标题 + 历史记录/收藏/新建会话 + 收起 */}
+          {/* 标题栏：标题 + 智能解读（可选）+ 历史记录/收藏/新建会话 + 收起 */}
           <div className="flex flex-shrink-0 items-center justify-between gap-1 border-b border-gray-100 py-2.5 pl-4 pr-2">
             {/* 点击标题返回对话（收起历史记录 / 收藏视图） */}
             <h3
@@ -113,6 +116,16 @@ export function AiAssistant({
               智能问数助手
             </h3>
             <div className="flex items-center gap-0.5">
+              {insightCommand && (
+                <button
+                  type="button"
+                  onClick={() => handleContinueHistory(insightCommand)}
+                  className="mr-1 flex h-8 shrink-0 items-center gap-1 rounded-lg bg-primary-50 px-2.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-100"
+                  title="自动发送指令，一键生成本页解读报告"
+                >
+                  ✦ 智能解读
+                </button>
+              )}
               <button
                 className={headerBtnCls(historyOpen)}
                 onClick={() => {

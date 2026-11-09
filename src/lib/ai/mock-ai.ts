@@ -3,6 +3,7 @@ import { qaPresets, welcomeMessage } from "@/lib/mock-data/qa";
 import { matchStandardQa } from "@/lib/mock-data/standard-qa";
 import { matchSmartQuery, SmartQueryCase } from "@/lib/mock-data/smart-query";
 import { COCKPIT_INSIGHT_COMMAND, COCKPIT_INSIGHT_REPORT, cockpitAnomalies } from "@/lib/mock-data/cockpit";
+import { DEFECT_TOTAL, QUALITY_INSIGHT_COMMAND, QUALITY_INSIGHT_REPORT } from "@/lib/mock-data/quality";
 import { generateId, delay } from "@/lib/utils";
 
 // 统一命中答案的包装格式：已结构化内容保持原样，表格内容包装为结构化回答
@@ -364,6 +365,48 @@ export async function mockAiResponse(userMessage: string): Promise<QaMessage> {
       content: COCKPIT_INSIGHT_REPORT,
       timestamp: Date.now(),
       followUpQuestions: ["哪些费用科目执行进度偏差最大？", "12#机组完成率偏低的原因？", "当前有哪些危险级异常？"],
+      executionNodes: nodes,
+      thinkingTime: Math.round(t / 100) / 10,
+      answerType: "analysis",
+    };
+  }
+
+  // 质量总览「智能解读」固定指令：立即执行，展示执行过程并按三方面输出仪表盘解读总结
+  if (userMessage.includes(QUALITY_INSIGHT_COMMAND)) {
+    let t = 0;
+    const nodes: ExecutionNode[] = [
+      {
+        id: "think", label: "分析思路", status: "completed",
+        duration: t += 80 + Math.random() * 120,
+        detail: "理解指令为「质量总览综合解读」：拉取缺陷分布、优质品率与检验得分、过程管控 9 项指标，从缺陷情况、质量结果、过程稳定性三方面评估后生成总结。",
+      },
+      {
+        id: "intent", label: "意图识别", status: "completed",
+        duration: t += 60 + Math.random() * 100,
+        detail: "命中质量总览固定指令，置信度 0.99。数据域：工艺质量。",
+      },
+      {
+        id: "data", label: "总览页取数", status: "completed",
+        duration: t += 90 + Math.random() * 150,
+        detail: `缺陷 ${DEFECT_TOTAL} 条与等级/部位分布、优质品率 2 项、检验加权得分、过程管控 9 项（近10批次均值），取数与汇总完成。`,
+      },
+      {
+        id: "analysis", label: "分项评估", status: "completed",
+        duration: t += 70 + Math.random() * 130,
+        detail: "缺陷情况：缺陷率 1.84% 环比上升；质量结果：优质品率与检验得分稳定；过程稳定性：7/9 项达标，3 项参数超差集中在松散回潮与烘丝。",
+      },
+      {
+        id: "report", label: "生成解读总结", status: "completed",
+        duration: t += 50 + Math.random() * 100,
+        detail: "按「缺陷情况 → 质量结果 → 过程稳定性 → 综合结论与建议」结构输出总结。",
+      },
+    ];
+    return {
+      id: generateId(),
+      role: "assistant",
+      content: QUALITY_INSIGHT_REPORT,
+      timestamp: Date.now(),
+      followUpQuestions: ["松散回潮非稳态指数逐批走势如何？", "爆口缺陷集中在哪些机台？", "过程管控未达标项的整改建议？"],
       executionNodes: nodes,
       thinkingTime: Math.round(t / 100) / 10,
       answerType: "analysis",

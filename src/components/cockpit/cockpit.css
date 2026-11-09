@@ -400,7 +400,9 @@
   box-shadow: -18px 0 40px #000a, 0 0 24px #459dff22;
 }
 .cockpit-viewport .assistant-panel button { font: inherit; cursor: pointer; }
-.cockpit-viewport .assistant-panel [hidden] { display: none !important; }
+/* 面板自身的 display:flex 会覆盖 UA 的 [hidden]{display:none}（点击 × 收起无效的根因），
+   面板与内部元素带 hidden 时均强制隐藏 */
+.cockpit-viewport .assistant-panel[hidden], .cockpit-viewport .assistant-panel [hidden] { display: none !important; }
 .cockpit-viewport .assistant-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #355a7c99; }
 .cockpit-viewport .assistant-head h3 { color: #f1f7ff; font-size: 16px; font-weight: 500; margin: 0; margin-right: auto; }
 .cockpit-viewport .assistant-btn { border: 1px solid #46749a66; background: transparent; color: #cfe4f8; font-size: 12px; padding: 4px 8px; white-space: nowrap; }

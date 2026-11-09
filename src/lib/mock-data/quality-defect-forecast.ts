@@ -251,13 +251,13 @@ export interface DefectForecast {
 
 // ===== 参数构造（按缺陷差异化，数量按实际模型输入动态展示）=====
 
-// 范围偏差：超上限 ↑ / 低于下限 ↓ / 范围内 →（百分数绝对差用 pct，规格 §9；非 pct 取 1 位小数并去尾零，避免浮点尾差）
+// 范围偏差：超上限 ↑ / 低于下限 ↓ / 范围内 0（百分数绝对差用 pct，规格 §9；非 pct 取 1 位小数并去尾零，避免浮点尾差）
 function rangeDev(value: number | null, lo: number | undefined, hi: number | undefined, pct: boolean): ParamCell["dev"] {
   if (value === null) return { text: "—", dir: "none" };
   const fmt = (d: number) => (pct ? `${d.toFixed(1)}pct` : `${+d.toFixed(1)}`);
   if (hi !== undefined && value > hi) return { text: `+${fmt(value - hi)} ↑`, dir: "up" };
   if (lo !== undefined && value < lo) return { text: `-${fmt(lo - value)} ↓`, dir: "down" };
-  return { text: "0 →", dir: "in" };
+  return { text: "0", dir: "in" };
 }
 
 const num = (v: number | null, d = 1) => (v === null ? null : v.toFixed(d));
@@ -306,10 +306,10 @@ function storageParams(v: {
   outboundInfo: string | null;
 }): ParamCell[] {
   return [
-    { name: "制丝车间计划投料量", source: "制丝·MES", value: "12000", unit: "kg", time: "10-19 日计划", ref: "12000", dev: { text: "0 →", dir: "in" } },
-    { name: "制丝计划产出", source: "制丝·MES", value: "9600", unit: "kg", time: "10-19 日计划", ref: "9600", dev: { text: "0 →", dir: "in" } },
+    { name: "制丝车间计划投料量", source: "制丝·MES", value: "12000", unit: "kg", time: "10-19 日计划", ref: "12000", dev: { text: "0", dir: "in" } },
+    { name: "制丝计划产出", source: "制丝·MES", value: "9600", unit: "kg", time: "10-19 日计划", ref: "9600", dev: { text: "0", dir: "in" } },
     { name: "制丝实际产出", source: "制丝·MES", value: num(v.dryingActual, 0), unit: "kg", time: "截至 14:00", ref: "≥9000", dev: rangeDev(v.dryingActual, 9000, undefined, false) },
-    { name: "卷包计划产量", source: "卷包·MES", value: "8500", unit: "kg", time: "10-19 日计划", ref: "8500", dev: { text: "0 →", dir: "in" } },
+    { name: "卷包计划产量", source: "卷包·MES", value: "8500", unit: "kg", time: "10-19 日计划", ref: "8500", dev: { text: "0", dir: "in" } },
     { name: "卷包实际产量", source: "卷包·MES", value: num(v.packingActual, 0), unit: "kg", time: "截至 14:00", ref: "≥8000", dev: rangeDev(v.packingActual, 8000, undefined, false) },
     { name: "当前库存", source: "仓储·MES", value: num(v.stock, 0), unit: "kg", time: "10-19 14:00", ref: "≤40000", dev: rangeDev(v.stock, undefined, 40000, false) },
     { name: "入库时间", source: "仓储·MES", value: v.inbound, time: "批次入库记录", ref: "—", dev: { text: "—", dir: "none" } },

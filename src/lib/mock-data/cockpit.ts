@@ -338,7 +338,7 @@ export const CARBON_WATER: CarbonWaterRow[] = [
 
 // ========== 智能解读：固定指令 + 一键生成的全厂KPI解读报告 ==========
 // 「智能解读」滑出面板每次打开都以新会话自动发送该指令，mock-ai 命中后返回报告
-export const COCKPIT_INSIGHT_COMMAND = "驾驶舱智能解读";
+export const COCKPIT_INSIGHT_COMMAND = "智能解读驾驶舱";
 
 const anomalyBrief = cockpitAnomalies("全部");
 const topDefect = DEFECT_TOP[0]!;

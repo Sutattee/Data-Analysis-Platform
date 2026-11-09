@@ -246,6 +246,24 @@ export const QUALITY_INSIGHT = [
   "过程管控 7/9 项达标，松散回潮非稳态指数等 3 项近期均值超差，建议优先排查松散回潮工况。",
 ];
 
+// ========== AI 助手「智能解读」：固定指令 + 一键生成的仪表盘解读报告 ==========
+// 面板顶部「智能解读」按钮点击后自动发送该指令，mock-ai 命中后按三方面输出总结
+export const QUALITY_INSIGHT_COMMAND = "智能解读仪表盘";
+
+export const QUALITY_INSIGHT_REPORT = `📊 质量总览智能解读 · 2026年8月
+
+一、缺陷情况
+近1个月全部缺陷 ${DEFECT_TOTAL} 条，缺陷率 ${DEFECT_RATE_OPTIONS[0]!.value}%（环比 ↑${DEFECT_RATE_OPTIONS[0]!.mom}pct），出现小幅上升。等级分布以 C类（${DEFECT_GRADES[2]!.value} 条）为主，A类 ${DEFECT_GRADES[0]!.value} 条需重点管控；部位分布中「${DEFECT_PARTS[0]!.name}」占 ${Math.round((DEFECT_PARTS[0]!.value / DEFECT_TOTAL) * 100)}% 居首，Top 缺陷为「${TOP_DEFECTS[0]!.name}」（${TOP_DEFECTS[0]!.count} 条）。近两周新冒头缺陷集中在卷接包机组（透明纸烫皱、条盒纸压痕等），建议关注包装工序设备状态。
+
+二、质量结果
+成品优质品率 ${FINISHED_PREMIUM.value}%（同比 +${FINISHED_PREMIUM.yoy}pct、环比 +${FINISHED_PREMIUM.mom}pct），制丝优质品率 ${SILK_PREMIUM.value}%（环比 -${-SILK_PREMIUM.mom}pct 小幅回落），均保持高位；包装与卷制质量检验加权 ${PACKING_SCORE.value} 分，近10批区间 ${PACKING_SCORE.rangeLow}～${PACKING_SCORE.rangeHigh} 分，整体质量结果稳定。
+
+三、过程稳定性
+过程管控 9 项中 7 项达标，3 项近期均值超差：松散回潮非稳态指数 4.1%（管控 ≤4.0%）、成品水分标准偏差 1.57%（≤1.55%）、烘丝机出口水分偏差 12.49%（低于下限 12.50%）。超差项集中在松散回潮与烘丝工序，过程能力存在波动压力，需结合批次趋势定位工艺偏差根因。
+
+四、综合结论与建议
+本月质量总体平稳：优质品率与检验得分达标，风险点在缺陷率环比小幅上升与 3 项过程参数超差。建议：1）优先排查松散回潮工况与烘丝出口水分偏差；2）针对爆口、小盒轧皱等 Top 缺陷开展机台专项排查；3）跟踪制丝优质品率环比回落趋势，防止扩散至成品端。`;
+
 // AI 助手推荐问题（由本页数据分析情况生成，回复走 qa.ts 预设规则）
 export const QUALITY_AI_QUESTIONS = [
   "松散回潮非稳态指数逐批走势如何？",
