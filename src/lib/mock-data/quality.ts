@@ -2,20 +2,22 @@
 
 // ============ 顶部指标卡 ============
 
-// 缺陷率卡：支持按等级切换（全部/A类/B类/C类/D类），value 单位 %，mom 为环比变化（百分点）
+// 缺陷率卡：支持按等级切换（全部/A类/B类/C类/D类），value 单位 %，
+// yoy 为同比变化、mom 为环比变化（百分点，正 = 上升）
 export interface DefectRateItem {
   key: string;
   label: string;
   value: number;
+  yoy: number;
   mom: number;
 }
 
 export const DEFECT_RATE_OPTIONS: DefectRateItem[] = [
-  { key: "all", label: "缺陷率", value: 1.84, mom: 0.4 },
-  { key: "A", label: "A类缺陷率", value: 0.42, mom: -0.05 },
-  { key: "B", label: "B类缺陷率", value: 0.68, mom: 0.12 },
-  { key: "C", label: "C类缺陷率", value: 0.51, mom: 0.08 },
-  { key: "D", label: "D类缺陷率", value: 0.23, mom: -0.02 },
+  { key: "all", label: "缺陷率", value: 1.84, yoy: -0.2, mom: 0.4 },
+  { key: "A", label: "A类缺陷率", value: 0.42, yoy: -0.12, mom: -0.05 },
+  { key: "B", label: "B类缺陷率", value: 0.68, yoy: 0.15, mom: 0.12 },
+  { key: "C", label: "C类缺陷率", value: 0.51, yoy: 0.06, mom: 0.08 },
+  { key: "D", label: "D类缺陷率", value: 0.23, yoy: -0.03, mom: -0.02 },
 ];
 
 // 成品优质品率（当前批次 + 同比/环比，pct：同比 vs 去年同期 / 环比 vs 上一批次，正 = 上升）
