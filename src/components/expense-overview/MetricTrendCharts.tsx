@@ -158,8 +158,8 @@ export function RateTrendChart({ subjectId }: { subjectId: string }) {
           </Line>
         </LineChart>
       </ResponsiveContainer>
-      {/* 手写图例：四项（含 100% 预算线），虚线项用上边框虚线样例 */}
-      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+      {/* 手写图例：四项（含 100% 预算线），居中显示，虚线项用上边框虚线样例 */}
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-0.5 w-4 rounded-sm" style={{ background: "#1d4ed8" }} />预算执行率
         </span>

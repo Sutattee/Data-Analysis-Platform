@@ -62,7 +62,7 @@ export function QualityOverviewCards() {
       <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">百小时停机断料率</span>
-          <span className="shrink-0 text-[10px] text-gray-400">本月</span>
+          <span className="shrink-0 text-[10px] text-gray-400">最近100小时</span>
         </div>
         <div className="mb-1 flex items-baseline gap-1">
           <span className="text-2xl font-bold text-gray-900">{STOPPAGE_RATE.value.toFixed(1)}</span>
