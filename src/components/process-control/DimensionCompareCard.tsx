@@ -1,6 +1,6 @@
 "use client";
 
-// 多维度对比卡：牌号/机台/班组对比页签置于卡片标题右侧（按指标能力开放，切换仅改变
+// 多维度对比卡：机台/班组对比页签置于卡片标题右侧（按指标能力开放，切换仅改变
 // 分组维度、保留当前筛选）；正文为汇总表——按对比对象统计可判定记录数（含未判定提示）/
 // 异常记录数 / 异常占比 / 指标对比值（注明结果均值口径）/ 组内最高告警等级。
 // 口径：异常 = 命中等级（超管控值）；可判定 = 已配置规则；分母为 0 显示「—」；
@@ -13,8 +13,8 @@ import { severityOf } from "@/lib/mock-data/quality-stability-forecast";
 import type { AlertLevel } from "@/types";
 import type { CompareDim, MonitorRecord, ProcessDetailMetric } from "@/lib/mock-data/process-control-detail";
 
-const DIM_LABEL: Record<CompareDim, string> = { brand: "牌号对比", machine: "机台对比", shift: "班组对比" };
-const DIM_ORDER: CompareDim[] = ["brand", "machine", "shift"];
+const DIM_LABEL: Record<CompareDim, string> = { machine: "机台对比", shift: "班组对比" };
+const DIM_ORDER: CompareDim[] = ["machine", "shift"];
 
 interface AggRow {
   name: string;
@@ -29,7 +29,7 @@ interface AggRow {
 function aggregate(metric: ProcessDetailMetric, records: MonitorRecord[], dim: CompareDim): AggRow[] {
   const groups = new Map<string, MonitorRecord[]>();
   for (const r of records) {
-    const key = dim === "shift" ? (r.shiftGroup ?? "—") : dim === "machine" ? r.machine : r.brand;
+    const key = dim === "shift" ? (r.shiftGroup ?? "—") : r.machine;
     const arr = groups.get(key);
     if (arr) arr.push(r);
     else groups.set(key, [r]);
@@ -71,8 +71,8 @@ function aggregate(metric: ProcessDetailMetric, records: MonitorRecord[], dim: C
 
 export function DimensionCompareCard({ metric, records }: { metric: ProcessDetailMetric; records: MonitorRecord[] }) {
   const tabs = DIM_ORDER.filter((d) => metric.compareDims.includes(d));
-  const [dim, setDim] = useState<CompareDim>(tabs[0] ?? "brand");
-  const active = tabs.includes(dim) ? dim : (tabs[0] ?? "brand");
+  const [dim, setDim] = useState<CompareDim>(tabs[0] ?? "machine");
+  const active = tabs.includes(dim) ? dim : (tabs[0] ?? "machine");
   const rows = aggregate(metric, records, active);
   const pendingConfig = metric.rule === null;
   const avgNote =

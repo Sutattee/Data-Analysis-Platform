@@ -26,7 +26,7 @@ export const DATA_AS_OF = "2026-08-17 16:00"; // 页面「数据截至时间」
 
 export type DetailCycle = "批" | "班" | "日" | "月";
 export type DetailDim = "batch" | "machine" | "shift" | "brand" | "material" | "env" | "spec";
-export type CompareDim = "brand" | "machine" | "shift";
+export type CompareDim = "machine" | "shift";
 
 export interface ProcessDetailMetric {
   id: string; // SF01~SF09 中的 6 个开放指标编码
@@ -35,7 +35,7 @@ export interface ProcessDetailMetric {
   decimals: number;
   cycle: DetailCycle; // 统计周期 → 时间范围选项与横轴形态
   dims: DetailDim[]; // 支持的统计维度（筛选项按此展示，未支持的不展示）
-  compareDims: CompareDim[]; // 对比页签能力（牌号/机台/班组，按指标能力开放）
+  compareDims: CompareDim[]; // 对比页签能力（机台/班组，按指标能力开放）
   machines: string[];
   control: { kind: "upper" | "lower" | "range"; text: string; upper?: number; lower?: number };
   nominal: [number, number]; // 正常波动区间（确定性生成的取值范围）
@@ -48,7 +48,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
     id: "SF01", name: "烟丝水分标准偏差", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand", "material", "env"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
     control: { kind: "upper", text: "≤1.55%", upper: 1.55 },
     nominal: [1.15, 1.48],
@@ -61,7 +61,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
     id: "SF02", name: "松散回潮非稳态指数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
     control: { kind: "upper", text: "≤4.0%", upper: 4.0 },
     nominal: [3.1, 3.8],
@@ -75,7 +75,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     // 未配置等级规则：不判级、不判超限（摘要与对比中显示「—」）
     id: "SF03", name: "烘丝工序非稳态指数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
     control: { kind: "upper", text: "待配置" },
     nominal: [0.35, 1.05],
@@ -85,7 +85,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
     id: "SF06", name: "非细支单支重量偏差", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["1#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
     control: { kind: "upper", text: "≤3.2%", upper: 3.2 },
     nominal: [2.6, 3.1],
@@ -98,7 +98,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
     id: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["2#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
     control: { kind: "upper", text: "≤2.6%", upper: 2.6 },
     nominal: [2.1, 2.55],
@@ -111,7 +111,7 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
     id: "SF09", name: "中支烟硬度变异系数", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
-    compareDims: ["brand", "machine", "shift"],
+    compareDims: ["machine", "shift"],
     machines: ["2#卷接包机组", "3#卷接包机组", "4#卷接包机组"],
     control: { kind: "upper", text: "≤1.5%", upper: 1.5 },
     nominal: [1.1, 1.46],
