@@ -1,6 +1,6 @@
 // 工艺质量 · 告警中心数据层
 // 口径：
-//  · 告警指标 = 12 个质量指标（9 个稳定性指标 SF01~SF09 + 包装卷制加权平均 + 优质品率成品/制丝），
+//  · 告警指标 = 6 个稳定性指标（SF01~SF03 / SF06 / SF08 / SF09），
 //    机台/单位/统计周期与稳定性预测页（quality-stability-forecast）对齐，等级阈值按告警策略体系独立配置；
 //    另有 5 个缺陷预测指标（QUALITY_DEFECT_METRICS，预测风险类型专属），与缺陷预测页
 //    （quality-defect-forecast）同源：3 个风险评分（仅指标定义保留）+ 预测成品水分 + 预测箱储总存储时长
@@ -10,8 +10,8 @@
 //    （即 指数≥4.00% 提示 / ≥4.20% 关注 / ≥4.40% 预警 / ≥4.80% 告警 / ≥6.00% 危险）
 //  · 各指标等级边界沿用实际阈值配置（与稳定性预测页对齐）；基准 = 最轻级边界，
 //    各级偏离比例区间由边界相对基准换算得出（见 qualityDeviationBandOf）
-//  · 告警记录 = 实测异常（已越界）+ 预测风险（预计越界）两类；稳定性/结果类按 (指标, 机台) 生成，
-//    等级分布按列表首屏调优（危险/告警各 4 条 → 首屏 4危+4告+2预，其余降档分散，五级仍全覆盖）；
+//  · 告警记录 = 实测异常（已越界）+ 预测风险（预计越界）两类；稳定性指标按 (指标, 机台) 生成，
+//    等级分布按列表首屏调优（危险 2 条 + 告警 1 条置顶，其余降档分散至预警/关注/提示，五级仍全覆盖）；
 //    另含 2 条缺陷预测记录（buildDefectAlertRecords，2026-10-19 最新一轮，全部「预测风险」，预测值与管控值对比口径；风险评分类预测记录已删除）
 //  · 板块标记：记录 id 前缀 ZL、策略 id 前缀 QAS（能源告警中心按前缀排除，避免误伤同名旧数据）
 //  · 本模块不依赖 alerts.ts（ALERT_RECORDS 由 alerts.ts 反向聚合，避免循环依赖）
@@ -29,7 +29,7 @@ export function alertTypeOfDisplay(display: string): AlertType {
 
 export const QUALITY_TYPE_OPTIONS = ["实测异常", "预测风险"];
 
-/* ---------------- 12 个数据指标主数据 ---------------- */
+/* ---------------- 6 个数据指标主数据 ---------------- */
 
 export type QualityCycle = "每批次" | "每班次" | "每月" | "每日";
 
@@ -46,14 +46,14 @@ export interface QualityLevelRule {
 
 export interface QualityAlertMetric {
   name: string;        // 指标名称（需求文案）
-  sfCode?: string;     // 对应稳定性预测页指标编码（机台/阈值来源；结果类指标无）
+  sfCode?: string;     // 对应稳定性预测页指标编码（机台/阈值来源）
   defectCode?: string; // 对应缺陷预测页缺陷编码（CPSFBH/YZCB/XCCG；缺陷预测指标专用）
-  defectKind?: QualityDefectKind; // 缺陷预测指标形态（表单联动；稳定性/结果类指标无）
-  process?: string;    // 来源工序（SF 稳定性指标关联，如「松散回潮」；结果类指标无 → 详情不展示）
+  defectKind?: QualityDefectKind; // 缺陷预测指标形态（表单联动；稳定性指标无）
+  process?: string;    // 来源工序（SF 稳定性指标关联，如「松散回潮」）
   unit: string;        // % / mg / 次 / 分 / pct / 小时
   decimals: number;    // 数值展示小数位
   cycle: QualityCycle; // 检测周期（表单联动）
-  objects: string[];   // 告警对象（机台）；结果类指标 = ["全厂"]
+  objects: string[];   // 告警对象（机台）
   rule: QualityLevelRule | null; // null = 未配置阈值（阈值由策略条件配置，不走偏离比例分级）
 }
 
@@ -67,7 +67,7 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
     ] },
   },
   {
-    name: "成品水分标准偏差", sfCode: "SF01", process: "松散回潮", unit: "%", decimals: 2, cycle: "每批次",
+    name: "烟丝水分标准偏差", sfCode: "SF01", process: "松散回潮", unit: "%", decimals: 2, cycle: "每批次",
     objects: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
     rule: { op: ">=", levels: [
       { level: "危险", threshold: 2.4 }, { level: "告警", threshold: 2.2 },
@@ -80,28 +80,6 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
     rule: { op: ">=", levels: [
       { level: "危险", threshold: 1.35 }, { level: "告警", threshold: 1.2 },
       { level: "预警", threshold: 1.15 }, { level: "关注", threshold: 1.1 },
-    ] },
-  },
-  {
-    name: "烘丝机出口水分偏差", sfCode: "SF04", process: "烘丝", unit: "%", decimals: 2, cycle: "每批次",
-    objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
-    rule: { op: ">=", levels: [
-      { level: "告警", threshold: 0.5 }, { level: "预警", threshold: 0.45 }, { level: "关注", threshold: 0.42 },
-    ] },
-  },
-  {
-    name: "加香出口水分不达标次数", sfCode: "SF05", process: "加香", unit: "次", decimals: 0, cycle: "每日",
-    objects: ["1#加香机", "2#加香机", "3#加香机"],
-    rule: { op: ">=", levels: [
-      { level: "危险", threshold: 7 }, { level: "告警", threshold: 5 }, { level: "提示", threshold: 4 },
-    ] },
-  },
-  {
-    name: "烟支单支克重偏差(毫克)", sfCode: "SF07", process: "卷制", unit: "mg", decimals: 1, cycle: "每班次",
-    objects: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
-    rule: { op: "<=", levels: [
-      { level: "危险", threshold: -18 }, { level: "告警", threshold: -15 },
-      { level: "预警", threshold: -13.5 }, { level: "关注", threshold: -12 },
     ] },
   },
   {
@@ -124,21 +102,6 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
       { level: "告警", threshold: 4.0 }, { level: "预警", threshold: 3.85 },
       { level: "关注", threshold: 3.7 }, { level: "提示", threshold: 3.5 },
     ] },
-  },
-  {
-    name: "包装与卷制质量检验加权平均值", unit: "分", decimals: 1, cycle: "每批次",
-    objects: ["全厂"],
-    rule: { op: "<=", levels: [{ level: "告警", threshold: 95 }, { level: "预警", threshold: 96 }, { level: "关注", threshold: 96.5 }] },
-  },
-  {
-    name: "优质品率（成品）", unit: "%", decimals: 1, cycle: "每批次",
-    objects: ["全厂"],
-    rule: { op: "<=", levels: [{ level: "告警", threshold: 96 }, { level: "预警", threshold: 97 }, { level: "关注", threshold: 98 }] },
-  },
-  {
-    name: "优质品率（制丝）", unit: "%", decimals: 1, cycle: "每批次",
-    objects: ["全厂"],
-    rule: { op: "<=", levels: [{ level: "告警", threshold: 96.5 }, { level: "预警", threshold: 97.5 }, { level: "关注", threshold: 98 }] },
   },
 ];
 
@@ -184,7 +147,7 @@ export const QUALITY_DEFECT_METRICS: QualityAlertMetric[] = [
 
 export const QUALITY_DEFECT_METRIC_NAMES = new Set(QUALITY_DEFECT_METRICS.map((m) => m.name));
 
-// 查找表覆盖全部 17 个指标（12 稳定性/结果类 + 5 缺陷预测类）：
+// 查找表覆盖全部 11 个指标（6 稳定性 + 5 缺陷预测类）：
 // qualityMetricOf / qualityMetricDefOf / qualityObjectsOfMetric / qualityCycleUnitOf / qualityDefectKindOf 共用
 const METRIC_MAP = new Map([...QUALITY_ALERT_METRICS, ...QUALITY_DEFECT_METRICS].map((m) => [m.name, m]));
 
@@ -197,7 +160,7 @@ export function qualityDefectKindOf(name: string): QualityDefectKind | undefined
   return METRIC_MAP.get(name)?.defectKind;
 }
 
-// 表单指标候选：实测异常 = 12 个稳定性/结果类指标；预测风险仅追加 预测成品水分 / 预测箱储总存储时长
+// 表单指标候选：实测异常 = 6 个稳定性指标；预测风险仅追加 预测成品水分 / 预测箱储总存储时长
 // 2 个缺陷指标（3 个风险评分指标不再开放新建；指标定义保留供历史策略展示，风险评分类告警记录已删除）
 export function qualityMetricOptionsOf(type: AlertType): string[] {
   const base = QUALITY_ALERT_METRICS.map((m) => m.name);
@@ -275,17 +238,11 @@ export type QualityDetailField = "machine" | "batch" | "shift" | "brand";
 const ALL_DETAIL_FIELDS: QualityDetailField[] = ["machine", "batch", "shift", "brand"];
 export const QUALITY_DETAIL_FIELDS: Record<string, QualityDetailField[]> = {
   "松散回潮非稳态指数": ["batch", "machine", "shift", "brand"],
+  "烟丝水分标准偏差": ["batch", "machine", "shift", "brand"],
   "烘丝工序非稳态指数": ["batch", "machine", "shift", "brand"],
-  "成品水分标准偏差": ["batch", "machine", "shift", "brand"],
   "非细支单支重量偏差": ["batch", "machine", "shift", "brand"],
   "常规烟支硬度变异系数": ["batch", "machine", "shift", "brand"],
   "中支烟硬度变异系数": ["batch", "machine", "shift", "brand"],
-  "包装与卷制质量检验加权平均值": ["batch", "machine", "shift", "brand"],
-  "烘丝机出口水分偏差": ["batch", "machine", "brand"],
-  "加香出口水分不达标次数": ["machine", "batch", "brand"],
-  "烟支单支克重偏差(毫克)": ["machine", "brand"],
-  "优质品率（成品）": ["brand"],
-  "优质品率（制丝）": ["batch", "brand", "machine"],
   // 缺陷预测指标：批次（预测页关联批次）/ 机台 / 班组 / 牌号 全展示
   "成品水分不合格风险评分": ["batch", "machine", "shift", "brand"],
   "烟支刺破风险评分": ["batch", "machine", "shift", "brand"],
@@ -300,7 +257,7 @@ export function qualityDetailFieldsOf(metricName: string): QualityDetailField[] 
 // 机台编号（列表「告警对象编号」搜索字段用；从机台名解析序号 + 类型缩写）
 const MACHINE_CODE: Record<string, string> = {};
 {
-  const PREFIX: Record<string, string> = { 松散回潮机: "SSJC", 烘丝机: "HSJ", 加香机: "JXJ", 卷接包机组: "JJB" };
+  const PREFIX: Record<string, string> = { 松散回潮机: "SSJC", 烘丝机: "HSJ", 卷接包机组: "JJB" };
   for (const m of QUALITY_ALERT_METRICS) {
     for (const o of m.objects) {
       if (o === "全厂" || MACHINE_CODE[o]) continue;
@@ -312,14 +269,14 @@ const MACHINE_CODE: Record<string, string> = {};
   MACHINE_CODE["全厂"] = "QC-ALL";
 }
 
-/* ---------------- 告警记录生成（确定性 31 条：实测约 2/3 + 预测约 1/3，五级全覆盖） ---------------- */
+/* ---------------- 告警记录生成（确定性 20 条：实测 11 + 预测 9（含 2 条缺陷预测），五级全覆盖） ---------------- */
 
 // 质量场景接收人（与 alerts.ts 的 ALERT_USERS 独立，避免循环依赖）
 const RECEIVERS = ["苏恒", "吴敏", "周婷", "陈静", "王芳", "刘洋", "高亚东"];
 const SHIFTS = ["甲班", "乙班", "丙班"];
 const BRANDS = ["娇子", "宽窄", "龙凤呈祥"];
 
-// 过程类指标原因/建议（贴合松散回潮、烘丝、加香、卷制工况；需求示例文案）
+// 稳定性指标原因/建议（贴合松散回潮、烘丝、卷制工况；需求示例文案）
 const PROCESS_CAUSES = [
   (metric: string) => `可能与来料水分或流量波动、加水加汽调节不稳定及开机初期工况波动有关，具体原因需结合${metric}过程数据核实。`,
   (metric: string) => `经排查，当批次来料物理指标波动叠加设备工况不稳，导致${metric}超出控制范围，具体原因需现场核实。`,
@@ -329,15 +286,6 @@ const PROCESS_SUGGESTIONS = [
   (metric: string) => `建议核查来料水分与流量、加水加汽控制及开机工况，按工艺标准调整异常参数，并持续监测${metric}是否恢复正常。`,
   (metric: string) => `建议复核工序基准设置与测点校准状态，按工艺标准调整参数，并跟踪后续批次${metric}变化。`,
   (metric: string) => `建议排查设备运行状态与环境条件，按工艺标准校正参数，持续监测${metric}走势。`,
-];
-// 结果类指标（优质品率/包装卷制加权）原因/建议
-const RESULT_CAUSES = [
-  (metric: string) => `可能与原料批次波动、设备工况不稳及检验抽样代表性有关，具体原因需结合${metric}检验数据核实。`,
-  (metric: string) => `当期缺陷集中于个别部位，叠加设备精度衰减，${metric}阶段性下滑，具体原因需现场核实。`,
-];
-const RESULT_SUGGESTIONS = [
-  (metric: string) => `建议核查缺陷集中部位与相关设备精度，按检验标准复核抽样，并持续跟踪${metric}回升情况。`,
-  (metric: string) => `建议排查相关机组运行状态与来料适配性，落实工艺标准执行，跟踪${metric}变化。`,
 ];
 
 // 单条记录规格（等级分布按列表首屏调优：危险/告警各 4 条 → 首屏 4危+4告+2预，
@@ -349,65 +297,47 @@ interface RecordSpec {
   forecast?: boolean;     // 预测风险（缺省 = 实测异常）
   value: number;          // 告警值（实测=当前值 / 预测=预计值）
   shifts?: number;        // 连续同向偏离周期数（飘移类：标题/条件带「连续N个批次」，对应飘移预警策略）
-  shiftBaseline?: number; // 飘移策略触发线（条件快照的基准值，如 SF04 飘移预警 = 0.50；缺省用统一基准）
+  shiftBaseline?: number; // 飘移策略触发线（条件快照的基准值，如 SF01 飘移预警 = 2.20；缺省用统一基准）
+  handled?: boolean;      // 预置已处理（约 1/3；工作台绑定的演示条目保持未处理）
+  noCause?: boolean;      // 演示「当前数据不足，暂无法确定异常原因」（飘移示例始终带原因）
   manualCause?: string;   // 人工补录内容（详情「没帮助」后补录的演示种子；独立于 AI 生成原因展示）
 }
 
 const SPECS: RecordSpec[] = [
   // 松散回潮非稳态指数（产品示例指标：基准 4%，偏离比例 0/5/10/20/50 分五级）
   { m: 0, machine: "1#松散回潮机", level: "预警", value: 4.52 },
-  { m: 0, machine: "2#松散回潮机", level: "预警", forecast: true, value: 4.45 },
-  { m: 0, machine: "3#松散回潮机", level: "提示", value: 4.06 },
+  { m: 0, machine: "2#松散回潮机", level: "预警", forecast: true, value: 4.45, handled: true },
+  { m: 0, machine: "3#松散回潮机", level: "提示", value: 4.06, noCause: true },
   { m: 0, machine: "1#松散回潮机", level: "关注", value: 4.25 },
-  // 成品水分标准偏差（2#：关注实测 + 预警预测；危险级见 3# 飘移与预测条）
-  { m: 1, machine: "2#松散回潮机", level: "预警", forecast: true, value: 2.15 },
+  // 烟丝水分标准偏差（2#：关注实测 + 预警预测；危险级见 3# 飘移与预测条）
+  { m: 1, machine: "2#松散回潮机", level: "预警", forecast: true, value: 2.15, handled: true },
   { m: 1, machine: "2#松散回潮机", level: "关注", value: 2.08 },
   { m: 1, machine: "1#松散回潮机", level: "关注", value: 2.05 },
-  { m: 1, machine: "3#松散回潮机", level: "预警", forecast: true, value: 2.12 },
-  // 烘丝工序非稳态指数
+  { m: 1, machine: "3#松散回潮机", level: "预警", forecast: true, value: 2.12, handled: true },
+  // 烘丝工序非稳态指数（1# 预测条 = 工作台 a5 演示锚点，保持未处理）
   { m: 2, machine: "5#烘丝机", level: "关注", value: 1.12 },
   { m: 2, machine: "1#烘丝机", level: "预警", forecast: true, value: 1.16 },
-  // 烘丝机出口水分偏差
-  { m: 3, machine: "3#烘丝机", level: "预警", value: 0.47 },
-  { m: 3, machine: "1#烘丝机", level: "关注", value: 0.43 },
-  // 烘丝机出口水分偏差 · 飘移示例（连续 3 个批次 > 上限 0.50% 触发，产生危险级记录；对应 QAS-010）
-  { m: 3, machine: "5#烘丝机", level: "危险", value: 0.58, shifts: 3, shiftBaseline: 0.5 },
-  // 成品水分标准偏差 · 飘移示例（连续 5 个批次 > 上限 2.20% 触发，产生危险级记录；危险等级按排序规则置顶）
+  // 烟丝水分标准偏差 · 飘移示例（连续 5 个批次 > 上限 2.20% 触发，产生危险级记录；危险等级按排序规则置顶）
   {
     m: 1, machine: "3#松散回潮机", level: "危险", value: 2.35, shifts: 5, shiftBaseline: 2.2,
     manualCause:
       "经现场核查为松散回潮加水流量计漂移导致水分控制偏差，已校准流量计并按工艺标准调整加水参数，后续两个批次标准偏差已回落至2.10%以下。",
   },
-  // 加香出口水分不达标次数（每日）
-  { m: 4, machine: "2#加香机", level: "危险", value: 8 },
-  { m: 4, machine: "1#加香机", level: "告警", forecast: true, value: 5 },
   // 非细支单支重量偏差
-  { m: 6, machine: "1#卷接包机组", level: "预警", value: 19.2 },
-  { m: 6, machine: "5#卷接包机组", level: "预警", forecast: true, value: 18.4 },
-  // 烟支单支克重偏差（2# 预警预测；告警级见 4# 实测条）
-  { m: 5, machine: "2#卷接包机组", level: "预警", forecast: true, value: -14.2 },
-  { m: 5, machine: "4#卷接包机组", level: "告警", value: -15.8 },
-  // 常规烟支硬度变异系数
-  { m: 7, machine: "2#卷接包机组", level: "告警", value: 3.58 },
-  { m: 7, machine: "3#卷接包机组", level: "提示", value: 3.05 },
+  { m: 3, machine: "1#卷接包机组", level: "预警", value: 19.2, handled: true },
+  { m: 3, machine: "5#卷接包机组", level: "预警", forecast: true, value: 18.4, noCause: true },
+  // 常规烟支硬度变异系数（2# 告警条 = 工作台 a4 演示锚点，保持未处理；3# 已处理条供工作台 p1 预测关注）
+  { m: 4, machine: "2#卷接包机组", level: "告警", value: 3.58 },
+  { m: 4, machine: "3#卷接包机组", level: "提示", value: 3.05, handled: true },
   // 中支烟硬度变异系数
-  { m: 8, machine: "4#卷接包机组", level: "预警", forecast: true, value: 3.9 },
-  { m: 8, machine: "2#卷接包机组", level: "关注", value: 3.75 },
-  // 包装与卷制质量检验加权平均值
-  { m: 9, machine: "全厂", level: "预警", value: 95.8 },
-  { m: 9, machine: "全厂", level: "关注", forecast: true, value: 96.4 },
-  // 优质品率（成品）
-  { m: 10, machine: "全厂", level: "告警", value: 95.6 },
-  { m: 10, machine: "全厂", level: "预警", forecast: true, value: 96.5 },
-  // 优质品率（制丝）
-  { m: 11, machine: "全厂", level: "预警", value: 97.5 },
-  { m: 11, machine: "全厂", level: "关注", value: 97.8 },
-  // 成品水分标准偏差 · 预测危险示例（预测值 2.52 越过危险线 2.40；尾部追加 = 触发时间最新，
+  { m: 5, machine: "4#卷接包机组", level: "预警", forecast: true, value: 3.9 },
+  { m: 5, machine: "2#卷接包机组", level: "关注", value: 3.75, handled: true },
+  // 烟丝水分标准偏差 · 预测危险示例（预测值 2.52 越过危险线 2.40；尾部追加 = 触发时间最新，
   // 危险级 + 最新 → 非飘移组第一，排列表第三；带人工补录演示）
   {
     m: 1, machine: "3#松散回潮机", level: "危险", forecast: true, value: 2.52,
     manualCause:
-      "当班确认为烘丝蒸汽压力阶段性波动导致出口水分抬升，已切换备用蒸汽支路并加密在线水分检测频次，最新两批实测值已回落至2.05%左右。",
+      "当班确认为松散回潮加水流量阶段性波动导致烟丝水分抬升，已切换备用加水支路并加密在线水分检测频次，最新两批实测值已回落至2.05%左右。",
   },
 ];
 
@@ -428,7 +358,7 @@ export function buildQualityAlertRecords(): AlertRecord[] {
   return [...buildStabilityAlertRecords(), ...buildDefectAlertRecords()];
 }
 
-/* ---------------- 缺陷指标 · 预测风险告警记录（5 条，与缺陷预测页最新一轮对齐） ---------------- */
+/* ---------------- 缺陷指标 · 预测风险告警记录（2 条，与缺陷预测页最新一轮对齐） ---------------- */
 // 口径：
 //  · 记录由缺陷预测结果触发 → type 固定「预测风险」；触发时间紧随本轮预测发布时刻（14:06）之后
 //  · 数值与缺陷预测页（quality-defect-forecast）同源：窗口最高评分 / 预测水分偏差 / 箱储时长核算
@@ -561,7 +491,7 @@ function buildDefectAlertRecords(): AlertRecord[] {
   }));
 }
 
-/* ---------------- 稳定性/结果类指标 · 告警记录生成（确定性 31 条，五级全覆盖） ---------------- */
+/* ---------------- 稳定性指标 · 告警记录生成（确定性 18 条，五级全覆盖） ---------------- */
 
 function buildStabilityAlertRecords(): AlertRecord[] {
   return SPECS.map((spec, i) => {
@@ -598,7 +528,7 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         : `${metric.name}${isUpper ? "超过上限" : "低于下限"}`;
 
     // 预测风险：预计越界周期数（月度批次推算用）与预测窗口
-    // （批周期与缺陷预测页同源口径「已排产批次」；日周期与稳定性预测页 SF05 同口径「未来已排产的22日」）
+    // （批周期与缺陷预测页同源口径「已排产批次」；日/月周期为防御分支，当前开放指标均为批/班周期）
     const forecastShift = 2 + (i % 3); // 2~4 个统计周期后越界
     const windowUnit = cycleUnit === "批次" ? "已排产批次" : cycleUnit;
     const forecastWindow = isForecast
@@ -616,10 +546,9 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         ? `${Number(triggerTime.slice(5, 7))}-${Number(triggerTime.slice(8, 10))} ${triggerHour >= 8 && triggerHour < 20 ? "白班" : "夜班"}`
         : undefined;
     const dateStr = triggerTime.slice(0, 10).replace(/-/g, "");
-    const handled = i % 3 === 1 && !spec.shifts; // 约 1/3 已处理（飘移示例保持未处理，便于演示确认操作）
-    const isResult = metric.objects[0] === "全厂"; // 结果类指标（原因/建议另一套文案）
-    const causeIdx = isResult ? i % RESULT_CAUSES.length : i % PROCESS_CAUSES.length;
-    const noCause = i % 5 === 2 && !spec.shifts; // 少量记录演示「当前数据不足，暂无法确定异常原因」（飘移示例带原因）
+    const handled = spec.handled ?? false; // 预置已处理（约 1/3；工作台绑定条目保持未处理）
+    const causeIdx = i % PROCESS_CAUSES.length;
+    const noCause = spec.noCause ?? false; // 少量记录演示「当前数据不足，暂无法确定异常原因」（飘移示例带原因）
 
     return {
       id: `ZL${dateStr}${pad3(i + 1)}`,
@@ -651,7 +580,7 @@ function buildStabilityAlertRecords(): AlertRecord[] {
       shift: SHIFTS[i % 3],
       shiftLabel, // 班次（白班/夜班，批/班周期指标生成；月度指标不生成 → 详情不展示）
       brand: BRANDS[i % 3],
-      process: metric.process, // 来源工序（结果类指标无 → 详情不展示）
+      process: metric.process, // 来源工序
       consecutiveShifts: spec.shifts, // 飘移类：连续同向偏离周期数（详情「连续同向偏离」= N个批次/班次/月；列表置顶）
       // 判定依据（策略快照：历史记录展示生成时的策略与条件；飘移类另以 consecutiveShifts 字段展示连续偏离）
       strategyName: spec.shifts
@@ -661,16 +590,10 @@ function buildStabilityAlertRecords(): AlertRecord[] {
         ? `${metric.name} ${isUpper ? ">" : "<"} ${isUpper ? "上限" : "下限"}${fmt(spec.shiftBaseline ?? base)}${metric.unit}`
         : `${metric.name} ${isUpper ? "≥" : "≤"} ${isUpper ? "上限" : "下限"}${fmt(base)}${metric.unit}${exceedSuffix}`,
       // 原因与建议
-      causeSummary: noCause
-        ? undefined
-        : isResult
-          ? RESULT_CAUSES[causeIdx](metric.name)
-          : PROCESS_CAUSES[causeIdx](metric.name),
+      causeSummary: noCause ? undefined : PROCESS_CAUSES[causeIdx](metric.name),
       causeType: noCause ? undefined : i % 2 === 0 ? "AI生成" : "人工补录",
       manualCause: spec.manualCause,
-      suggestion: isResult
-        ? RESULT_SUGGESTIONS[i % RESULT_SUGGESTIONS.length](metric.name)
-        : PROCESS_SUGGESTIONS[i % PROCESS_SUGGESTIONS.length](metric.name),
+      suggestion: PROCESS_SUGGESTIONS[i % PROCESS_SUGGESTIONS.length](metric.name),
       // 责任与处理情况（确认时间 = handledAt；约 1/3 预置已处理演示状态）
       receiver: RECEIVERS[i % RECEIVERS.length],
       notifyMethods: ["企业微信"],

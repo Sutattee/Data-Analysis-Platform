@@ -186,9 +186,6 @@ export const PROCESS_LINK: Record<string, string> = {
   "pm-1": "/quality/forecast/stability?metric=SF02",
   "pm-2": "/quality/forecast/stability?metric=SF01",
   "pm-3": "/quality/forecast/stability?metric=SF03",
-  "pm-4": "/quality/forecast/stability?metric=SF04",
-  "pm-5": "/quality/forecast/stability?metric=SF05",
-  "pm-6": "/quality/forecast/stability?metric=SF07",
   "pm-7": "/quality/forecast/stability?metric=SF06",
   "pm-8": "/quality/forecast/stability?metric=SF08",
   "pm-9": "/quality/forecast/stability?metric=SF09",
@@ -356,7 +353,7 @@ export const COCKPIT_INSIGHT_REPORT = `📊 驾驶舱智能解读报告 · ${COC
 
 【工艺质量】
 • 成品优质品率 ${YIELD_RINGS[0]!.value.toFixed(1)}%、制丝优质品率 ${YIELD_RINGS[1]!.value.toFixed(1)}%，保持高位
-• 过程管控 9 项中 4 项未达标：松散回潮非稳态指数 4.8%（≤4.0%）、成品水分标准偏差 1.65%（≤1.55%）、烟支单支克重偏差 46mg（≤40mg）超上限，烘丝机出口水分偏差 12.4% 低于下限 12.5%
+• 过程管控 6 项中 2 项近期均值超差：松散回潮非稳态指数 4.1%（≤4.0%）、烟丝水分标准偏差 1.57%（≤1.55%）
 • 全部缺陷 ${DEFECT_TOTAL_COUNT} 条，以「${topDefect.name}」居首（${topDefect.count}条 / 占比${topDefect.pct}%）
 
 【能耗与碳水资源】

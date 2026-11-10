@@ -29,7 +29,7 @@ export type DetailDim = "batch" | "machine" | "shift" | "brand" | "material" | "
 export type CompareDim = "brand" | "machine" | "shift";
 
 export interface ProcessDetailMetric {
-  id: string; // SF01~SF09 / QC-10 / QC-11
+  id: string; // SF01~SF09 中的 6 个开放指标编码
   name: string;
   unit: string;
   decimals: number;
@@ -46,7 +46,7 @@ export interface ProcessDetailMetric {
 // 等级规则：最轻级边界 ≡ 管控值（越管控值即至少提示级）
 export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
   {
-    id: "SF01", name: "成品水分标准偏差", unit: "%", decimals: 2, cycle: "批",
+    id: "SF01", name: "烟丝水分标准偏差", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand", "material", "env"],
     compareDims: ["brand", "machine", "shift"],
     machines: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
@@ -83,31 +83,6 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     sfCode: "SF03",
   },
   {
-    id: "SF04", name: "烘丝机出口水分偏差", unit: "%", decimals: 2, cycle: "批",
-    dims: ["batch", "machine", "brand"],
-    compareDims: ["brand", "machine"],
-    machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
-    control: { kind: "range", text: "12.50%～13.50%", lower: 12.5, upper: 13.5 },
-    nominal: [12.68, 13.32],
-    rule: { op: "between", levels: [
-      { level: "告警", low: 12.4, high: 13.6 }, { level: "关注", low: 12.5, high: 13.5 },
-    ] },
-    sfCode: "SF04",
-  },
-  {
-    id: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "日",
-    dims: ["batch", "machine", "brand"],
-    compareDims: ["brand", "machine"],
-    machines: ["1#加香机", "2#加香机", "3#加香机"],
-    control: { kind: "upper", text: "≤3次", upper: 3 },
-    nominal: [0, 2],
-    rule: { op: ">=", levels: [
-      { level: "危险", threshold: 8 }, { level: "告警", threshold: 6 },
-      { level: "预警", threshold: 5 }, { level: "关注", threshold: 4 }, { level: "提示", threshold: 3 },
-    ] },
-    sfCode: "SF05",
-  },
-  {
     id: "SF06", name: "非细支单支重量偏差", unit: "%", decimals: 2, cycle: "批",
     dims: ["batch", "machine", "shift", "brand"],
     compareDims: ["brand", "machine", "shift"],
@@ -119,19 +94,6 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
       { level: "预警", threshold: 3.5 }, { level: "关注", threshold: 3.3 }, { level: "提示", threshold: 3.2 },
     ] },
     sfCode: "SF06",
-  },
-  {
-    id: "SF07", name: "烟支单支克重偏差（毫克）", unit: "mg", decimals: 1, cycle: "批",
-    dims: ["machine", "brand"],
-    compareDims: ["brand", "machine"],
-    machines: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
-    control: { kind: "upper", text: "≤40mg", upper: 40 },
-    nominal: [32, 39],
-    rule: { op: ">=", levels: [
-      { level: "危险", threshold: 55 }, { level: "告警", threshold: 48 },
-      { level: "预警", threshold: 45 }, { level: "关注", threshold: 42 }, { level: "提示", threshold: 40 },
-    ] },
-    sfCode: "SF07",
   },
   {
     id: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "批",
@@ -159,52 +121,27 @@ export const PROCESS_DETAIL_METRICS: ProcessDetailMetric[] = [
     ] },
     sfCode: "SF09",
   },
-  {
-    id: "QC-10", name: "优质品率（成品）", unit: "%", decimals: 1, cycle: "批",
-    dims: ["spec", "brand"],
-    compareDims: ["brand"],
-    machines: ["全厂"],
-    control: { kind: "lower", text: "≥96%", lower: 96 },
-    nominal: [96.5, 99.3],
-    rule: { op: "<=", levels: [
-      { level: "危险", threshold: 93 }, { level: "告警", threshold: 94 },
-      { level: "预警", threshold: 95 }, { level: "提示", threshold: 96 },
-    ] },
-  },
-  {
-    id: "QC-11", name: "优质品率（制丝）", unit: "%", decimals: 1, cycle: "批",
-    dims: ["batch", "brand", "machine"],
-    compareDims: ["brand", "machine"],
-    machines: ["全厂"],
-    control: { kind: "lower", text: "≥98%", lower: 98 },
-    nominal: [98.4, 99.6],
-    rule: { op: "<=", levels: [
-      { level: "危险", threshold: 95 }, { level: "告警", threshold: 96.5 },
-      { level: "预警", threshold: 97.5 }, { level: "提示", threshold: 98 },
-    ] },
-  },
 ];
 
 export function metricOfDetail(id: string): ProcessDetailMetric | undefined {
   return PROCESS_DETAIL_METRICS.find((m) => m.id === id);
 }
 
-// 关联工序（取稳定性预测指标档案；结果类指标 QC-10/11 无 sfCode → 无工序，趋势图悬浮不展示该字段）
+// 关联工序（取稳定性预测指标档案；开放指标均有 sfCode，趋势图悬浮展示工序字段）
 export function processOfDetail(m: ProcessDetailMetric): string | undefined {
   return m.sfCode ? STABILITY_METRICS.find((s) => s.code === m.sfCode)?.process : undefined;
 }
 
 // 总览过程管控列表（pm-*）→ 本页指标编码
 export const PM_TO_DETAIL: Record<string, string> = {
-  "pm-1": "SF02", "pm-2": "SF01", "pm-3": "SF03", "pm-4": "SF04", "pm-5": "SF05",
-  "pm-6": "SF07", "pm-7": "SF06", "pm-8": "SF08", "pm-9": "SF09",
+  "pm-1": "SF02", "pm-2": "SF01", "pm-3": "SF03", "pm-7": "SF06", "pm-8": "SF08", "pm-9": "SF09",
 };
 
 /* ---------------- 筛选选项 ---------------- */
 
-// 材料（成品水分标准偏差「更多条件」）
+// 材料（烟丝水分标准偏差「更多条件」）
 export const MATERIAL_OPTIONS = ["云南C3F", "贵州B2F", "四川X2F", "津巴布韦L1"];
-// 规格（优质品率成品统计维度）
+// 规格（预留：当前开放指标均无 spec 维度，暂不展示规格筛选）
 export const SPEC_OPTIONS = ["常规", "细支", "中支"];
 // 环境温湿度区间选项（值 = [下限, 上限]，与记录数值比较）
 export const ENV_TEMP_OPTIONS: { text: string; range: [number, number] }[] = [
@@ -231,7 +168,7 @@ export interface MonitorRecord {
   machine: string;
   brand: string;
   material?: string; // SF01
-  spec?: string; // QC-10
+  spec?: string; // 规格维度（预留，当前开放指标无 spec 维度）
   envTemp?: number; // SF01
   envHum?: number; // SF01
   value: number;
@@ -297,21 +234,9 @@ const ANOMALIES: Record<string, { machine: string; fromEnd: number; value: numbe
     { machine: "2#松散回潮机", fromEnd: 5, value: 4.48 },
   ],
   SF03: [], // 待配置不判级
-  SF04: [
-    { machine: "3#烘丝机", fromEnd: 1, value: 12.4 }, // 批次 20260816-05，与总览 pm-4「12.4%」一致
-    { machine: "5#烘丝机", fromEnd: 7, value: 13.66 },
-  ],
-  SF05: [
-    { machine: "2#加香机", fromEnd: 1, value: 6 },
-    { machine: "1#加香机", fromEnd: 2, value: 4 },
-  ],
   SF06: [
     { machine: "1#卷接包机组", fromEnd: 3, value: 3.62 },
     { machine: "5#卷接包机组", fromEnd: 8, value: 3.36 },
-  ],
-  SF07: [
-    { machine: "2#卷接包机组", fromEnd: 2, value: 46.4 },
-    { machine: "4#卷接包机组", fromEnd: 11, value: 41.2 },
   ],
   SF08: [
     { machine: "3#卷接包机组", fromEnd: 4, value: 2.82 },
@@ -321,11 +246,6 @@ const ANOMALIES: Record<string, { machine: string; fromEnd: number; value: numbe
     { machine: "4#卷接包机组", fromEnd: 5, value: 1.58 },
     { machine: "3#卷接包机组", fromEnd: 17, value: 1.52 },
   ],
-  "QC-10": [
-    { machine: "全厂", fromEnd: 4, value: 95.6 },
-    { machine: "全厂", fromEnd: 15, value: 95.9 },
-  ],
-  "QC-11": [{ machine: "全厂", fromEnd: 9, value: 97.6 }],
 };
 
 // 对象水平值：机台×牌号×班组组合的稳定水平（在 nominal 区间 20%~80% 分散，保证按
@@ -457,16 +377,6 @@ export function recordsOfDetail(id: string): MonitorRecord[] {
     sf02.label = "20260817-02";
     sf02.cycleLabel = "批次20260817-02";
     sf02.time = "2026-08-17 14:30";
-  }
-}
-
-// SF05 最新日口径校准：1#加香机 08-17 = 0 次（与总览 pm-5「0次」一致）
-{
-  const sf05 = recordsOfDetail("SF05").find((r) => r.machine === "1#加香机" && r.label === "08-17");
-  if (sf05) {
-    sf05.value = 0;
-    sf05.level = null;
-    sf05.overPct = "0%";
   }
 }
 

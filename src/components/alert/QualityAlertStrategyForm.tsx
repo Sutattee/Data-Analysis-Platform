@@ -336,7 +336,7 @@ export function QualityAlertStrategyForm({
               deviationMode="exceed"
               onChange={(conditions, relation) => setData((prev) => ({ ...prev, conditions, relation }))}
             />
-            {/* 缺陷指标预测分级示例：仅预测风险类型展示（12 个稳定性指标沿用常规条件配置） */}
+            {/* 缺陷指标预测分级示例：仅预测风险类型展示（6 个稳定性指标沿用常规条件配置） */}
             {alertType === "预测风险" && (
               <div className="mt-3">
                 <QualityThresholdNote />

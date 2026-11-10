@@ -29,21 +29,14 @@ export const DIR_LABEL: Record<ControlDir, string> = {
 // 表单判断方向选项（顺序与 PRD 一致）
 export const DIR_OPTIONS: ControlDir[] = ["<", "≤", ">", "≥", "=", "between"];
 
-// 管控指标目录（预置 16 项；默认方向：水分允许范围 between / 优质品率 ≥ / 偏差·次数·时长 ≤）
+// 管控指标目录（预置 9 项；默认方向：水分允许范围 between / 偏差·次数·时长 ≤）
 const CATALOG: ControlMetricDef[] = [
   { id: "cm-001", name: "松散回潮非稳态指数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
-  { id: "cm-002", name: "成品水分标准偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
+  { id: "cm-002", name: "烟丝水分标准偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-003", name: "烘丝工序非稳态指数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
-  { id: "cm-004", name: "烘丝机出口水分偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
-  { id: "cm-005", name: "加香出口水分不达标次数", unit: "次", decimals: 0, valueKind: "count", defaultDir: "≤" },
-  { id: "cm-006", name: "烟支单支克重偏差(毫克)", unit: "mg", decimals: 1, valueKind: "duration", defaultDir: "≤" },
   { id: "cm-007", name: "非细支单支重量偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-008", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-009", name: "中支烟硬度变异系数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
-  { id: "cm-010", name: "包装与卷制质量检验加权平均值", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≥" },
-  { id: "cm-011", name: "优质品率（成品）", unit: "%", decimals: 1, valueKind: "percent", defaultDir: "≥" },
-  { id: "cm-012", name: "优质品率（制丝）", unit: "%", decimals: 1, valueKind: "percent", defaultDir: "≥" },
-  { id: "cm-013", name: "烘丝机出口水分", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
   { id: "cm-014", name: "加香出口水分", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
   { id: "cm-015", name: "成品水分", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
   { id: "cm-016", name: "箱储总存储时长", unit: "h", decimals: 1, valueKind: "duration", defaultDir: "≤" },
@@ -81,18 +74,12 @@ export function controlSummary(c: MetricControlConfig): string {
   return `${text}（${c.enabled ? "启用" : "停用"}）`;
 }
 
-// 预置配置（含启停混合；烘丝工序非稳态指数 / 常规烟支硬度变异系数 / 包装与卷制质量检验加权平均值 / 成品水分未配置，留作新增演示）
+// 预置配置（含启停混合；烘丝工序非稳态指数 / 常规烟支硬度变异系数 / 成品水分未配置，留作新增演示）
 let configs: MetricControlConfig[] = [
-  { id: "mc-001", metricId: "cm-002", metricName: "成品水分标准偏差", unit: "%", dir: "≤", value: 1.55, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-18 09:30" },
+  { id: "mc-001", metricId: "cm-002", metricName: "烟丝水分标准偏差", unit: "%", dir: "≤", value: 1.55, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-18 09:30" },
   { id: "mc-002", metricId: "cm-001", metricName: "松散回潮非稳态指数", unit: "%", dir: "≤", value: 4.0, enabled: true, updatedBy: "李工", updatedAt: "2026-10-12 14:20" },
-  { id: "mc-003", metricId: "cm-004", metricName: "烘丝机出口水分偏差", unit: "%", dir: "between", low: 12.5, high: 13.5, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-20 10:10" },
-  { id: "mc-004", metricId: "cm-005", metricName: "加香出口水分不达标次数", unit: "次", dir: "≤", value: 3, enabled: true, updatedBy: "王五", updatedAt: "2026-10-15 09:50" },
-  { id: "mc-005", metricId: "cm-006", metricName: "烟支单支克重偏差(毫克)", unit: "mg", dir: "≤", value: 40, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-21 10:40" },
   { id: "mc-006", metricId: "cm-007", metricName: "非细支单支重量偏差", unit: "%", dir: "≤", value: 3.2, enabled: true, updatedBy: "李工", updatedAt: "2026-09-28 16:40" },
   { id: "mc-007", metricId: "cm-009", metricName: "中支烟硬度变异系数", unit: "%", dir: "≤", value: 1.5, enabled: false, updatedBy: "苏恒", updatedAt: "2026-10-25 14:35" },
-  { id: "mc-008", metricId: "cm-011", metricName: "优质品率（成品）", unit: "%", dir: "≥", value: 96, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-10 15:30" },
-  { id: "mc-009", metricId: "cm-012", metricName: "优质品率（制丝）", unit: "%", dir: "≥", value: 98, enabled: false, updatedBy: "李工", updatedAt: "2026-10-24 09:15" },
-  { id: "mc-010", metricId: "cm-013", metricName: "烘丝机出口水分", unit: "%", dir: "between", low: 12.5, high: 13.5, enabled: true, updatedBy: "李工", updatedAt: "2026-09-15 10:00" },
   { id: "mc-011", metricId: "cm-014", metricName: "加香出口水分", unit: "%", dir: "between", low: 12.0, high: 13.0, enabled: true, updatedBy: "李工", updatedAt: "2026-09-15 10:05" },
   { id: "mc-012", metricId: "cm-016", metricName: "箱储总存储时长", unit: "h", dir: "≤", value: 72, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-22 11:05" },
 ];
@@ -111,12 +98,9 @@ function nextLogId(): string {
 
 // 变更记录（种子：代表性历史，时间倒序由查询函数保证）
 let changeLogs: ControlChangeLog[] = [
-  { id: "cl-001", controlId: "mc-010", type: "新增", before: "—", after: "12.50%～13.50%（启用）", by: "李工", at: "2026-09-15 10:00" },
   { id: "cl-002", controlId: "mc-011", type: "新增", before: "—", after: "12.00%～13.00%（启用）", by: "李工", at: "2026-09-15 10:05" },
   { id: "cl-003", controlId: "mc-001", type: "新增", before: "—", after: "≤1.45%（启用）", by: "王五", at: "2026-09-18 14:30" },
   { id: "cl-004", controlId: "mc-001", type: "修改", before: "≤1.45%（启用）", after: "≤1.55%（启用）", by: "苏恒", at: "2026-10-18 09:30" },
-  { id: "cl-005", controlId: "mc-009", type: "新增", before: "—", after: "≥98.0%（启用）", by: "李工", at: "2026-09-22 09:40" },
-  { id: "cl-006", controlId: "mc-009", type: "停用", before: "≥98.0%（启用）", after: "≥98.0%（停用）", by: "李工", at: "2026-10-24 09:15" },
   { id: "cl-007", controlId: "mc-012", type: "新增", before: "—", after: "≤72.0h（启用）", by: "苏恒", at: "2026-10-22 11:05" },
   { id: "cl-008", controlId: "mc-007", type: "新增", before: "—", after: "≤1.40%（启用）", by: "王五", at: "2026-09-26 15:20" },
   { id: "cl-009", controlId: "mc-007", type: "修改", before: "≤1.40%（启用）", after: "≤1.50%（启用）", by: "苏恒", at: "2026-10-25 14:30" },

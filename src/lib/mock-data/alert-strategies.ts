@@ -83,7 +83,7 @@ export const METRIC_HISTORICAL_AVG: Record<string, string> = {
   台时产量: "1085",
   // 工艺质量告警指标（参考过程管控/稳定性预测口径；烘丝机出口水分偏差与能源口径共用同值）
   松散回潮非稳态指数: "1.36",
-  成品水分标准偏差: "1.65",
+  烟丝水分标准偏差: "1.65",
   烘丝工序非稳态指数: "0.43",
   加香出口水分不达标次数: "0.8",
   "烟支单支克重偏差(毫克)": "42",
@@ -1051,14 +1051,14 @@ export const ALERT_STRATEGIES: AlertStrategy[] = ([
   },
   {
     id: "QAS-002",
-    name: "成品水分标准偏差异常告警策略",
-    description: "成品水分标准偏差达到上限 2% 且超出 0.4pct 判定告警",
+    name: "烟丝水分标准偏差异常告警策略",
+    description: "烟丝水分标准偏差达到上限 2% 且超出 0.4pct 判定告警",
     type: "当前异常",
     domain: "工艺质量",
     scope: "指定对象",
     objects: ["1#松散回潮机", "2#松散回潮机", "3#松散回潮机"],
     conditions: [
-      { metric: "成品水分标准偏差", operator: "≥", baselineType: "上限", baselineValue: "2", deviation: "0.4" },
+      { metric: "烟丝水分标准偏差", operator: "≥", baselineType: "上限", baselineValue: "2", deviation: "0.4" },
     ],
     relation: "且",
     level: "告警",
@@ -1470,7 +1470,7 @@ export function getAlertStrategy(id: string): AlertStrategy | undefined {
 }
 
 // 异常详情抽屉「判定依据」辅助：按记录的策略快照名解析档案策略 id——先按策略名精确匹配，
-// 未命中按条件指标兜底（如「成品水分标准偏差风险预警策略」→ 含该指标条件的 QAS-002）；
+// 未命中按条件指标兜底（如「烟丝水分标准偏差风险预警策略」→ 含该指标条件的 QAS-002）；
 // 均未命中返回 null（策略名以纯文本展示，不提供跳转）
 export function alertStrategyIdFor(strategyName: string, metricName: string): string | null {
   const list = getAlertStrategies();
@@ -1482,14 +1482,14 @@ export function alertStrategyIdFor(strategyName: string, metricName: string): st
 }
 
 // 触发条件展示文案：去除策略快照条件中的「超出量」片段（超出量改以记录实际值随条件合并展示）。
-// 如「成品水分标准偏差 ≥ 上限2.00% 超出0.1pct」→「成品水分标准偏差 ≥ 上限2.00%」；
+// 如「烟丝水分标准偏差 ≥ 上限2.00% 超出0.1pct」→「烟丝水分标准偏差 ≥ 上限2.00%」；
 // 双条件「≥上限12.8% 超出0.5pct 或 ＜下限12.2% 超出0.5pct」两段超出量均去除
 export function conditionBodyOf(triggerCondition: string): string {
   return triggerCondition.replace(/ ?超出\d+(?:\.\d+)?\S*/g, "");
 }
 
 // 触发条件合并展示：条件文本去除超出量片段后，与记录超出量数值（去方向词前缀）拼为一段，
-// 如「成品水分标准偏差 > 上限2.20%  超出量0.5pct」；超出量无有效值时仅展示条件
+// 如「烟丝水分标准偏差 > 上限2.20%  超出量0.5pct」；超出量无有效值时仅展示条件
 export function conditionWithExceed(triggerCondition: string, deviationValue: string): string {
   const exceed = deviationValue.replace(/^超(?:上限|下限)/, "");
   return exceed && exceed !== "-" ? `${conditionBodyOf(triggerCondition)}  超出量${exceed}` : conditionBodyOf(triggerCondition);

@@ -90,10 +90,10 @@ export const EMERGING_DEFECTS: EmergingDefect[] = [
 // ============ 模块二：过程管控 ============
 
 // 摘要：半年评价达标项 / 当日异常批次
-export const PROCESS_SUMMARY = { halfYearPass: 7, halfYearTotal: 9, todayAbnormal: 3, todayBatches: 28 };
+export const PROCESS_SUMMARY = { halfYearPass: 5, halfYearTotal: 6, todayAbnormal: 3, todayBatches: 28 };
 
-// 过程管控指标（9 项）：管控值为 null 且无 tolRange 表示「待配置」（不参与超差判定）；
-// tolRange = 区间型管控（值落在区间内达标，如 12.50%～13.50%），设置时优先于 toleranceNum 判定
+// 过程管控指标（6 项）：管控值为 null 且无 tolRange 表示「待配置」（不参与超差判定）；
+// tolRange = 区间型管控（值落在区间内达标），设置时优先于 toleranceNum 判定
 export interface ProcessMetric {
   id: string;
   stage: string; // 工序
@@ -105,7 +105,7 @@ export interface ProcessMetric {
   recent: string; // 近期均值展示
   recentNum: number; // 近期均值数值
   recentNote: string; // 近期均值统计周期（近10批次 / 近30日）
-  tolerance: string; // 管控值展示（如 ≤4.0% / ≤3次 / 12.50%～13.50% / 待配置）
+  tolerance: string; // 管控值展示（如 ≤4.0% / 待配置）
   toleranceNum: number | null; // 上限型管控值数值（null = 非上限型或待配置）
   tolRange?: [number, number]; // 区间型管控 [下限, 上限]
 }
@@ -128,7 +128,7 @@ export const PROCESS_METRICS: ProcessMetric[] = [
   {
     id: "pm-2",
     stage: "松散回潮",
-    name: "成品水分标准偏差",
+    name: "烟丝水分标准偏差",
     halfYearValue: "1.8%",
     halfYearPass: false,
     latestValue: "1.65%",
@@ -152,49 +152,6 @@ export const PROCESS_METRICS: ProcessMetric[] = [
     recentNote: "近10批次",
     tolerance: "待配置",
     toleranceNum: null,
-  },
-  {
-    id: "pm-4",
-    stage: "烘丝",
-    name: "烘丝机出口水分偏差",
-    halfYearValue: "0.46%",
-    halfYearPass: true,
-    latestValue: "12.4%",
-    latestNum: 12.4,
-    recent: "12.49%",
-    recentNum: 12.49,
-    recentNote: "近10批次",
-    tolerance: "12.50%～13.50%",
-    toleranceNum: null,
-    tolRange: [12.5, 13.5],
-  },
-  {
-    id: "pm-5",
-    stage: "加香",
-    name: "加香出口水分不达标次数",
-    halfYearValue: "0.8次",
-    halfYearPass: true,
-    latestValue: "0次",
-    latestNum: 0,
-    recent: "1次",
-    recentNum: 1,
-    recentNote: "近30日",
-    tolerance: "≤3次",
-    toleranceNum: 3,
-  },
-  {
-    id: "pm-6",
-    stage: "卷制",
-    name: "烟支单支克重偏差（毫克）",
-    halfYearValue: "44mg",
-    halfYearPass: false,
-    latestValue: "46mg",
-    latestNum: 46,
-    recent: "42mg",
-    recentNum: 42,
-    recentNote: "近10批次",
-    tolerance: "≤40mg",
-    toleranceNum: 40,
   },
   {
     id: "pm-7",
@@ -246,7 +203,7 @@ export const PROCESS_METRICS: ProcessMetric[] = [
 export const QUALITY_INSIGHT = [
   "近1个月缺陷 58 条、缺陷率 1.84%（环比 ↑0.4pct），小盒杂项部位占 29.3%，Top 缺陷为爆口 9 条。",
   "成品与制丝优质品率均 98.6%，包装卷制质量加权 96.8 分，整体质量结果稳定。",
-  "过程管控 7/9 项达标，松散回潮非稳态指数等 3 项近期均值超差，建议优先排查松散回潮工况。",
+  "过程管控 5/6 项达标，松散回潮非稳态指数与烟丝水分标准偏差 2 项近期均值超差，建议优先排查松散回潮工况。",
 ];
 
 // ========== AI 助手「智能解读」：固定指令 + 一键生成的仪表盘解读报告 ==========
@@ -262,14 +219,14 @@ export const QUALITY_INSIGHT_REPORT = `📊 质量总览智能解读 · 2026年8
 成品优质品率 ${FINISHED_PREMIUM.value}%（同比 +${FINISHED_PREMIUM.yoy}pct、环比 +${FINISHED_PREMIUM.mom}pct），制丝优质品率 ${SILK_PREMIUM.value}%（环比 -${-SILK_PREMIUM.mom}pct 小幅回落），均保持高位；包装与卷制质量检验加权 ${PACKING_SCORE.value} 分，近10批区间 ${PACKING_SCORE.rangeLow}～${PACKING_SCORE.rangeHigh} 分，整体质量结果稳定。
 
 三、过程稳定性
-过程管控 9 项中 7 项达标，3 项近期均值超差：松散回潮非稳态指数 4.1%（管控 ≤4.0%）、成品水分标准偏差 1.57%（≤1.55%）、烘丝机出口水分偏差 12.49%（低于下限 12.50%）。超差项集中在松散回潮与烘丝工序，过程能力存在波动压力，需结合批次趋势定位工艺偏差根因。
+过程管控 6 项中 5 项达标，2 项近期均值超差：松散回潮非稳态指数 4.1%（管控 ≤4.0%）、烟丝水分标准偏差 1.57%（≤1.55%）。超差项集中在松散回潮工序，过程能力存在波动压力，需结合批次趋势定位工艺偏差根因。
 
 四、综合结论与建议
-本月质量总体平稳：优质品率与检验得分达标，风险点在缺陷率环比小幅上升与 3 项过程参数超差。建议：1）优先排查松散回潮工况与烘丝出口水分偏差；2）针对爆口、小盒轧皱等 Top 缺陷开展机台专项排查；3）跟踪制丝优质品率环比回落趋势，防止扩散至成品端。`;
+本月质量总体平稳：优质品率与检验得分达标，风险点在缺陷率环比小幅上升与 2 项过程参数超差。建议：1）优先排查松散回潮工况与烟丝水分控制偏差；2）针对爆口、小盒轧皱等 Top 缺陷开展机台专项排查；3）跟踪制丝优质品率环比回落趋势，防止扩散至成品端。`;
 
 // AI 助手推荐问题（由本页数据分析情况生成，回复走 qa.ts 预设规则）
 export const QUALITY_AI_QUESTIONS = [
   "松散回潮非稳态指数逐批走势如何？",
-  "烘丝机出口水分偏差高于均值的原因是什么？",
+  "烟丝水分标准偏差超差的原因是什么？",
   "小盒轧皱集中在哪些机台与班组？",
 ];

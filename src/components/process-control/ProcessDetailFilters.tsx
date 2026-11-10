@@ -2,7 +2,7 @@
 
 // 查询条件区：指标单选（切换由主视图统一清不适配条件并跳转）、统计周期（按周期分
 // 形态：批=近N批次，班=近N班次，日=近N日，月=近1/2/3个月，按统计单元数取最近
-// N 个单元）、牌号/机台/班组多选、更多条件（材料+环境温湿度，仅支持的指标展示）。
+// N 个单元）、牌号单选下拉、机台/班组多选、更多条件（材料+环境温湿度，仅支持的指标展示）。
 // 指标选项仅展示指标名称（不带单位与统计周期）。查询 = 应用输入态；重置 = 恢复初始条件（均由主视图处理）。
 import { SearchMultiSelect } from "@/components/alert/SearchMultiSelect";
 import { SearchSelect } from "@/components/forecast/SearchSelect";
@@ -19,7 +19,7 @@ import {
 
 export interface DetailFilterState {
   rangeMode: "last1" | "last2" | "last3" | "last4" | "last5" | "last6" | "last10" | "last20" | "last30" | "last40" | "last50" | "last60";
-  brands: string[];
+  brand: string;
   machines: string[];
   shifts: string[];
   materials: string[];
@@ -89,18 +89,17 @@ export function ProcessDetailFilters({
             ))}
           </select>
         </div>
-        {/* 维度条件按指标支持能力展示 */}
+        {/* 维度条件按指标支持能力展示（牌号为下拉单选，默认第一项） */}
         {metric.dims.includes("brand") && (
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-gray-500">牌号</span>
-            <div className="w-[200px]">
-              <SearchMultiSelect
-                options={BRAND_OPTIONS.map((b) => ({ value: b, label: b }))}
-                value={filter.brands}
-                onChange={(v) => patch({ brands: v })}
-                placeholder="选择牌号"
-              />
-            </div>
+            <select value={filter.brand} onChange={(e) => patch({ brand: e.target.value })} className={selectCls}>
+              {BRAND_OPTIONS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
           </div>
         )}
         {metric.dims.includes("machine") && metric.machines.length > 1 && (
@@ -150,7 +149,7 @@ export function ProcessDetailFilters({
           </Button>
         </div>
       </div>
-      {/* 更多条件：材料 + 环境温湿度（仅成品水分标准偏差等支持的指标展示） */}
+      {/* 更多条件：材料 + 环境温湿度（仅烟丝水分标准偏差等支持的指标展示） */}
       {metric.dims.includes("material") && (
         <div className="flex flex-wrap items-center gap-3 border-t border-gray-50 pt-3">
           <span className="text-xs text-gray-400">更多条件</span>

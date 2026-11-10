@@ -67,11 +67,8 @@ const DEFECT_CODE_OF: Record<string, DefectCode> = {
 /** 稳定性指标名 → 稳定性预测页 code（quality-alerts 与稳定性预测页同源） */
 const SF_CODE_OF: Record<string, string> = {
   松散回潮非稳态指数: "SF02",
-  成品水分标准偏差: "SF01",
+  烟丝水分标准偏差: "SF01",
   烘丝工序非稳态指数: "SF03",
-  烘丝机出口水分偏差: "SF04",
-  加香出口水分不达标次数: "SF05",
-  "烟支单支克重偏差(毫克)": "SF07",
   非细支单支重量偏差: "SF06",
   常规烟支硬度变异系数: "SF08",
   中支烟硬度变异系数: "SF09",
@@ -122,14 +119,14 @@ function toAlarm(r: AlertRecord, isFocus: boolean): WorkbenchAlarm {
 
 /** 待处理告警绑定谓词（对应需求示例 a1-a5，首页仅展示前 5 条；记录被会话确认处理后自动移出） */
 const ALARM_BINDINGS: Array<(r: AlertRecord) => boolean> = [
-  // a1 危险·实测：成品水分标准偏差 @3#松散回潮机 连续5个批次超上限（飘移）
+  // a1 危险·实测：烟丝水分标准偏差 @3#松散回潮机 连续5个批次超上限（飘移）
   (r) =>
-    r.metricName === "成品水分标准偏差" &&
+    r.metricName === "烟丝水分标准偏差" &&
     r.objectName === "3#松散回潮机" &&
     r.consecutiveShifts === 5,
   // a2 危险·预测：同指标同机 预测风险 危险（预计越过危险线 2.40）
   (r) =>
-    r.metricName === "成品水分标准偏差" &&
+    r.metricName === "烟丝水分标准偏差" &&
     r.objectName === "3#松散回潮机" &&
     r.type === "预测风险" &&
     r.level === "危险",
@@ -229,7 +226,7 @@ export interface WorkbenchAttention {
 
 /**
  * 预测关注（容量 ≤6，去重口径：已有关联待处理告警的对象只在告警区展示）：
- * p1 稳定性：SF07 烟支单支克重偏差 —— 关联告警已确认处理，持续跟踪预测走势；
+ * p1 稳定性：SF08 常规烟支硬度变异系数 —— 关联告警已确认处理，持续跟踪预测走势；
  * p2 缺陷：CPSFBH 成品水分 @1#烘丝机 —— 预测值恰达允许上限，本轮有预测、未触发告警
  * （3#烘丝机预测成品水分已有关联待处理告警 a3，按去重口径只在告警区展示）
  */
@@ -237,21 +234,21 @@ function buildAttentions(): WorkbenchAttention[] {
   const list: WorkbenchAttention[] = [];
 
   const handled = qualityRecords().find(
-    (r) => r.metricName === "烟支单支克重偏差(毫克)" && !!r.handledBy
+    (r) => r.metricName === "常规烟支硬度变异系数" && !!r.handledBy
   );
   if (handled) {
-    const f = stabilityForecastOf("SF07", handled.objectName);
+    const f = stabilityForecastOf("SF08", handled.objectName);
     const trend = f ? `${machineTagOf(f).text}，${levelChangeOf(f).text}` : "暂无有效预测";
     list.push({
       key: "p1",
       kind: "稳定性预测",
-      name: "烟支单支克重偏差",
+      name: "常规烟支硬度变异系数",
       machine: handled.objectName,
       statusText: "告警已处理 · 持续关注",
       summary: trend,
       updatedLabel: f ? f.updatedAt.slice(-5) : "—",
       recordHref: `/quality/alert/records/${handled.id}`,
-      forecastHref: `/quality/forecast/stability?metric=SF07&machine=${enc(handled.objectName)}`,
+      forecastHref: `/quality/forecast/stability?metric=SF08&machine=${enc(handled.objectName)}`,
     });
   }
 

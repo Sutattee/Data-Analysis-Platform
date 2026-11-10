@@ -96,11 +96,6 @@ const PARAM_DEFS: Record<string, StabilityParamDef> = {
   airTemp: { key: "airTemp", name: "热风温度", unit: "℃", source: "process", tip: "近1小时均值" },
   exhaust: { key: "exhaust", name: "排潮风门开度", unit: "%", source: "process", tip: "最新值" },
   steamPress: { key: "steamPress", name: "蒸汽压力", unit: "MPa", source: "process", tip: "近1小时均值" },
-  flavorMoist: { key: "flavorMoist", name: "加香入口烟丝水分", unit: "%", source: "process", tip: "批次均值" },
-  cutFlow: { key: "cutFlow", name: "烟丝流量", unit: "kg/h", source: "process", tip: "近1小时均值" },
-  flavorFlow: { key: "flavorFlow", name: "香料实际流量", unit: "L/h", source: "process", tip: "近1小时均值" },
-  envTemp: { key: "envTemp", name: "环境温度", unit: "℃", source: "env", tip: "近1小时均值" },
-  envHum: { key: "envHum", name: "环境湿度", unit: "%", source: "env", tip: "近1小时均值" },
   rollSpeed: { key: "rollSpeed", name: "卷接速度", unit: "支/分", source: "process", tip: "最新值" },
   fillValue: { key: "fillValue", name: "烟丝填充值", unit: "cm³/g", source: "process", tip: "批次均值" },
 };
@@ -113,11 +108,6 @@ export const PARAM_SPECS: Record<string, ParamSpec> = {
   airTemp: { kind: "range", low: 110, high: 125 },
   exhaust: { kind: "range", low: 35, high: 55 },
   steamPress: { kind: "range", low: 0.6, high: 0.8 },
-  flavorMoist: { kind: "range", low: 12, high: 13 },
-  cutFlow: { kind: "base", base: 6500, tol: 200 },
-  flavorFlow: { kind: "base", base: 52, tol: 2 },
-  envTemp: { kind: "range", low: 18, high: 28 },
-  envHum: { kind: "range", low: 40, high: 65 },
   rollSpeed: { kind: "range", low: 6500, high: 7000 },
   fillValue: { kind: "range", low: 4.3, high: 4.8 },
 };
@@ -141,7 +131,7 @@ export interface StabilityMetricDef {
 
 export const STABILITY_METRICS: StabilityMetricDef[] = [
   {
-    code: "SF01", name: "成品水分标准偏差", unit: "%", decimals: 2, cycle: "批", process: "松散回潮",
+    code: "SF01", name: "烟丝水分标准偏差", unit: "%", decimals: 2, cycle: "批", process: "松散回潮",
     params: [PARAM_DEFS.wallTemp, PARAM_DEFS.airTemp],
     rule: { op: ">=", levels: [{ level: "危险", threshold: 2.4 }, { level: "告警", threshold: 2.2 }, { level: "预警", threshold: 2.1 }, { level: "关注", threshold: 2.0 }] },
     modelVer: "MoistNet v2.3",
@@ -162,32 +152,11 @@ export const STABILITY_METRICS: StabilityMetricDef[] = [
     machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
   },
   {
-    code: "SF04", name: "烘丝机出口水分偏差", unit: "%", decimals: 2, cycle: "批", process: "烘丝",
-    params: [PARAM_DEFS.airTemp],
-    rule: { op: "between", levels: [{ level: "告警", low: -0.5, high: 0.5 }, { level: "关注", low: -0.4, high: 0.4 }] },
-    modelVer: "MoistNet v2.3",
-    machines: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
-  },
-  {
-    code: "SF05", name: "加香出口水分不达标次数", unit: "次", decimals: 0, cycle: "日", process: "加香",
-    params: [PARAM_DEFS.flavorMoist, PARAM_DEFS.cutFlow, PARAM_DEFS.flavorFlow, PARAM_DEFS.envTemp, PARAM_DEFS.envHum],
-    rule: { op: ">=", levels: [{ level: "告警", threshold: 5 }, { level: "提示", threshold: 4 }] },
-    modelVer: "CountNet v1.2",
-    machines: ["1#加香机", "2#加香机", "3#加香机"],
-  },
-  {
     code: "SF06", name: "非细支单支重量偏差", unit: "mg", decimals: 1, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.rollSpeed],
     rule: { op: "between", levels: [{ level: "告警", low: -20, high: 20 }, { level: "预警", low: -18, high: 18 }] },
     modelVer: "WeightNet v2.0",
     machines: ["1#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
-  },
-  {
-    code: "SF07", name: "烟支单支克重偏差", unit: "mg", decimals: 1, cycle: "班", process: "卷制",
-    params: [PARAM_DEFS.fillValue],
-    rule: { op: "<=", levels: [{ level: "危险", threshold: -18 }, { level: "告警", threshold: -15 }, { level: "预警", threshold: -13.5 }, { level: "关注", threshold: -12 }] }, // 下限型：克重不足
-    modelVer: "WeightNet v2.0",
-    machines: ["1#卷接包机组", "2#卷接包机组", "4#卷接包机组"],
   },
   {
     code: "SF08", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, cycle: "班", process: "卷制",
@@ -197,7 +166,7 @@ export const STABILITY_METRICS: StabilityMetricDef[] = [
     machines: ["2#卷接包机组", "3#卷接包机组", "5#卷接包机组"],
   },
   {
-    code: "SF09", name: "中支烟支硬度变异系数", unit: "%", decimals: 2, cycle: "班", process: "卷制",
+    code: "SF09", name: "中支烟硬度变异系数", unit: "%", decimals: 2, cycle: "班", process: "卷制",
     params: [PARAM_DEFS.rollSpeed, PARAM_DEFS.fillValue],
     rule: { op: ">=", levels: [{ level: "告警", threshold: 4.0 }, { level: "预警", threshold: 3.85 }, { level: "关注", threshold: 3.7 }, { level: "提示", threshold: 3.5 }] },
     modelVer: "FirmNet v1.6",
@@ -215,7 +184,7 @@ function windowSizeOf(cycle: Cycle): number {
 }
 
 // 窗口文案：批 / 班周期以已排产批次为窗口单位（班周期横轴同为批次刻度）；月周期为自然月；
-// 日周期为已排产日（与告警侧 SF05 预测窗口同口径）
+// 日周期为已排产日
 export function windowTextOf(cycle: Cycle): string {
   const n = windowSizeOf(cycle);
   return cycle === "月" ? `未来${n}个月` : cycle === "日" ? `未来已排产的${n}日` : `未来${n}个已排产批次`;
@@ -277,7 +246,7 @@ interface ForecastSeed {
 }
 
 const SEEDS: ForecastSeed[] = [
-  // ===== SF01 成品水分标准偏差（关注2.00/预警2.10/告警2.20/危险2.40，批）=====
+  // ===== SF01 烟丝水分标准偏差（关注2.00/预警2.10/告警2.20/危险2.40，批）=====
   // 2#：实测告警（2.31）→ 3 批次升至 2.41 越过危险线后高位维持（默认指标默认机台，演示「预测：危险」）
   { code: "SF01", machine: "2#松散回潮机", base: 2.31, histFrom: 2.05, futureSpec: { kind: "climb", target: 2.48, hitStep: 4 }, conf: 0.85, updatedAt: "2026-10-10 08:00",
     values: [53.4, 126.5], phis: [0.31, 0.18] },
@@ -300,25 +269,6 @@ const SEEDS: ForecastSeed[] = [
     values: [44.5, 0.66], phis: [0.02, 0.01] },
   { code: "SF03", machine: "1#烘丝机", base: 1.26, histFrom: 1.13, futureSpec: { kind: "hold" }, conf: 0.82, updatedAt: "2026-10-10 07:45",
     values: [60.0, 0.87], phis: [0.11, 0.07] },
-  // ===== SF04 烘丝机出口水分偏差（双侧 关注±0.40/告警±0.50，批）=====
-  { code: "SF04", machine: "1#烘丝机", base: 0.62, histFrom: 0.48, futureSpec: { kind: "hold" }, conf: 0.83, updatedAt: "2026-10-10 07:50",
-    values: [129.2], phis: [0.21] },
-  { code: "SF04", machine: "3#烘丝机", base: 0.44, histFrom: 0.36, futureSpec: { kind: "climb", target: 0.56, hitStep: 1 }, conf: 0.8, updatedAt: "2026-10-10 07:35",
-    values: [127.3], phis: [0.14] },
-  { code: "SF04", machine: "5#烘丝机", base: 0.18, histFrom: 0.24, futureSpec: { kind: "drift", delta: -0.03 }, conf: 0.85, updatedAt: "2026-10-10 07:15",
-    values: [118.0], phis: [0.03] },
-  // ===== SF05 加香出口水分不达标次数（提示≥4/告警≥5，日）=====
-  // 1#：实测 5.4 已达告警级 → 窗口内高位维持（演示「预计持续告警」）
-  { code: "SF05", machine: "1#加香机", base: 5.4, histFrom: 4, futureSpec: { kind: "hold" }, conf: 0.78, updatedAt: "2026-10-10 08:00",
-    values: [13.4, 6820, 55.6, 26.2, 63.5], phis: [1.4, 0.9, 0.7, 0, 0] },
-  { code: "SF05", machine: "2#加香机", base: 4, histFrom: 3, futureSpec: { kind: "climb", target: 5, hitStep: 2 }, conf: null, updatedAt: "2026-10-10 06:30",
-    values: [12.8, 6560, 53.1, 24.4, 58.2], phis: [0.8, 0.5, 0.3, 0, 0.2] },
-  {
-    // 烟丝流量测点离线 → 必需输入不满足，本轮「数据不足」
-    code: "SF05", machine: "3#加香机", base: 0, histFrom: 0, futureSpec: { kind: "hold" }, conf: null, updatedAt: "2026-10-10 06:20",
-    values: [13.1, null, 52.4, 25.1, 61.0], phis: [0, 0, 0, 0, 0],
-    insufficient: true, reason: "烟丝流量测点数据缺失，必需输入不满足模型要求",
-  },
   // ===== SF06 非细支单支重量偏差（双侧 预警±18/告警±20，班）=====
   { code: "SF06", machine: "3#卷接包机组", base: 23.5, histFrom: 19.5, futureSpec: { kind: "hold" }, conf: 0.84, updatedAt: "2026-10-10 08:00",
     values: [7150], phis: [3.2] },
@@ -330,14 +280,6 @@ const SEEDS: ForecastSeed[] = [
     values: [6720], phis: [0],
     failed: true, reason: "预测模型服务超时，本轮预测未生成",
   },
-  // ===== SF07 烟支单支克重偏差（下限型 关注-12~危险-18，班）=====
-  // 2#：实测告警 → 2 班次降至 -19.2 越过危险线（演示「危险」等级预测）
-  { code: "SF07", machine: "2#卷接包机组", base: -16.2, histFrom: -13.5, futureSpec: { kind: "climb", target: -19.2, hitStep: 2 }, conf: 0.82, updatedAt: "2026-10-10 08:00",
-    values: [4.15], phis: [2.4] },
-  { code: "SF07", machine: "4#卷接包机组", base: -13.8, histFrom: -12.2, futureSpec: { kind: "climb", target: -16.0, hitStep: 1 }, conf: 0.8, updatedAt: "2026-10-10 07:30",
-    values: [4.38], phis: [1.2] },
-  { code: "SF07", machine: "1#卷接包机组", base: -8.4, histFrom: -9.5, futureSpec: { kind: "drift", delta: 0.8 }, conf: 0.85, updatedAt: "2026-10-10 07:05",
-    values: [4.62], phis: [0.4] },
   // ===== SF08 常规烟支硬度变异系数（提示3.0~告警3.5，班）=====
   // 3#：实测告警 3.62 → 2 班次内回落至提示级并维持（演示「预计逐步降级」）
   { code: "SF08", machine: "3#卷接包机组", base: 3.62, histFrom: 3.35, futureSpec: { kind: "climb", target: 3.1, hitStep: 2 }, conf: 0.83, updatedAt: "2026-10-10 08:00",
@@ -346,7 +288,7 @@ const SEEDS: ForecastSeed[] = [
     values: [6950, 4.75], phis: [0.12, 0.06] },
   { code: "SF08", machine: "2#卷接包机组", base: 2.95, histFrom: 3.02, futureSpec: { kind: "drift", delta: -0.06 }, conf: 0.85, updatedAt: "2026-10-10 07:20",
     values: [6800, 4.55], phis: [0.05, 0.02] },
-  // ===== SF09 中支烟支硬度变异系数（提示3.5~告警4.0，班）=====
+  // ===== SF09 中支烟硬度变异系数（提示3.5~告警4.0，班）=====
   { code: "SF09", machine: "4#卷接包机组", base: 4.15, histFrom: 3.9, futureSpec: { kind: "hold" }, conf: 0.82, updatedAt: "2026-10-10 08:00",
     values: [7040, 4.5], phis: [0.18, 0.08] },
   { code: "SF09", machine: "2#卷接包机组", base: 3.78, histFrom: 3.6, futureSpec: { kind: "climb", target: 4.08, hitStep: 3 }, conf: 0.81, updatedAt: "2026-10-10 07:35",
@@ -827,13 +769,8 @@ const ADVICE: Record<string, string> = {
   airTemp: "热风温度设定与换热器工况",
   exhaust: "排潮风门开度与执行机构状态",
   steamPress: "蒸汽压力稳定性与减压阀工况",
-  flavorMoist: "加香入口烟丝水分及前工序出口水分",
-  cutFlow: "烟丝流量计量与喂料稳定性",
-  flavorFlow: "香料流量计量与喷嘴状态",
-  envTemp: "车间温度测点与空调工况",
-  envHum: "车间湿度测点与除湿设备运行",
-  rollSpeed: "卷接速度与机台转速稳定性",
-  fillValue: "烟丝填充值及掺配均匀性",
+  rollSpeed: "卷接速度设定与机组运行稳定性",
+  fillValue: "烟丝填充值与来料结构稳定性",
 };
 
 // AI 解读段落：主题 + 正文（视图按「主题：正文」渲染）；数据不足、预测失败由视图层拦截，不进入本函数
