@@ -2,14 +2,13 @@
 
 // 左图 · 成品水分趋势（单折线，仅展示近 N 批次的检测值）
 // 蓝实线+圆点=检测值；缺失（待回传）不填 0、不跨缺失点连线；点击历史批次点打开对应记录详情。
-// 浅绿 ReferenceArea=按连续同标准版本分段的合格区间（与右图同一口径）；
-// 烘丝工艺允许范围（12.5%~13.5%）为管控上限 / 下限两条水平虚线；图例仅列「合格区间」。
+// 浅绿 ReferenceArea=按连续同标准版本分段的合格区间（与右图同一口径，即管控上下限范围，
+// 不再单独绘制管控上下限虚线）；图例两项：检测值（蓝实线）、合格区间。
 import {
   CartesianGrid,
   Line,
   LineChart,
   ReferenceArea,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,7 +16,6 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/Card";
 import {
-  DRYING_RANGE,
   batchLabelOf,
   fmt2,
   historyOf,
@@ -42,7 +40,6 @@ interface Segment {
 
 const BLUE = "#2563eb";
 const GREEN = "#16a34a";
-const RED = "#dc2626";
 
 export function MoistureTrendChart({
   line,
@@ -77,12 +74,10 @@ export function MoistureTrendChart({
   }
   if (cur) segments.push(cur);
 
-  // 纵轴：检测值 + 合格段边界 + 管控上下限自适应，上下留 12% 裕量
+  // 纵轴：检测值 + 合格段边界自适应，上下留 12% 裕量
   const values = [
     ...rows.map((r) => r.actual).filter((v): v is number => v !== null),
     ...segments.flatMap((s) => [s.low, s.high]),
-    DRYING_RANGE.low,
-    DRYING_RANGE.high,
   ];
   const hasData = rows.length > 0 && values.length > 0;
   const vMin = hasData ? Math.min(...values) : 0;
@@ -139,7 +134,7 @@ export function MoistureTrendChart({
                     );
                   }}
                 />
-                {/* 分段合格区间：浅绿底（标准换版处分段，无版本标注） */}
+                {/* 分段合格区间：浅绿底（标准换版处分段，无版本标注；区间上下界即管控上下限） */}
                 {segments.map((s) => (
                   <ReferenceArea
                     key={`${s.key}-${s.x1}`}
@@ -151,21 +146,6 @@ export function MoistureTrendChart({
                     fillOpacity={0.08}
                   />
                 ))}
-                {/* 管控上限 / 下限：烘丝工艺允许范围两条水平虚线（不进图例） */}
-                <ReferenceLine
-                  y={DRYING_RANGE.high}
-                  stroke={RED}
-                  strokeDasharray="6 4"
-                  strokeWidth={1}
-                  label={{ value: "管控上限", position: "insideTopRight", fill: RED, fontSize: 10 }}
-                />
-                <ReferenceLine
-                  y={DRYING_RANGE.low}
-                  stroke={RED}
-                  strokeDasharray="6 4"
-                  strokeWidth={1}
-                  label={{ value: "管控下限", position: "insideBottomRight", fill: RED, fontSize: 10 }}
-                />
                 {/* 检测值：蓝实线 + 圆点；待回传批次无点不连线；点热区点击打开记录详情 */}
                 <Line isAnimationActive animationDuration={900} animationEasing="ease-out"
                   dataKey="actual"
@@ -196,8 +176,12 @@ export function MoistureTrendChart({
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {/* 图例：仅列「合格区间」一项（管控上下限虚线不进图例） */}
+          {/* 图例两项：检测值（蓝色实线）、合格区间 */}
           <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-0.5 w-5 rounded-sm" style={{ backgroundColor: BLUE }} />
+              检测值
+            </span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-5 rounded-sm" style={{ backgroundColor: "rgba(22,163,74,0.15)" }} />
               合格区间
