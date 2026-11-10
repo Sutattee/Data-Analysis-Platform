@@ -43,7 +43,7 @@ function TrendCard({
   );
 }
 
-// 通用 Tooltip：月份 + 实际/预测值（带单位）+ 可选等级标签
+// 通用 Tooltip：月份 + 实际/预测值（带单位）+ 可选等级标签；planRate 行仅预算执行率图出现
 function TrendTooltip({ active, payload, label, unit, withGrade }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as TrendPoint;
@@ -55,6 +55,9 @@ function TrendTooltip({ active, payload, label, unit, withGrade }: any) {
       <p className="text-gray-500">
         {isForecast ? "预测" : "实际"}：{v !== null && v !== undefined ? `${v}${unit}` : "—"}
       </p>
+      {d.planRate !== undefined && (
+        <p className="text-gray-500">计划执行进度：{d.planRate}%</p>
+      )}
       {withGrade && d.gradeLabel && (
         <p className="mt-0.5 border-t border-gray-100 pt-0.5 text-gray-400">
           等级：<span className="font-medium" style={{ color: d.gradeColor }}>{d.gradeLabel}</span>
@@ -126,7 +129,8 @@ export function HealthTrendChart({ subjectId }: { subjectId: string }) {
 
 /* ---------------- 预算执行率趋势（%） ---------------- */
 
-// 预算执行率趋势：累计执行率实线（1-8 月）+ 预测虚线（9-12 月）+ 100% 预算线，折线上均展示数值
+// 预算执行率趋势：累计执行率实线（1-8 月）+ 预测虚线（9-12 月）+ 计划执行进度天蓝实线（1-12 月）
+// + 年度预算 100% 橙色虚线；手写图例（recharts 自动图例不含 ReferenceLine，故本图改为手写）
 export function RateTrendChart({ subjectId }: { subjectId: string }) {
   const s = expenseDataOf(subjectId);
   const data = rateTrendOf(s);
@@ -144,8 +148,8 @@ export function RateTrendChart({ subjectId }: { subjectId: string }) {
             unit="%"
           />
           <Tooltip content={<TrendTooltip unit="%" />} cursor={{ stroke: "#e5e7eb" }} />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-          <ReferenceLine y={100} stroke="#f97316" strokeDasharray="6 4" label={{ value: "100% 预算线", position: "insideTopRight", fontSize: 10, fill: "#f97316" }} />
+          <ReferenceLine y={100} stroke="#f97316" strokeDasharray="6 4" label={{ value: "年度预算 100%", position: "insideTopRight", fontSize: 10, fill: "#f97316" }} />
+          <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="planRate" name="计划执行进度" stroke="#0ea5e9" strokeWidth={2} connectNulls dot={{ r: 2, fill: "#0ea5e9" }} />
           <Line isAnimationActive animationDuration={900} animationEasing="ease-out" type="monotone" dataKey="value" name="预算执行率" stroke="#1d4ed8" strokeWidth={2} connectNulls dot={{ r: 2.5, fill: "#1d4ed8" }}>
             <LabelList dataKey="value" position="top" formatter={(v: any) => (v === null || v === undefined ? "" : `${v}%`)} style={{ fontSize: 9, fill: "#1d4ed8" }} />
           </Line>
@@ -154,6 +158,21 @@ export function RateTrendChart({ subjectId }: { subjectId: string }) {
           </Line>
         </LineChart>
       </ResponsiveContainer>
+      {/* 手写图例：四项（含 100% 预算线），虚线项用上边框虚线样例 */}
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-sm" style={{ background: "#1d4ed8" }} />预算执行率
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-4" style={{ borderTop: "2px dashed #3b82f6" }} />预测执行率
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-sm" style={{ background: "#0ea5e9" }} />计划执行进度
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-4" style={{ borderTop: "2px dashed #f97316" }} />年度预算 100%
+        </span>
+      </div>
     </TrendCard>
   );
 }

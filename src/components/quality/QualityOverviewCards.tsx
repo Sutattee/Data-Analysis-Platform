@@ -21,15 +21,16 @@ const upCls = (v: number) => {
   return v > 0 ? "text-green-600" : "text-orange-500";
 };
 
-// 顶部 5 张指标卡：缺陷率（支持 A/B/C/D 等级切换）、百小时停机断料率、成品/制丝优质品率、包装与卷制加权平均分
+// 顶部 5 张指标卡（桌面端保持一行）：缺陷率（支持 A/B/C/D 等级切换）、百小时停机断料率、
+// 成品/制丝优质品率、包装与卷制加权平均分；紧凑内边距适配一屏布局
 export function QualityOverviewCards() {
   const [grade, setGrade] = useState("all");
   const rate = DEFECT_RATE_OPTIONS.find((o) => o.key === grade) ?? DEFECT_RATE_OPTIONS[0];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
       {/* 缺陷率：右上角等级下拉，切换后整卡联动 */}
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">{rate.label}</span>
           <select
@@ -58,7 +59,7 @@ export function QualityOverviewCards() {
       </div>
 
       {/* 百小时停机断料率：设备效率类指标，率下降为改善（与缺陷率同口径：升橙 / 降绿） */}
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">百小时停机断料率</span>
           <span className="shrink-0 text-[10px] text-gray-400">本月</span>
@@ -82,7 +83,7 @@ export function QualityOverviewCards() {
       </div>
 
       {/* 成品优质品率 */}
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">成品优质品率</span>
           <span className="shrink-0 text-[10px] text-gray-400">当前批次</span>
@@ -106,7 +107,7 @@ export function QualityOverviewCards() {
       </div>
 
       {/* 制丝优质品率 */}
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">制丝优质品率</span>
           <span className="shrink-0 text-[10px] text-gray-400">当前批次</span>
@@ -130,7 +131,7 @@ export function QualityOverviewCards() {
       </div>
 
       {/* 包装与卷制质量检验加权平均值 */}
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-all duration-200 hover:shadow-md">
         <div className="mb-1 flex items-center justify-between gap-1">
           <span className="truncate text-xs text-gray-500">包装与卷制质量检验加权平均值</span>
           <span className="shrink-0 text-[10px] text-gray-400">本月</span>

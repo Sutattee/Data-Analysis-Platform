@@ -95,7 +95,7 @@ export function DefectModule() {
   return (
     <Card padding={false}>
       {/* 模块头：标题 + 统计口径 + 查看全部 */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-50 px-5 py-4">
+      <div className="flex items-center justify-between gap-2 border-b border-gray-50 px-5 py-3">
         <div className="flex items-baseline gap-2">
           <h3 className="text-sm font-semibold text-gray-800">缺陷</h3>
           <span className="text-xs text-gray-400">近1个月</span>
@@ -105,12 +105,12 @@ export function DefectModule() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 p-4 md:grid-cols-2 xl:grid-cols-4">
         {/* 缺陷部位分布（环形图中心展示缺陷总数 + 右侧图例，hover 扇区放大） */}
         <div>
           <h4 className={chartTitle}>缺陷部位分布</h4>
           <div className="flex items-center gap-2">
-            <div className="relative h-[170px] min-w-0 flex-1">
+            <div className="relative h-[150px] min-w-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <HoverPie data={DEFECT_PARTS} innerRadius={34} />
               </ResponsiveContainer>
@@ -127,7 +127,7 @@ export function DefectModule() {
         <div>
           <h4 className={chartTitle}>缺陷等级分布</h4>
           <div className="flex items-center gap-2">
-            <div className="h-[170px] min-w-0 flex-1">
+            <div className="h-[150px] min-w-0 flex-1">
               <ResponsiveContainer width="100%" height="100%">
                 <HoverPie data={DEFECT_GRADES} />
               </ResponsiveContainer>
@@ -139,7 +139,7 @@ export function DefectModule() {
         {/* Top5 缺陷排名（横向条形图，条侧标注条数与占比） */}
         <div>
           <h4 className={chartTitle}>Top5 缺陷排名</h4>
-          <div className="h-[170px]">
+          <div className="h-[150px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={TOP_DEFECTS}
@@ -188,7 +188,7 @@ export function DefectModule() {
         {/* 新冒头缺陷（按日期倒序，默认展示 4 条，滚动区域表头固定） */}
         <div>
           <h4 className={chartTitle}>新冒头缺陷</h4>
-          <div className="max-h-[170px] overflow-auto rounded-lg border border-gray-100">
+          <div className="max-h-[150px] overflow-auto rounded-lg border border-gray-100">
             <table className="w-full text-[11px]">
               <thead className="sticky top-0 z-10 bg-gray-50">
                 <tr className="text-left text-gray-500">

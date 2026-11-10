@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { PM_TO_DETAIL } from "@/lib/mock-data/process-control-detail";
 import { PROCESS_METRICS } from "@/lib/mock-data/quality";
 
-// 模块二「过程管控」：9 项过程指标表（全宽）；
+// 模块二「过程管控」：6 项过程指标表（全宽，紧凑行高适配一屏布局）；
 // 行内展示最新实际值（纯数值）/管控值/近期均值（带统计周期）/半年均值评价，最新实际值超管控值的标红；
 // 管控值支持上限型（≤X）与区间型（值落在区间内达标）；整行、指标名称与「详情」进入过程管控详情页
 export function ProcessControlModule() {
   const router = useRouter();
-  const th = "text-left px-4 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap";
+  const th = "text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap";
   // 行跳转目标：pm-* → 过程管控详情指标编码（缺省 SF02）
   const detailPath = (id: string) => `/quality/process-control/${PM_TO_DETAIL[id] ?? "SF02"}`;
 
@@ -42,9 +42,9 @@ export function ProcessControlModule() {
                   onClick={() => router.push(detailPath(m.id))}
                   className="cursor-pointer transition-colors hover:bg-gray-50"
                 >
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-600">{m.stage}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">{m.stage}</td>
                   {/* 指标名称可点击进入详情（与整行同目标） */}
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">
+                  <td className="px-4 py-2.5 font-medium whitespace-nowrap">
                     <span
                       className="text-primary-600 hover:text-primary-700 hover:underline"
                       onClick={(e) => {
@@ -56,26 +56,26 @@ export function ProcessControlModule() {
                     </span>
                   </td>
                   {/* 最新实际值（纯数值 + 单位，不带统计周期）：超管控值标红 */}
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-2.5 whitespace-nowrap">
                     <span className={`font-medium ${latestOver ? "text-red-600" : "text-gray-800"}`}>
                       {m.latestValue}
                     </span>
                   </td>
                   {/* 管控值：待配置置灰 */}
                   <td
-                    className={`px-4 py-3 whitespace-nowrap ${
+                    className={`px-4 py-2.5 whitespace-nowrap ${
                       m.toleranceNum === null && !m.tolRange ? "text-gray-300" : "text-gray-600"
                     }`}
                   >
                     {m.tolerance}
                   </td>
                   {/* 近期均值：值「｜」统计周期（近10批次 / 近30日） */}
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-2.5 whitespace-nowrap">
                     <span className="text-gray-800">{m.recent}</span>
                     <span className="text-gray-300">｜</span>
                     <span className="text-[11px] text-gray-400">{m.recentNote}</span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="px-4 py-2.5 whitespace-nowrap">
                     <span className="text-gray-800">{m.halfYearValue}</span>
                     <span className="text-gray-300">｜</span>
                     {m.halfYearPass ? (
@@ -84,7 +84,7 @@ export function ProcessControlModule() {
                       <span className="text-xs text-red-600">未达标</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -102,9 +102,6 @@ export function ProcessControlModule() {
             })}
           </tbody>
         </table>
-      </div>
-      <div className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400">
-        近期均值统计周期随指标监测频次而异；点击指标名称、行或「详情」进入过程管控详情。
       </div>
     </Card>
   );

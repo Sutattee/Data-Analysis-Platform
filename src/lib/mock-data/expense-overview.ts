@@ -467,20 +467,25 @@ export interface TrendPoint {
   month: string;
   value: number | null;         // 实际值（1-8 月）
   forecastValue: number | null; // 预测值（9-12 月；8 月点带实际值使虚线连出）
+  planRate?: number;            // 累计计划执行进度 %（预算执行率趋势用，1-12 月全程有值）
   gradeLabel?: string;          // 健康度等级标签（健康度趋势用）
   gradeColor?: string;          // 健康度等级颜色
 }
 
-// 月度累计执行率趋势：1-8 月实际累计执行率；9-12 月预测 = (累计实际 + 预测期各月预算计划) ÷ 年度预算
+// 月度累计执行率趋势：1-8 月实际累计执行率；9-12 月预测 = (累计实际 + 预测期各月预算计划) ÷ 年度预算；
+// planRate = 累计预算计划 ÷ 年度预算（计划执行进度基准线，全年计划排定故 1-12 月全程有值）
 export function rateTrendOf(s: ExpenseSummary): TrendPoint[] {
   let acc = s.monthly.reduce((t, m) => t + (m.actual ?? 0), 0);
+  let cumP = 0;
   return s.monthly.map((m, i) => {
     const isLastActual = s.monthly[i + 1]?.actual === null || i === s.monthly.length - 1;
+    cumP += m.plan;
+    const planRate = round((cumP / s.budget) * 100, 1);
     if (m.actual !== null) {
-      return { month: m.month, value: m.cumRate, forecastValue: isLastActual ? m.cumRate : null };
+      return { month: m.month, value: m.cumRate, forecastValue: isLastActual ? m.cumRate : null, planRate };
     }
     acc += m.plan; // 预测口径：按预算计划执行
-    return { month: m.month, value: null, forecastValue: round((acc / s.budget) * 100, 1) };
+    return { month: m.month, value: null, forecastValue: round((acc / s.budget) * 100, 1), planRate };
   });
 }
 
