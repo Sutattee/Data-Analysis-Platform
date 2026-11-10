@@ -1,9 +1,10 @@
 "use client";
 
 // 左图 · 成品水分趋势（单折线，仅展示近 N 批次的检测值）
-// 蓝实线+圆点=检测值；缺失（待回传）不填 0、不跨缺失点连线；点击历史批次点打开对应记录详情。
+// 蓝实线+圆点=检测值；超合格区间上限或低于下限的批次点用橙红色圆点标识（异常）；
+// 缺失（待回传）不填 0、不跨缺失点连线；点击历史批次点打开对应记录详情。
 // 浅绿 ReferenceArea=按连续同标准版本分段的合格区间（与右图同一口径，即管控上下限范围，
-// 不再单独绘制管控上下限虚线）；图例两项：检测值（蓝实线）、合格区间。
+// 不再单独绘制管控上下限虚线）；图例三项：检测值（蓝实线）、合格区间、异常（橙红圆点）。
 import {
   CartesianGrid,
   Line,
@@ -40,6 +41,7 @@ interface Segment {
 
 const BLUE = "#2563eb";
 const GREEN = "#16a34a";
+const ABNORMAL = "#ea580c"; // 超上限 / 低于下限的异常点（橙红色圆点）
 
 export function MoistureTrendChart({
   line,
@@ -158,9 +160,13 @@ export function MoistureTrendChart({
                     if (v === null || v === undefined || !Number.isFinite(props.cx) || !Number.isFinite(props.cy)) {
                       return <g key={props.payload?.label} />;
                     }
+                    // 异常判定：超当批次合格区间上限或低于下限 → 橙红色圆点（无标准批次不判定）
+                    const rec = props.payload!.record;
+                    const std = stdOf(rec.brand, (rec.startAt ?? rec.planStart).slice(0, 10));
+                    const abnormal = std ? v > std.high || v < std.low : false;
                     return (
                       <g key={props.payload?.label}>
-                        <circle cx={props.cx} cy={props.cy} r={3} fill={BLUE} stroke="#fff" strokeWidth={1} />
+                        <circle cx={props.cx} cy={props.cy} r={abnormal ? 4 : 3} fill={abnormal ? ABNORMAL : BLUE} stroke="#fff" strokeWidth={1} />
                         <circle
                           cx={props.cx}
                           cy={props.cy}
@@ -176,7 +182,7 @@ export function MoistureTrendChart({
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {/* 图例两项：检测值（蓝色实线）、合格区间 */}
+          {/* 图例三项：检测值（蓝色实线）、合格区间、异常（橙红色圆点） */}
           <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <span className="inline-block h-0.5 w-5 rounded-sm" style={{ backgroundColor: BLUE }} />
@@ -185,6 +191,10 @@ export function MoistureTrendChart({
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-5 rounded-sm" style={{ backgroundColor: "rgba(22,163,74,0.15)" }} />
               合格区间
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: ABNORMAL }} />
+              异常
             </span>
           </div>
         </>
