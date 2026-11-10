@@ -16,6 +16,7 @@ import {
   recordsOfDetail,
   type MonitorRecord,
 } from "@/lib/mock-data/process-control-detail";
+import { BRAND_OPTIONS } from "@/lib/mock-data/quality-defect";
 import { AnomalyPointDrawer } from "./AnomalyPointDrawer";
 import { DimensionCompareCard } from "./DimensionCompareCard";
 import { LatestSummaryCard } from "./LatestSummaryCard";
@@ -27,10 +28,11 @@ function initRangeMode(cycle: "批" | "班" | "日" | "月" | undefined): Detail
   return cycle === "月" ? "last3" : "last30";
 }
 
+// 初始查询条件：牌号默认选中首个牌号（无「全部牌号」空选），其余维度不选
 function initialFilter(rangeMode: DetailFilterState["rangeMode"]): DetailFilterState {
   return {
     rangeMode,
-    brands: [],
+    brands: [BRAND_OPTIONS[0]],
     machines: [],
     shifts: [],
     materials: [],
@@ -72,7 +74,9 @@ export function ProcessControlDetailView() {
   const records = useMemo(() => {
     if (!metric) return [];
     const filtered = allRecords.filter((r) => {
-      if (applied.brands.length && !applied.brands.includes(r.brand)) return false;
+      // 牌号过滤仅对支持牌号维度的指标生效（防御：不支持时不因默认牌号滤空数据）
+      if (metric.dims.includes("brand") && applied.brands.length && !applied.brands.includes(r.brand))
+        return false;
       if (applied.machines.length && !applied.machines.includes(r.machine)) return false;
       if (applied.shifts.length && !(r.shiftGroup && applied.shifts.includes(r.shiftGroup))) return false;
       if (applied.materials.length && !(r.material && applied.materials.includes(r.material))) return false;

@@ -533,6 +533,7 @@ export interface AlertStrategy {
   objects: string[];              // 指定对象名称（scope=指定对象时）
   conditions: AlertCondition[];   // 触发条件
   relation: "且" | "或";          // 多条件关系
+  brand?: string;                 // 牌号（工艺质量口径：策略适用牌号，新建/编辑表单必填）
   level: AlertLevel;              // 告警等级
   detectCycle: AlertDetectCycle;  // 检测周期
   notifyTemplate: string;         // 通知预览模板

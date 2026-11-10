@@ -11,6 +11,7 @@ import { useApp } from "@/lib/store/AppContext";
 import { ALERT_LEVELS, ALERT_USERS } from "@/lib/mock-data/alerts";
 import { SearchMultiSelect } from "@/components/alert/SearchMultiSelect";
 import { objectsForMetric } from "@/lib/mock-data/objects";
+import { BRAND_OPTIONS } from "@/lib/mock-data/quality-defect";
 import { defaultNotifyTemplate, addAlertStrategy, updateAlertStrategy, activeTargetForMetric } from "@/lib/mock-data/alert-strategies";
 import {
   TYPE_DISPLAY,
@@ -31,6 +32,7 @@ interface FormData {
   typeDisplay: string; // "实测异常" | "预测风险"
   conditions: AlertCondition[];
   relation: "且" | "或";
+  brand: string;             // 牌号（必填，单选下拉）
   level: AlertLevel;
   consecutiveShift: string; // 连续同向偏离（正整数字符串；空 = 未配置）
   notifyMethods: string[];  // 通知方式（多选；当前选项仅「企业微信」）
@@ -46,6 +48,7 @@ const EMPTY: FormData = {
   typeDisplay: "实测异常",
   conditions: [{ metric: "", operator: "≤", baselineType: "基准值", baselineValue: "" }],
   relation: "且",
+  brand: "",
   level: "预警",
   consecutiveShift: "",
   notifyMethods: ["企业微信"],
@@ -65,6 +68,7 @@ function toFormData(s: AlertStrategy): FormData {
     typeDisplay: TYPE_DISPLAY[s.type],
     conditions: s.conditions.map((c) => ({ ...c })),
     relation: s.relation,
+    brand: s.brand ?? "",
     level: s.level,
     consecutiveShift:
       s.conditions[0]?.consecutiveShifts != null ? String(s.conditions[0].consecutiveShifts) : "",
@@ -101,7 +105,7 @@ function Tip({ text }: { text: string }) {
 
 // 新建/编辑数据告警（工艺质量板块，按需求文档字段：
 // 告警名称 / 策略说明 / 告警类型 / 触发条件（判断方式→基准类型→基准值及单位→超出量）/
-// 告警等级 / 检测周期（按指标联动）/ 连续同向偏离（选填正整数，单位随指标周期）/
+// 牌号（必填）/ 告警等级 / 检测周期（按指标联动）/ 连续同向偏离（选填正整数，单位随指标周期）/
 // 通知方式（企业微信）/ 接收人（多选搜索用户名）/ 重复提醒（开关+次数）/ 提醒间隔；
 // 告警对象不在表单展示，保存时按首条条件的指标自动带入；操作 = 取消、保存）
 export function QualityAlertStrategyForm({
@@ -155,6 +159,7 @@ export function QualityAlertStrategyForm({
     const e: Record<string, string> = {};
     const ce: string[] = [];
     if (!data.name.trim()) e.name = "请输入告警名称";
+    if (!data.brand) e.brand = "请选择牌号";
     // 连续同向偏离：选填；填写时仅支持正整数
     const shiftTrim = data.consecutiveShift.trim();
     if (shiftTrim && (!/^\d+$/.test(shiftTrim) || Number(shiftTrim) < 1)) {
@@ -217,6 +222,7 @@ export function QualityAlertStrategyForm({
           alertType === "预测风险" ? c.forecastRange ?? "未来7天" : undefined,
       })),
       relation: data.relation,
+      brand: data.brand,
       level: data.level,
       detectCycle: detectCycle ?? "每批次",
       // 通知配置：企业微信 + 接收人；重复提醒开启时保存次数与间隔（关闭时剥离）
@@ -278,9 +284,6 @@ export function QualityAlertStrategyForm({
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-400">
-              实测异常监测当前值越界；预测风险监测预测值将越界，并支持 2 个缺陷预测指标（预测成品水分 / 预测箱储总存储时长）。
-            </p>
           </div>
 
           {/* 策略说明 */}
@@ -293,6 +296,22 @@ export function QualityAlertStrategyForm({
               value={data.description}
               onChange={(e) => set("description", e.target.value)}
             />
+          </div>
+
+          {/* 牌号（必填单选下拉，告警等级之前） */}
+          <div>
+            <label className={labelCls}>牌号 <span className="text-red-500">*</span></label>
+            <select
+              className={selectCls}
+              value={data.brand}
+              onChange={(e) => set("brand", e.target.value)}
+            >
+              <option value="">请选择</option>
+              {BRAND_OPTIONS.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+            {errors.brand && <p className="mt-1 text-xs text-red-500">{errors.brand}</p>}
           </div>
 
           {/* 告警等级（触发条件之前） */}

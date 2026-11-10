@@ -604,12 +604,13 @@ export function peakOfForecast(f: StabilityForecast): ForecastPeak | null {
 
 // ============ 牌号视角（趋势图右上角牌号筛选） ============
 
-// 牌号筛选选项：全部 + 平台牌号
-export const STABILITY_BRAND_OPTIONS = ["全部", ...BRAND_OPTIONS];
+// 牌号筛选选项：平台牌号（不提供「全部」，进入页面默认选中首个牌号）
+export const STABILITY_BRAND_OPTIONS = BRAND_OPTIONS;
 
 // 牌号视角预测：以横轴刻度为键对历史 / 预测序列做确定性扰动（同一牌号在同一刻度的偏移稳定，
 // 基准点 = 历史末点 = 预测首点 三方同口径保持一致），批 / 班周期点位的牌号字段改写为所选牌号
-// （月 / 日周期按自然周期聚合，无数值字段不携带）；「全部」与数据不足 / 预测失败对象原样返回（不编造曲线）
+// （月 / 日周期按自然周期聚合，无数值字段不携带）；「全部」（查询接口的默认参数口径）与
+// 数据不足 / 预测失败对象原样返回（不编造曲线）
 export function forecastWithBrand(f: StabilityForecast, brand: string): StabilityForecast {
   if (brand === "全部" || f.insufficient || f.failed) return f;
   const metric = metricOf(f.code)!;

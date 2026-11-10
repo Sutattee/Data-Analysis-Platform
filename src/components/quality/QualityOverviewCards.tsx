@@ -5,6 +5,7 @@ import {
   DEFECT_RATE_OPTIONS,
   FINISHED_PREMIUM,
   SILK_PREMIUM,
+  STOPPAGE_RATE,
   PACKING_SCORE,
 } from "@/lib/mock-data/quality";
 
@@ -20,7 +21,7 @@ const upCls = (v: number) => {
   return v > 0 ? "text-green-600" : "text-orange-500";
 };
 
-// 顶部 4 张指标卡：缺陷率（支持 A/B/C/D 等级切换）、成品/制丝优质品率、包装与卷制加权平均分
+// 顶部 5 张指标卡：缺陷率（支持 A/B/C/D 等级切换）、百小时停机断料率、成品/制丝优质品率、包装与卷制加权平均分
 export function QualityOverviewCards() {
   const [grade, setGrade] = useState("all");
   const rate = DEFECT_RATE_OPTIONS.find((o) => o.key === grade) ?? DEFECT_RATE_OPTIONS[0];
@@ -52,6 +53,30 @@ export function QualityOverviewCards() {
           <span className="text-gray-400">本月</span>
           <span className="text-gray-900">
             环比 <span className={momCls(rate.mom)}>{rate.mom > 0 ? "↑" : rate.mom < 0 ? "↓" : ""}{Math.abs(rate.mom)}</span>
+          </span>
+        </div>
+      </div>
+
+      {/* 百小时停机断料率：设备效率类指标，率下降为改善（与缺陷率同口径：升橙 / 降绿） */}
+      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md">
+        <div className="mb-1 flex items-center justify-between gap-1">
+          <span className="truncate text-xs text-gray-500">百小时停机断料率</span>
+          <span className="shrink-0 text-[10px] text-gray-400">本月</span>
+        </div>
+        <div className="mb-1 flex items-baseline gap-1">
+          <span className="text-2xl font-bold text-gray-900">{STOPPAGE_RATE.value.toFixed(1)}</span>
+          <span className="text-sm text-gray-400">%</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-gray-400">同比</span>
+          <span className={momCls(STOPPAGE_RATE.yoy)}>
+            {STOPPAGE_RATE.yoy > 0 ? "↑" : STOPPAGE_RATE.yoy < 0 ? "↓" : ""}
+            {Math.abs(STOPPAGE_RATE.yoy).toFixed(1)}
+          </span>
+          <span className="ml-1 text-gray-400">环比</span>
+          <span className={momCls(STOPPAGE_RATE.mom)}>
+            {STOPPAGE_RATE.mom > 0 ? "↑" : STOPPAGE_RATE.mom < 0 ? "↓" : ""}
+            {Math.abs(STOPPAGE_RATE.mom).toFixed(1)}
           </span>
         </div>
       </div>

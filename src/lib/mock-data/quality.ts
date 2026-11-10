@@ -24,6 +24,9 @@ export const FINISHED_PREMIUM = { value: 98.6, yoy: 0.4, mom: 0.2 };
 // 制丝优质品率（当前批次 + 同比/环比，pct；环比小幅回落）
 export const SILK_PREMIUM = { value: 98.6, yoy: 0.3, mom: -0.1 };
 
+// 百小时停机断料率（设备效率类：本月 + 同比/环比 pct；率下降为改善）
+export const STOPPAGE_RATE = { value: 1.6, yoy: -0.2, mom: 0.1 };
+
 // 包装与卷制质量检验加权平均值（分，本月 + 近10批区间）
 export const PACKING_SCORE = { value: 96.8, rangeLow: 95.1, rangeHigh: 97.9 };
 

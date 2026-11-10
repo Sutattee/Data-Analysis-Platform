@@ -227,7 +227,7 @@ export function DefectForecastView() {
 
   return (
     <div className="space-y-3">
-      {/* 顶部：缺陷 tab 切换（分段式）+ 牌号筛选 + 当前缺陷静态信息（工序 / 质量类别只读，随缺陷切换）一行排布；
+      {/* 顶部：缺陷 tab 切换（分段式）+ 牌号筛选 + 当前缺陷静态信息（缺陷类别只读，随缺陷切换）一行排布；
           班次 / 班组等上下文不在页面展示（趋势图悬浮提示内可查）；
           深链到未开放 tab 的缺陷（烟支刺破）时不点亮任何 tab，仅正常展示内容 */}
       <Card>
@@ -251,10 +251,7 @@ export function DefectForecastView() {
           <BrandFilter options={brands} value={curBrand} onChange={handleBrand} />
           <div className="flex items-center gap-4 text-xs text-gray-500">
             <span>
-              工序：<span className="font-medium text-gray-700">{defect.process}</span>
-            </span>
-            <span>
-              质量类别：<span className="font-medium text-gray-700">{defect.qualityClass}</span>
+              缺陷类别：<span className="font-medium text-gray-700">{defect.qualityClass}</span>
             </span>
           </div>
         </div>

@@ -98,7 +98,7 @@ export function ProcessDetailFilters({
                 options={BRAND_OPTIONS.map((b) => ({ value: b, label: b }))}
                 value={filter.brands}
                 onChange={(v) => patch({ brands: v })}
-                placeholder="全部牌号"
+                placeholder="选择牌号"
               />
             </div>
           </div>

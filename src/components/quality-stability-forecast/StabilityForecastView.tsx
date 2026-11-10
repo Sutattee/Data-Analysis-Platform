@@ -70,8 +70,9 @@ export function StabilityForecastView() {
   });
   const [code, setCode] = useState(initial.metric);
   const [machine, setMachine] = useState(initial.machine);
-  // 牌号筛选（顶部指标筛选旁）：不同牌号的预测趋势与数据不同，切换即整轮重算
-  const [brand, setBrand] = useState("全部");
+  // 牌号筛选（顶部指标筛选旁）：不同牌号的预测趋势与数据不同，切换即整轮重算；
+  // 无「全部」选项，默认选中首个牌号
+  const [brand, setBrand] = useState(STABILITY_BRAND_OPTIONS[0]);
   // 点击趋势图等级标记点（升级点 / 触发等级的基准点）→ 匹配告警记录，滑出异常详情抽屉
   const [anomalyAlert, setAnomalyAlert] = useState<AlertRecord | null>(null);
   // 智能解读：进入页面不展示解读区（AI 解读 / 风险来源 / 来源分布 / 关联工序及环境参数），点击按钮后流式生成
@@ -81,11 +82,11 @@ export function StabilityForecastView() {
   const machineText = machine === "全部" ? "全部机台" : machine;
   const forecast = machine === "全部" ? combinedForecastOf(code, brand) : stabilityForecastOf(code, machine, brand);
 
-  // 切换指标：机台 / 牌号重置为「全部」（深链机台随指标失效），全量联动；解读区收起回到按钮态
+  // 切换指标：机台重置为「全部」、牌号重置为默认牌号（深链机台随指标失效），全量联动；解读区收起回到按钮态
   function changeCode(v: string) {
     setCode(v);
     setMachine("全部");
-    setBrand("全部");
+    setBrand(STABILITY_BRAND_OPTIONS[0]);
     setInterpreting(false);
   }
 
