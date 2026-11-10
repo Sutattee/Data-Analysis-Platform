@@ -75,7 +75,7 @@ export const QUALITY_ALERT_METRICS: QualityAlertMetric[] = [
     ] },
   },
   {
-    name: "烘丝工序非稳态指数", sfCode: "SF03", process: "烘丝", unit: "", decimals: 2, cycle: "每批次",
+    name: "烘丝工序非稳态指数", sfCode: "SF03", process: "烘丝", unit: "%", decimals: 2, cycle: "每批次",
     objects: ["1#烘丝机", "3#烘丝机", "5#烘丝机"],
     rule: { op: ">=", levels: [
       { level: "危险", threshold: 1.35 }, { level: "告警", threshold: 1.2 },
@@ -476,7 +476,7 @@ function buildDefectAlertRecords(): AlertRecord[] {
     shiftLabel: "10-19 白班",
     brand: spec.brand,
     process: spec.process,
-    // 判定依据（策略快照，与 QAS-011~015 策略条件同文案）
+    // 判定依据（策略快照，与 QAS-014~018 预测类策略条件同文案）
     strategyName: spec.strategyName,
     triggerCondition: spec.triggerCondition,
     // 原因与建议（预测解释由模型生成）

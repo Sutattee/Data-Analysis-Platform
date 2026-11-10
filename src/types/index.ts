@@ -601,7 +601,7 @@ export interface MetricValueRecord {
 export type ControlDir = "<" | "≤" | ">" | "≥" | "=" | "between";
 
 // 数值口径（校验规则：percent 0~100 / count 非负整数 / duration 非负数）
-export type ControlValueKind = "percent" | "count" | "duration";
+export type ControlValueKind = "percent" | "count" | "duration" | "weight";
 
 // 管控指标目录（预置；新增表单的可选指标来源）
 export interface ControlMetricDef {

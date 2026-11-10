@@ -29,14 +29,14 @@ export const DIR_LABEL: Record<ControlDir, string> = {
 // 表单判断方向选项（顺序与 PRD 一致）
 export const DIR_OPTIONS: ControlDir[] = ["<", "≤", ">", "≥", "=", "between"];
 
-// 管控指标目录（预置 9 项；默认方向：水分允许范围 between / 偏差·次数·时长 ≤）
+// 管控指标目录（预置 9 项，顺序与需求清单一致；默认方向：水分允许范围 between / 偏差·次数·时长 ≤）
 const CATALOG: ControlMetricDef[] = [
   { id: "cm-001", name: "松散回潮非稳态指数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
-  { id: "cm-002", name: "烟丝水分标准偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-003", name: "烘丝工序非稳态指数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
-  { id: "cm-007", name: "非细支单支重量偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
+  { id: "cm-007", name: "非细支单支重量偏差", unit: "mg", decimals: 1, valueKind: "weight", defaultDir: "≤" },
   { id: "cm-008", name: "常规烟支硬度变异系数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-009", name: "中支烟硬度变异系数", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
+  { id: "cm-002", name: "烟丝水分标准偏差", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "≤" },
   { id: "cm-014", name: "加香出口水分", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
   { id: "cm-015", name: "成品水分", unit: "%", decimals: 2, valueKind: "percent", defaultDir: "between" },
   { id: "cm-016", name: "箱储总存储时长", unit: "h", decimals: 1, valueKind: "duration", defaultDir: "≤" },
@@ -78,7 +78,7 @@ export function controlSummary(c: MetricControlConfig): string {
 let configs: MetricControlConfig[] = [
   { id: "mc-001", metricId: "cm-002", metricName: "烟丝水分标准偏差", unit: "%", dir: "≤", value: 1.55, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-18 09:30" },
   { id: "mc-002", metricId: "cm-001", metricName: "松散回潮非稳态指数", unit: "%", dir: "≤", value: 4.0, enabled: true, updatedBy: "李工", updatedAt: "2026-10-12 14:20" },
-  { id: "mc-006", metricId: "cm-007", metricName: "非细支单支重量偏差", unit: "%", dir: "≤", value: 3.2, enabled: true, updatedBy: "李工", updatedAt: "2026-09-28 16:40" },
+  { id: "mc-006", metricId: "cm-007", metricName: "非细支单支重量偏差", unit: "mg", dir: "≤", value: 13.5, enabled: true, updatedBy: "李工", updatedAt: "2026-09-28 16:40" },
   { id: "mc-007", metricId: "cm-009", metricName: "中支烟硬度变异系数", unit: "%", dir: "≤", value: 1.5, enabled: false, updatedBy: "苏恒", updatedAt: "2026-10-25 14:35" },
   { id: "mc-011", metricId: "cm-014", metricName: "加香出口水分", unit: "%", dir: "between", low: 12.0, high: 13.0, enabled: true, updatedBy: "李工", updatedAt: "2026-09-15 10:05" },
   { id: "mc-012", metricId: "cm-016", metricName: "箱储总存储时长", unit: "h", dir: "≤", value: 72, enabled: true, updatedBy: "苏恒", updatedAt: "2026-10-22 11:05" },
@@ -143,7 +143,7 @@ export function validateControlValue(
   if (!raw.trim() || !Number.isFinite(v)) return "请输入有效数值";
   if (kind === "percent" && (v < 0 || v > 100)) return "取值范围 0～100";
   if (kind === "count" && (!Number.isInteger(v) || v < 0)) return "须为非负整数";
-  if (kind === "duration" && v < 0) return "不能为负数";
+  if ((kind === "duration" || kind === "weight") && v < 0) return "不能为负数";
   const dot = raw.trim().split(".")[1];
   if (dot && dot.length > decimals) return `最多保留 ${decimals} 位小数`;
   return null;
