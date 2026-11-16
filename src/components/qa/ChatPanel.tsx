@@ -35,18 +35,19 @@ import {
 } from "@/lib/mock-data/fill-form";
 import { exportTablesToExcel } from "@/lib/qa/export-excel";
 import { validateUploadFile, uploadedToTemplateItem } from "@/lib/mock-data/report-templates-admin";
-import { Sparkles, FileText, Plus } from "lucide-react";
+import { Sparkles, FileText, Plus, Eye } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { TemplatePickerModal } from "./TemplatePickerModal";
 import { ReportDrawer } from "./ReportDrawer";
 import { FillDrawer } from "./FillDrawer";
+import { DataPreviewPanel } from "./DataPreviewPanel";
 import { QA_TOOLBAR_ICONS } from "@/components/layout/NavIcon";
 import { AnalystAvatar } from "./AnalystAvatar";
 import { Spinner } from "@/components/ui/Spinner";
 
 // ---------- 数据准备 ----------
 const allTables = dataModels.flatMap((dm) =>
-  (dm.children || []).map((c) => ({ id: c.id, name: c.name, domain: dm.name }))
+  (dm.children || []).map((c) => ({ id: c.id, name: c.name, enName: c.enName ?? "", domain: dm.name }))
 );
 const demoTables = allTables.slice(0, 3).map((t) => t.id);
 const knowledgeBases = mockKnowledgeDocs.map((d) => ({ id: d.id, name: d.title, category: d.category }));
@@ -143,6 +144,8 @@ export function ChatPanel({
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [reportDrawer, setReportDrawer] = useState<{ open: boolean; msgId: string | null; autoExport: boolean }>({ open: false, msgId: null, autoExport: false });
+  // 数据预览面板（「选择数据范围」各表右侧「预览数据」按钮打开；与报告/填表面板互斥共用右栏）
+  const [previewTable, setPreviewTable] = useState<{ id: string; name: string; enName?: string } | null>(null);
   // 报告任务计时器（阶段轮换）与大纲生成计时器；报告大纲上下文（含生成方式，供失败重试重跑）
   const reportTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const outlineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -711,6 +714,7 @@ export function ChatPanel({
         const { content, note } = applyReportEdit(task.content ?? "", text);
         updateReportTask(doneReport.id, { content, edited: true });
         setReportDrawer({ open: true, msgId: doneReport.id, autoExport: false });
+        setPreviewTable(null); // 右栏互斥：报告生成完成自动打开文档面板时关数据预览面板
         showToast(note);
         return;
       }
@@ -800,10 +804,16 @@ export function ChatPanel({
 
 
   // ========== 下拉菜单内容渲染（多选列表：全部 + 各选项） ==========
+  // renderItemExtra：行右侧附加内容（数据范围菜单传入「预览数据」按钮）
+  // activeId：当前高亮行（正在预览的数据表）
+  // onItemClick：行点击回调（数据范围菜单用于切换右侧预览面板；勾选行为不受影响）
   const renderCheckboxList = (
     items: { id: string; name: string; subtitle?: string }[],
     selected: string[],
-    setSelected: (ids: string[]) => void
+    setSelected: (ids: string[]) => void,
+    renderItemExtra?: (item: { id: string; name: string }) => React.ReactNode,
+    activeId?: string | null,
+    onItemClick?: (item: { id: string; name: string }) => void
   ) => {
     const allSelected = selected.length === items.length;
     return (
@@ -823,7 +833,10 @@ export function ChatPanel({
         {items.map((item) => (
           <label
             key={item.id}
-            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer ${
+              item.id === activeId ? "bg-primary-50" : "hover:bg-gray-50"
+            }`}
+            onClick={() => onItemClick?.(item)}
           >
             <input
               type="checkbox"
@@ -834,20 +847,22 @@ export function ChatPanel({
               }}
               className="w-4 h-4 text-primary-600 rounded"
             />
-            <div className="min-w-0">
-              <div className="text-sm text-gray-800">{item.name}</div>
-              {item.subtitle && <div className="text-xs text-gray-400">{item.subtitle}</div>}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm text-gray-800">{item.name}</div>
+              {item.subtitle && <div className="truncate text-xs text-gray-400" title={item.subtitle}>{item.subtitle}</div>}
             </div>
+            {renderItemExtra?.(item)}
           </label>
         ))}
       </>
     );
   };
 
-  // 数据范围菜单选项（含案例数据预设项）与勾选联动逻辑
+  // 数据范围菜单选项（含案例数据预设项）与勾选联动逻辑：
+  // 表项副标题为表英文名（不展示业务域）；案例数据预设项仅保留名称
   const modelMenuItems = [
-    { id: "__demo_preset__", name: "卷烟厂案例数据", subtitle: "Demo 案例数据（含卷接工单/包装工单/制丝批次3张表）" },
-    ...allTables.map((t) => ({ id: t.id, name: t.name, subtitle: t.domain })),
+    { id: "__demo_preset__", name: "卷烟厂案例数据" },
+    ...allTables.map((t) => ({ id: t.id, name: t.name, subtitle: t.enName })),
   ];
   const modelMenuSelected = demoTables.every((d) => selectedModels.includes(d))
     ? [...selectedModels, "__demo_preset__"]
@@ -864,6 +879,24 @@ export function ChatPanel({
     }
     setSelectedModels(next);
   };
+
+  // 打开数据预览面板：菜单保持展开（左侧可继续切换数据表），右栏面板滑出并关闭报告/填表面板
+  function openDataPreview(id: string, name: string, enName?: string) {
+    setReportDrawer({ open: false, msgId: null, autoExport: false });
+    setFillDrawer({ open: false, msgId: null });
+    setPreviewTable({ id, name, enName });
+  }
+
+  // 行点击与预览图标共用：切换右侧数据预览面板到该表（案例数据预设项除外；勾选行为不受影响）
+  function previewModelItem(item: { id: string; name: string }) {
+    if (item.id === "__demo_preset__") return;
+    const t = allTables.find((x) => x.id === item.id);
+    openDataPreview(item.id, item.name, t?.enName);
+  }
+
+  // 右栏面板（报告/填表/数据预览）打开时，选择器下拉菜单收窄，避免遮挡右侧面板信息
+  const rightPanelOpen = reportDrawer.open || fillDrawer.open || previewTable !== null;
+  const selectorMenuCls = rightPanelOpen ? "w-60" : "w-80";
 
   // ========== 选择器条（数据范围 / 知识库：下拉菜单在按钮上方弹出，无遮罩层） ==========
   // 注意：SelectorBar/ToolBar/InputArea 是渲染函数（非组件），调用处必须写 {Xxx()} 而非 <Xxx />：
@@ -883,10 +916,38 @@ export function ChatPanel({
           {QA_TOOLBAR_ICONS.model} {modelLabel} ▾
         </button>
         {openMenu === "model" && (
-          <div className="absolute bottom-full left-0 z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+          <div className={`absolute bottom-full left-0 z-30 mb-2 ${selectorMenuCls} rounded-xl border border-gray-100 bg-white p-2 shadow-xl`}>
             <div className="border-b border-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">选择数据范围</div>
             <div className="mt-1 max-h-64 space-y-0.5 overflow-auto">
-              {renderCheckboxList(modelMenuItems, modelMenuSelected, handleModelMenuChange)}
+              {renderCheckboxList(
+                modelMenuItems,
+                modelMenuSelected,
+                handleModelMenuChange,
+                (item) =>
+                  // 每个数据表选项右侧的「预览数据」图标按钮（案例数据预设项不展示）；
+                  // 正在预览的表行以 bg-primary-50 高亮（activeId）
+                  item.id === "__demo_preset__" ? null : (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        previewModelItem(item);
+                      }}
+                      title="预览数据字段"
+                      aria-label="预览数据字段"
+                      className={`flex-shrink-0 flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                        previewTable?.id === item.id
+                          ? "bg-primary-100 text-primary-600"
+                          : "text-gray-400 hover:bg-primary-50 hover:text-primary-600"
+                      }`}
+                    >
+                      <Eye size={14} />
+                    </button>
+                  ),
+                previewTable?.id,
+                // 点击整行同样切换右侧预览面板（勾选行为不受影响）
+                previewModelItem
+              )}
             </div>
           </div>
         )}
@@ -904,7 +965,7 @@ export function ChatPanel({
           {QA_TOOLBAR_ICONS.knowledge} {kbLabel} ▾
         </button>
         {openMenu === "kb" && (
-          <div className="absolute bottom-full left-0 z-30 mb-2 w-80 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+          <div className={`absolute bottom-full left-0 z-30 mb-2 ${selectorMenuCls} rounded-xl border border-gray-100 bg-white p-2 shadow-xl`}>
             <div className="border-b border-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">选择业务知识库</div>
             <div className="mt-1 max-h-64 space-y-0.5 overflow-auto">
               {renderCheckboxList(
@@ -1237,10 +1298,12 @@ export function ChatPanel({
                   onReportOutlineRegenerate={handleOutlineRegenerate}
                   onOpenReport={(id) => {
                     setFillDrawer({ open: false, msgId: null }); // 右栏互斥：打开文档面板时关表格面板
+                    setPreviewTable(null); // 右栏互斥：同时关数据预览面板
                     setReportDrawer({ open: true, msgId: id, autoExport: false });
                   }}
                   onDownloadReport={(id) => {
                     setFillDrawer({ open: false, msgId: null });
+                    setPreviewTable(null);
                     setReportDrawer({ open: true, msgId: id, autoExport: true });
                   }}
                   onShareReport={(id) => {
@@ -1250,6 +1313,7 @@ export function ChatPanel({
                   onRetryReport={retryReportGeneration}
                   onOpenFill={(id) => {
                     setReportDrawer({ open: false, msgId: null, autoExport: false }); // 右栏互斥：打开表格面板时关文档面板
+                    setPreviewTable(null); // 右栏互斥：同时关数据预览面板
                     setFillDrawer({ open: true, msgId: id });
                   }}
                   onDownloadFill={downloadFill}
@@ -1295,7 +1359,7 @@ export function ChatPanel({
       {/* ===== 右侧详情面板（文档/表格互斥）：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出 ===== */}
       <div
         className={`flex-shrink-0 h-full transition-[width] duration-300 overflow-hidden ${
-          reportDrawer.open || fillDrawer.open ? "w-[720px]" : "w-0"
+          reportDrawer.open || fillDrawer.open || previewTable ? "w-[720px]" : "w-0"
         }`}
       >
         <div className="w-[720px] h-full border-l border-gray-100 bg-white">
@@ -1318,6 +1382,17 @@ export function ChatPanel({
             onStop={stopFillGeneration}
             onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
             onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}
+          />
+          {/* 数据预览面板（「选择数据范围」入口，与报告/填表面板互斥展示） */}
+          <DataPreviewPanel
+            tableId={previewTable?.id ?? null}
+            tableName={previewTable?.name}
+            tableEnName={previewTable?.enName}
+            onClose={() => setPreviewTable(null)}
+            onQuote={(q) => {
+              setInput(q);
+              textareaRef.current?.focus();
+            }}
           />
         </div>
       </div>

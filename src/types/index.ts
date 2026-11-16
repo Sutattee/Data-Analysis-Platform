@@ -215,6 +215,7 @@ export interface DataField {
 export interface DataModel {
   id: string;
   name: string;
+  enName?: string;        // 表英文名（数据范围下拉与数据预览面板展示）
   type: "table" | "view";
   description: string;
   fields: DataField[];

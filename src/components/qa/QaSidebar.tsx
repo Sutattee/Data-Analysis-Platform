@@ -234,14 +234,18 @@ export function QaSidebar({
   }
 
   return (
-    <aside className="w-60 flex-shrink-0 flex flex-col bg-white overflow-hidden">
-      {/* 顶部：折叠 */}
-      <div className="flex items-center px-3 py-2 flex-shrink-0">
-        <button onClick={onToggleCollapse} className="p-1 text-gray-400 hover:text-gray-700" title="折叠">{"<<"}</button>
-      </div>
+    <aside className="relative w-60 flex-shrink-0 flex flex-col bg-white">
+      {/* 折叠按钮：吸附侧栏右缘、垂直居中的圆形按钮（骑跨边界，不遮挡列表内容） */}
+      <button
+        onClick={onToggleCollapse}
+        className="absolute right-0 top-1/2 z-10 -translate-y-1/2 translate-x-1/2 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-xs text-gray-400 shadow-sm hover:text-gray-600 hover:border-gray-300 transition-colors"
+        title="折叠"
+      >
+        {"<"}
+      </button>
 
-      {/* + 新建会话（次级按钮） */}
-      <div className="px-3 py-2 flex-shrink-0">
+      {/* + 新建会话（次级按钮；顶部留白收窄，按钮贴近侧栏顶端） */}
+      <div className="px-3 pt-0.5 pb-2 flex-shrink-0">
         <button
           onClick={onNewSession}
           className="w-full px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 hover:border-gray-400 transition-colors"

@@ -4,6 +4,7 @@ import { matchStandardQa } from "@/lib/mock-data/standard-qa";
 import { matchSmartQuery, SmartQueryCase } from "@/lib/mock-data/smart-query";
 import { COCKPIT_INSIGHT_COMMAND, COCKPIT_INSIGHT_REPORT, cockpitAnomalies } from "@/lib/mock-data/cockpit";
 import { DEFECT_TOTAL, QUALITY_INSIGHT_COMMAND, QUALITY_INSIGHT_REPORT } from "@/lib/mock-data/quality";
+import { ENERGY_INSIGHT_COMMAND, ENERGY_INSIGHT_REPORT } from "@/lib/mock-data/energy-overview";
 import { generateId, delay } from "@/lib/utils";
 
 // 统一命中答案的包装格式：已结构化内容保持原样，表格内容包装为结构化回答
@@ -407,6 +408,48 @@ export async function mockAiResponse(userMessage: string): Promise<QaMessage> {
       content: QUALITY_INSIGHT_REPORT,
       timestamp: Date.now(),
       followUpQuestions: ["松散回潮非稳态指数逐批走势如何？", "爆口缺陷集中在哪些机台？", "过程管控未达标项的整改建议？"],
+      executionNodes: nodes,
+      thinkingTime: Math.round(t / 100) / 10,
+      answerType: "analysis",
+    };
+  }
+
+  // 仪表盘（能源总览）「智能解读」固定指令：立即执行，展示执行过程并输出仪表盘解读报告
+  if (userMessage.includes(ENERGY_INSIGHT_COMMAND)) {
+    let t = 0;
+    const nodes: ExecutionNode[] = [
+      {
+        id: "think", label: "分析思路", status: "completed",
+        duration: t += 80 + Math.random() * 120,
+        detail: "理解指令为「仪表盘综合解读」：拉取 7 项能耗指标卡、综合能耗/电耗/蒸汽/天然气/碳排放趋势、区域电耗对比与分类碳排放，逐项评估后生成解读报告。",
+      },
+      {
+        id: "intent", label: "意图识别", status: "completed",
+        duration: t += 60 + Math.random() * 100,
+        detail: "命中仪表盘固定指令，置信度 0.99。数据域：能源消耗。",
+      },
+      {
+        id: "data", label: "仪表盘取数", status: "completed",
+        duration: t += 90 + Math.random() * 150,
+        detail: "指标卡 7 项（含目标值/历史均值/同环比对比）、月度与日度趋势序列 10 条、区域电耗对比 7 个区域、分类碳排放 4 类，取数与汇总完成。",
+      },
+      {
+        id: "analysis", label: "指标评估", status: "completed",
+        duration: t += 70 + Math.random() * 130,
+        detail: "优于目标：综合能耗、蒸汽总量、天然气、水耗；超目标：单箱电耗（↑0.6 kWh/箱）、碳排放强度（↑0.002 kg CO₂/万支）；关注：污水 COD 逼近限值、卷包电耗与锅炉天然气存在危险级异常点。",
+      },
+      {
+        id: "report", label: "生成解读报告", status: "completed",
+        duration: t += 50 + Math.random() * 100,
+        detail: "按「总体判断 → 分项解读 → 行动建议」结构输出仪表盘分析报告。",
+      },
+    ];
+    return {
+      id: generateId(),
+      role: "assistant",
+      content: ENERGY_INSIGHT_REPORT,
+      timestamp: Date.now(),
+      followUpQuestions: ["单箱电耗超目标的原因分析", "制丝车间电耗偏高的时段分布？", "第二类碳排放占比为何最高？"],
       executionNodes: nodes,
       thinkingTime: Math.round(t / 100) / 10,
       answerType: "analysis",

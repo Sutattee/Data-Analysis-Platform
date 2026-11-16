@@ -11,7 +11,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         {/* 返回首页 */}
         <div className="px-3 py-4 border-b border-gray-100">
           <Link
-            href="/home"
+            href="/qa"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors"
           >
             <span>←</span>

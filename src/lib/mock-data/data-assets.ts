@@ -12,6 +12,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm1-1",
         name: "卷接工单表",
+        enName: "ods_rolling_order",
         type: "table",
         description: "卷接工序生产工单执行记录",
         fields: [
@@ -26,6 +27,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm1-2",
         name: "包装工单表",
+        enName: "ods_packing_order",
         type: "table",
         description: "包装工序生产工单执行记录",
         fields: [
@@ -40,6 +42,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm1-3",
         name: "制丝批次表",
+        enName: "ods_silk_batch",
         type: "table",
         description: "制丝工序生产批次记录",
         fields: [
@@ -61,6 +64,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm2-1",
         name: "质量检验记录表",
+        enName: "ods_quality_inspection",
         type: "table",
         description: "卷烟质量检验结果记录",
         fields: [
@@ -74,6 +78,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm2-2",
         name: "缺陷记录表",
+        enName: "ods_defect_record",
         type: "table",
         description: "卷烟缺陷明细",
         fields: [
@@ -94,6 +99,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm3-1",
         name: "物料消耗表",
+        enName: "ods_material_consumption",
         type: "table",
         description: "各工序物料消耗计量",
         fields: [
@@ -106,6 +112,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm3-2",
         name: "能耗计量表",
+        enName: "ods_energy_meter",
         type: "table",
         description: "各工序能源消耗计量",
         fields: [
@@ -127,6 +134,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm4-1",
         name: "设备运行日志",
+        enName: "ods_device_runtime_log",
         type: "table",
         description: "设备运行状态记录",
         fields: [
@@ -140,6 +148,7 @@ export const dataModels: DataModel[] = [
       {
         id: "dm4-2",
         name: "设备台账",
+        enName: "dim_device_info",
         type: "table",
         description: "设备基础信息",
         fields: [

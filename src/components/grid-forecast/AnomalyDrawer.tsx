@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store/AppContext";
-import { ALERT_RECORDS, PRODUCTION_MATERIAL_METRICS } from "@/lib/mock-data/alerts";
+import { ALERT_RECORDS } from "@/lib/mock-data/alerts";
 import { AlertLevelBadge } from "@/components/alert/alertBadges";
 import type {
   AnomalyDetail,
@@ -226,7 +225,6 @@ export function AnomalyDrawer({
   onClose: () => void;
   detail: AnomalyDetail | null;
 }) {
-  const router = useRouter();
   const toast = useToast();
   const { state } = useApp();
   const currentUser = state.user?.nickname || state.user?.username || "当前用户";
@@ -328,25 +326,6 @@ export function AnomalyDrawer({
       onClose={onClose}
       title="异常详情"
       width={520}
-      footer={
-        rec ? (
-          <div className="flex justify-end">
-            <Button
-              onClick={() => {
-                // 记录抽屉快照，返回总览页时一键恢复异常详情
-                sessionStorage.setItem("anomaly-drawer-return", JSON.stringify(detail));
-                // 辅料指标记录跳生产管理板块的告警详情，其余跳能源板块
-                const base = PRODUCTION_MATERIAL_METRICS.includes(rec.metricName)
-                  ? "/production/alert/records"
-                  : "/alert/records";
-                router.push(`${base}/${rec.id}`);
-              }}
-            >
-              查看告警详情
-            </Button>
-          </div>
-        ) : undefined
-      }
     >
       {detail && (
         <div className="space-y-5">

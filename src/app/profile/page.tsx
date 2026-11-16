@@ -120,7 +120,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-white">
       {/* 顶部：返回首页 + 标题（左上方） */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
-        <Link href="/home" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors">
+        <Link href="/qa" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors">
           <span>←</span>
           <span>返回首页</span>
         </Link>

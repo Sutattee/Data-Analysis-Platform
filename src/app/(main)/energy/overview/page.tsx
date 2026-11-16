@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { OverviewMetricCards } from "@/components/energy-overview/OverviewMetricCards";
 import { ComprehensiveEnergyChart } from "@/components/energy-overview/ComprehensiveEnergyChart";
 import { ElectricityCombinedChart } from "@/components/energy-overview/ElectricityCombinedChart";
@@ -10,6 +10,7 @@ import { GasConsumptionChart } from "@/components/energy-overview/GasConsumption
 import { CarbonEmissionTrendChart } from "@/components/energy-overview/CarbonEmissionTrendChart";
 import { AiAssistant } from "@/components/energy-overview/AiAssistant";
 import { AnomalyDrawer } from "@/components/grid-forecast/AnomalyDrawer";
+import { ENERGY_INSIGHT_COMMAND } from "@/lib/mock-data/energy-overview";
 import type { AnomalyDetail } from "@/lib/mock-data/grid-forecast";
 
 export default function EnergyOverviewPage() {
@@ -17,25 +18,13 @@ export default function EnergyOverviewPage() {
   const [drawer, setDrawer] = useState<AnomalyDetail | null>(null);
   const onAnomaly = (d: AnomalyDetail) => setDrawer(d);
 
-  // 从告警记录详情「返回异常详情」时，恢复跳转前的抽屉快照
-  useEffect(() => {
-    const raw = sessionStorage.getItem("anomaly-drawer-return");
-    if (raw) {
-      sessionStorage.removeItem("anomaly-drawer-return");
-      try {
-        setDrawer(JSON.parse(raw) as AnomalyDetail);
-      } catch {
-        /* 忽略非法快照 */
-      }
-    }
-  }, []);
-
   return (
-    /* AI 助手包裹仪表盘：打开对话时右侧推出面板，左侧自适应收窄 */
-    <AiAssistant>
+    /* AI 助手包裹仪表盘：打开对话时右侧推出面板，左侧自适应收窄；
+       insightCommand：面板顶部「✦ 智能解读」按钮，点击自动发送指令生成仪表盘解读报告 */
+    <AiAssistant insightCommand={ENERGY_INSIGHT_COMMAND}>
       <div className="space-y-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">能源总览</h1>
+          <h1 className="text-xl font-bold text-gray-900">仪表盘问数</h1>
         </div>
 
         {/* 顶部 9 张指标卡 */}

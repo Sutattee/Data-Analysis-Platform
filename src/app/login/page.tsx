@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store/AppContext";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/layout/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function LoginPage() {
     }
     const success = login(username, password);
     if (success) {
-      router.replace("/home");
+      router.replace("/qa");
     } else {
       setError("用户名或密码错误");
     }
@@ -31,10 +32,10 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4 shadow-lg shadow-primary-200">
-            D
+          <div className="mx-auto mb-4 w-fit shadow-lg shadow-primary-200">
+            <Logo size={64} />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">工厂产质耗KPI分析平台</h1>
+          <h1 className="text-xl font-bold text-gray-900">智能分析平台</h1>
           <p className="text-sm text-gray-500 mt-2">请登录您的账号</p>
         </div>
 

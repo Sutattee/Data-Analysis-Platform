@@ -288,7 +288,7 @@ export function InlinePanel({
 }: {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  title?: ReactNode;
   width?: number;
   padding?: boolean;
   label?: string;
@@ -308,7 +308,7 @@ export function InlinePanel({
     <aside role="region" aria-label={label} className="h-full flex flex-col bg-white" style={{ width: `min(${width}px, 100vw)` }}>
       {title && (
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 gap-3">
-          <h3 className="font-semibold text-gray-800 truncate flex-1 min-w-0" title={title}>{title}</h3>
+          <h3 className="font-semibold text-gray-800 truncate flex-1 min-w-0" title={typeof title === "string" ? title : undefined}>{title}</h3>
           <div className="flex items-center gap-1 flex-shrink-0">
             {headerExtra}
             <button

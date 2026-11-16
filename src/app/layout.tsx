@@ -4,8 +4,8 @@ import { AppProvider } from "@/lib/store/AppContext";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
-  title: "工厂产质耗KPI分析平台",
-  description: "工厂产质耗KPI分析平台",
+  title: "智能分析平台",
+  description: "智能分析平台",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
