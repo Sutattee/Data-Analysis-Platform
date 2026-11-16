@@ -62,6 +62,7 @@ export function FillDrawer({
   onClose,
   data,
   fillId,
+  wide = false,
   onStop,
   onRetry,
   onExport,
@@ -70,6 +71,7 @@ export function FillDrawer({
   onClose: () => void;
   data: FillCardData | null;
   fillId: string;
+  wide?: boolean; // 宽屏预览：面板占满容器宽度（便于展示列数多、结构复杂的报表）
   onStop: () => void;
   onRetry: () => void;
   onExport: (name: string) => void; // 按报表名直接导出 XLSX（浏览器下载，由 ChatPanel 执行）
@@ -104,6 +106,7 @@ export function FillDrawer({
       onClose={onClose}
       title={task?.title ?? "智能填表"}
       width={720}
+      fillWidth={wide}
       padding={false}
       label="表格详情面板"
       headerExtra={

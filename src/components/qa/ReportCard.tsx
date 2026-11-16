@@ -15,7 +15,7 @@ export function ReportCard({
 }: {
   data: ReportCardData;
   onOpen: () => void;
-  onDownload: () => void; // 打开导出文档弹窗
+  onDownload: () => void; // 弹出导出文档弹窗（选择 Word/PDF 格式后下载，不打开右侧面板）
   onShare: () => void;    // 复制分享链接
   onRetry: () => void;    // 失败后重新生成
 }) {
@@ -37,6 +37,7 @@ export function ReportCard({
           title={task.status === "done" ? "点击查看报告" : "点击查看生成进度"}
         >
           {task.title}
+          <span className="text-gray-400 font-normal">.docx</span>
         </button>
         {/* 行尾组：恒占位 + hover 显现（opacity 过渡），行高与卡片高度固定不变 */}
         <div className="ml-auto flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

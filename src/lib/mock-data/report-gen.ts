@@ -748,7 +748,7 @@ const REPORT_AGENT_FLOWS: Record<ReportGenMode, string[]> = {
     "查询、计算与分析数据（独立任务可并行）",
     "生成正文和图表",
     "校验数据及结论",
-    "调用文档工具生成完整报告",
+    "调用文档工具渲染排版 DOCX",
     "展示预览并支持下载",
   ],
   // ② 分析报告：基于报告模板生成（方式一）
@@ -764,7 +764,7 @@ const REPORT_AGENT_FLOWS: Record<ReportGenMode, string[]> = {
     "查询、计算与分析数据（独立任务可并行）",
     "按模板生成正文和图表",
     "校验数据及结论",
-    "调用文档工具生成完整报告",
+    "调用文档工具渲染排版 DOCX",
     "展示预览并支持下载",
   ],
   // ③ 分析报告：基于对话分析结果生成（方式三）
@@ -780,7 +780,7 @@ const REPORT_AGENT_FLOWS: Record<ReportGenMode, string[]> = {
     "按需补查、计算与分析数据（独立任务可并行）",
     "整合正文和图表",
     "校验数据及结论",
-    "调用文档工具生成完整报告",
+    "调用文档工具渲染排版 DOCX",
     "展示预览并支持下载",
   ],
 };
@@ -806,8 +806,8 @@ function reportStepDetail(step: string, outline: ReportOutline, mode: ReportGenM
   if (step.includes("查询") || step.includes("补查")) return "并行查询数据资产：产量与机组效率（生产域）、优质品率与过程管控（质量域）、综合能耗与碳排放（能源域）、可控费用与辅料消耗（费用域），取数与计算完成。";
   if (step.includes("正文")) return `按大纲顺序撰写 ${l1} 个章节，结合分析思路（${l2 > 0 ? "目标对比/环比/排名/占比" : "目标对比与环比"}）展开，图表随文生成。`;
   if (step.includes("校验数据")) return "逐项交叉核对正文数值与取数结果，结论与数据一致，无口径冲突。";
-  if (step.includes("文档工具")) return "调用文档工具生成完整报告：统一章节编号、表格口径与目录。";
-  if (step.includes("预览")) return "报告已生成，支持在抽屉中预览并导出 Word/PDF。";
+  if (step.includes("文档工具")) return "以 Markdown 组织正文后渲染排版为 DOCX：图表嵌入高清图片，数据明细转 Word 原生表格，核心指标格式化表格，正文按标题/段落/列表排版，自动生成目录与页眉页脚。";
+  if (step.includes("预览")) return "Word 文档（.docx）已生成：短报告（≤1500字）在对话中直接展示全文，长报告展示卡片，均可下载或分享。";
   return "步骤执行完成。";
 }
 

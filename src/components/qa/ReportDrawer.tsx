@@ -12,7 +12,8 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { parseMarkdownTable } from "@/lib/qa/parse-table";
-import { downloadDocFile, downloadPdfFile } from "@/lib/qa/export-doc";
+import { downloadPdfFile } from "@/lib/qa/export-doc";
+import { downloadDocxFile } from "@/lib/qa/export-docx";
 import type { ReportCardData } from "@/types";
 
 // ---------- 轻量 markdown 分块（正文渲染与目录锚点共用，保证序号一致） ----------
@@ -195,8 +196,8 @@ function extractToc(md: string): { level: 2 | 3; text: string; anchor: string }[
   });
 }
 
-// ---------- 导出文档弹窗（叠加于抽屉之上） ----------
-function ExportDocModal({
+// ---------- 导出文档弹窗（叠加于抽屉/页面之上，卡片「下载」与面板「下载」共用） ----------
+export function ExportDocModal({
   open,
   defaultName,
   content,
@@ -221,7 +222,8 @@ function ExportDocModal({
   const handleExport = () => {
     const finalName = name.trim() || defaultName;
     if (format === "docx") {
-      downloadDocFile(finalName, content);
+      // Word 导出为真实 .docx（原生表格/自动目录/页眉页脚排版）
+      downloadDocxFile(finalName, content);
       toast("Word文档导出成功", "success");
     } else {
       downloadPdfFile(finalName, content);
@@ -275,6 +277,7 @@ function ExportDocModal({
 
 // ---------- 内联面板容器：与对话区并列（无蒙层、不锁定滚动），接口与 ui/Drawer 同构 ----------
 // 标题栏 + 内容区 + 底部操作条；ESC 关闭保留。报告/填表两个详情面板共用（label 区分语义）。
+// fillWidth：宽屏预览模式——占满外层容器宽度（忽略 width 上限），随面板扩展自适应。
 export function InlinePanel({
   open,
   onClose,
@@ -284,6 +287,7 @@ export function InlinePanel({
   label = "文档详情面板",
   headerExtra,
   footer,
+  fillWidth = false,
   children,
 }: {
   open: boolean;
@@ -294,6 +298,7 @@ export function InlinePanel({
   label?: string;
   headerExtra?: ReactNode;
   footer?: ReactNode;
+  fillWidth?: boolean;
   children: ReactNode;
 }) {
   useEffect(() => {
@@ -305,7 +310,12 @@ export function InlinePanel({
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <aside role="region" aria-label={label} className="h-full flex flex-col bg-white" style={{ width: `min(${width}px, 100vw)` }}>
+    <aside
+      role="region"
+      aria-label={label}
+      className={`h-full flex flex-col bg-white ${fillWidth ? "w-full" : ""}`}
+      style={fillWidth ? undefined : { width: `min(${width}px, 100vw)` }}
+    >
       {title && (
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 gap-3">
           <h3 className="font-semibold text-gray-800 truncate flex-1 min-w-0" title={typeof title === "string" ? title : undefined}>{title}</h3>
@@ -333,7 +343,7 @@ export function ReportDrawer({
   onClose,
   data,
   reportId,
-  autoExport = false,
+  wide = false,
   onStop,
   onRetry,
 }: {
@@ -341,7 +351,7 @@ export function ReportDrawer({
   onClose: () => void;
   data: ReportCardData | null;
   reportId: string;
-  autoExport?: boolean; // 打开面板后直接弹出导出文档弹窗（对话卡片「下载」入口）
+  wide?: boolean; // 宽屏预览：面板占满容器宽度（报告内容区随之增大）
   onStop: () => void;
   onRetry: () => void;
 }) {
@@ -358,9 +368,8 @@ export function ReportDrawer({
     if (open) {
       setShowShare(false);
       setTocOpen(false);
-      if (autoExport) setShowExport(true);
     }
-  }, [open, reportId, autoExport]);
+  }, [open, reportId]);
 
   // 生成中正文流式增长时自动滚动到底部（跟随最新输出）
   useEffect(() => {
@@ -375,7 +384,7 @@ export function ReportDrawer({
   const drawerTitle = !task
     ? "报告"
     : task.status === "generating"
-      ? `${task.title} ｜ 思考中...`
+      ? `${task.title} ｜ 正在思考...`
       : task.title;
 
   return (
@@ -385,6 +394,7 @@ export function ReportDrawer({
         onClose={onClose}
         title={drawerTitle}
         width={720}
+        fillWidth={wide}
         padding={false}
         headerExtra={
           task?.status === "done" ? (

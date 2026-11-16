@@ -35,10 +35,10 @@ import {
 } from "@/lib/mock-data/fill-form";
 import { exportTablesToExcel } from "@/lib/qa/export-excel";
 import { validateUploadFile, uploadedToTemplateItem } from "@/lib/mock-data/report-templates-admin";
-import { Sparkles, FileText, Plus, Eye } from "lucide-react";
+import { Sparkles, FileText, Plus, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { TemplatePickerModal } from "./TemplatePickerModal";
-import { ReportDrawer } from "./ReportDrawer";
+import { ReportDrawer, ExportDocModal } from "./ReportDrawer";
 import { FillDrawer } from "./FillDrawer";
 import { DataPreviewPanel } from "./DataPreviewPanel";
 import { QA_TOOLBAR_ICONS } from "@/components/layout/NavIcon";
@@ -136,16 +136,30 @@ export function ChatPanel({
   }, []);
 
   // ----- 报告生成状态机 -----
-  // 已选模板（方式一）/ 模板选择弹窗 / 大纲生成中 / 报告抽屉（autoExport=打开后直接弹导出）
+  // 已选模板（方式一）/ 模板选择弹窗 / 大纲生成中 / 报告抽屉
   const [reportTemplate, setReportTemplate] = useState<ReportTemplateItem | null>(null);
   // 对话内上传的填报文件（工具条「+」入口）：与已选模板互斥，发送后按通用对标表结构填表
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [outlineBusy, setOutlineBusy] = useState(false);
-  const [reportDrawer, setReportDrawer] = useState<{ open: boolean; msgId: string | null; autoExport: boolean }>({ open: false, msgId: null, autoExport: false });
+  const [reportDrawer, setReportDrawer] = useState<{ open: boolean; msgId: string | null }>({ open: false, msgId: null });
   // 数据预览面板（「选择数据范围」各表右侧「预览数据」按钮打开；与报告/填表面板互斥共用右栏）
   const [previewTable, setPreviewTable] = useState<{ id: string; name: string; enName?: string } | null>(null);
+  // 报告/报表面板宽屏预览：true 时面板扩展占满整行（智能问数区暂隐），仅隐藏不重置对话内容；
+  // wideWidth 为展开时实测的整行宽度（px，展开/收起均走 width 过渡实现平滑动画）。
+  // 打开/关闭/切换面板时复位为默认左右分栏；数据预览面板不参与宽屏模式。
+  const [panelWide, setPanelWide] = useState(false);
+  const [wideWidth, setWideWidth] = useState(720);
+  // 卡片「下载」弹出的导出文档弹窗（不打开右侧面板）：选择格式后浏览器直接下载
+  const [exportModal, setExportModal] = useState<{ open: boolean; msgId: string | null }>({ open: false, msgId: null });
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const togglePanelWide = useCallback(() => {
+    setPanelWide((v) => {
+      if (!v && rowRef.current) setWideWidth(Math.max(720, rowRef.current.clientWidth));
+      return !v;
+    });
+  }, []);
   // 报告任务计时器（阶段轮换）与大纲生成计时器；报告大纲上下文（含生成方式，供失败重试重跑）
   const reportTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const outlineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,7 +200,7 @@ export function ChatPanel({
     setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, executionNodes: nodes } : m)));
   }, []);
 
-  // 报告生成：阶段轮换（正在查询数据 → 正在生成第N章… → 正在整合报告）→ 流式逐字快速输出正文 → done。
+  // 报告生成：阶段轮换（正在查询数据 → 正在生成第N章… → 正在整合报告 → 正在渲染排版 DOCX）→ 流式逐字快速输出正文 → done。
   // mode 对应报告生成方式（template 按模板/outline 按要求+大纲/conversation 按对话），决定思考节点的执行流程文案；
   // 思考节点随进度推进：前 STAGE_NODES 步在阶段轮换期点亮，其余随流式输出比例点亮，完成后全部置为已完成。
   const runReportStages = useCallback((reportMsgId: string, outline: ReportOutline, turnCount: number, mode: ReportGenMode) => {
@@ -196,6 +210,7 @@ export function ChatPanel({
       "正在查询数据",
       ...outline.sections.map((s, i) => `正在生成第${i + 1}章：${s.title}`),
       "正在整合报告",
+      "正在渲染排版 DOCX",
     ];
     // 执行日志目标文本：已完成步骤逐行编号（对话页流式逐字打出）
     const logTarget = (doneCount: number) =>
@@ -438,7 +453,8 @@ export function ChatPanel({
         content: "",
         timestamp: Date.now(),
         fillCard: {
-          title: template.name,
+          // 报表名 = 统计周期 + 模板名（如「2026年10月能耗统计表」），卡片/面板/下载文件名统一使用
+          title: `${period}${template.name}`,
           status: "generating",
           stage: FILL_STAGES[0],
           templateId: template.id,
@@ -683,7 +699,8 @@ export function ChatPanel({
           const { period: nextPeriod, note } = applyFillEdit(rec.period, text);
           fillFlows.current[doneFill.id] = { ...rec, period: nextPeriod, text };
           beginFillRun(doneFill.id, rec.template, nextPeriod, text);
-          updateFillCard(doneFill.id, { period: nextPeriod, edited: true });
+          // 周期调整时同步更新报表名前缀（下载文件名随之更新）
+          updateFillCard(doneFill.id, { period: nextPeriod, title: `${nextPeriod}${rec.template.name}`, edited: true });
           runFillStages(doneFill.id, rec.template, nextPeriod, text);
           showToast(note);
           return;
@@ -713,8 +730,12 @@ export function ChatPanel({
         const task = doneReport.reportCard.task;
         const { content, note } = applyReportEdit(task.content ?? "", text);
         updateReportTask(doneReport.id, { content, edited: true });
-        setReportDrawer({ open: true, msgId: doneReport.id, autoExport: false });
-        setPreviewTable(null); // 右栏互斥：报告生成完成自动打开文档面板时关数据预览面板
+        // 编辑后仅长报告（>1500 字）自动打开右侧文档面板预览；短报告在对话中直接展示完整正文
+        if (content.length > 1500) {
+          setReportDrawer({ open: true, msgId: doneReport.id });
+          setPreviewTable(null); // 右栏互斥：打开文档面板时关数据预览面板
+          setPanelWide(false); // 面板打开/切换均复位为默认左右分栏
+        }
         showToast(note);
         return;
       }
@@ -882,9 +903,10 @@ export function ChatPanel({
 
   // 打开数据预览面板：菜单保持展开（左侧可继续切换数据表），右栏面板滑出并关闭报告/填表面板
   function openDataPreview(id: string, name: string, enName?: string) {
-    setReportDrawer({ open: false, msgId: null, autoExport: false });
+    setReportDrawer({ open: false, msgId: null });
     setFillDrawer({ open: false, msgId: null });
     setPreviewTable({ id, name, enName });
+    setPanelWide(false); // 数据预览不参与宽屏模式
   }
 
   // 行点击与预览图标共用：切换右侧数据预览面板到该表（案例数据预设项除外；勾选行为不受影响）
@@ -1193,8 +1215,8 @@ export function ChatPanel({
   // ========== 渲染 ==========
   // 双栏布局：左对话区（始终可见、可操作）+ 右文档详情面板（点「打开文件」滑出，无蒙层并列展示）
   return (
-    <div className="flex h-full min-w-0">
-      <div className="flex flex-col h-full flex-1 min-w-0">
+    <div ref={rowRef} className="flex h-full min-w-0">
+      <div className={`flex flex-col h-full flex-1 min-w-0 ${panelWide ? "overflow-hidden" : ""}`}>
       {/* Toast 通知 */}
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-gray-800 text-white text-sm rounded-lg shadow-lg animate-pulse">
@@ -1211,6 +1233,14 @@ export function ChatPanel({
           setShowTemplateModal(false);
         }}
         kindFilter={fillSkillOn ? "excel" : reportSkillOn ? "analysis" : undefined}
+      />
+
+      {/* 导出文档弹窗（卡片「下载」入口）：文件名可编辑 + Word(.docx)/PDF(.pdf) 格式选择 */}
+      <ExportDocModal
+        open={exportModal.open}
+        defaultName={messages.find((m) => m.id === exportModal.msgId)?.reportCard?.task?.title ?? "报告"}
+        content={messages.find((m) => m.id === exportModal.msgId)?.reportCard?.task?.content ?? ""}
+        onClose={() => setExportModal({ open: false, msgId: null })}
       />
 
       {/* ===== 内容区（唯一滚动区）：欢迎模式 / 消息列表 ===== */}
@@ -1299,12 +1329,18 @@ export function ChatPanel({
                   onOpenReport={(id) => {
                     setFillDrawer({ open: false, msgId: null }); // 右栏互斥：打开文档面板时关表格面板
                     setPreviewTable(null); // 右栏互斥：同时关数据预览面板
-                    setReportDrawer({ open: true, msgId: id, autoExport: false });
+                    setReportDrawer({ open: true, msgId: id });
+                    setPanelWide(false); // 切换面板复位为默认左右分栏
                   }}
                   onDownloadReport={(id) => {
-                    setFillDrawer({ open: false, msgId: null });
-                    setPreviewTable(null);
-                    setReportDrawer({ open: true, msgId: id, autoExport: true });
+                    // 卡片「下载」：弹出导出文档弹窗（文件名可编辑、选择 Word/PDF 格式），
+                    // 不打开右侧面板；导出由弹窗内完成下载与 toast 提示
+                    const task = messages.find((m) => m.id === id)?.reportCard?.task;
+                    if (!task || task.status !== "done" || !task.content) {
+                      showToast("报告尚未生成完成");
+                      return;
+                    }
+                    setExportModal({ open: true, msgId: id });
                   }}
                   onShareReport={(id) => {
                     try { navigator.clipboard?.writeText(`https://shifang.example.com/r/${id}`); } catch { /* 剪贴板不可用时静默 */ }
@@ -1312,9 +1348,10 @@ export function ChatPanel({
                   }}
                   onRetryReport={retryReportGeneration}
                   onOpenFill={(id) => {
-                    setReportDrawer({ open: false, msgId: null, autoExport: false }); // 右栏互斥：打开表格面板时关文档面板
+                    setReportDrawer({ open: false, msgId: null }); // 右栏互斥：打开表格面板时关文档面板
                     setPreviewTable(null); // 右栏互斥：同时关数据预览面板
                     setFillDrawer({ open: true, msgId: id });
+                    setPanelWide(false); // 切换面板复位为默认左右分栏
                   }}
                   onDownloadFill={downloadFill}
                   onShareFill={shareFill}
@@ -1326,7 +1363,7 @@ export function ChatPanel({
                   <div className="bg-gray-100 px-4 py-3 rounded-lg">
                     <div className="flex items-center gap-2 text-gray-500 text-sm">
                       <Spinner size="sm" />
-                      思考中...
+                      正在思考...
                     </div>
                   </div>
                 </div>
@@ -1356,29 +1393,44 @@ export function ChatPanel({
       </div>
       </div>
 
-      {/* ===== 右侧详情面板（文档/表格互斥）：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出 ===== */}
+      {/* ===== 右侧详情面板（文档/表格互斥）：与对话区并列（浅灰分割线分隔，无蒙层），宽度过渡从右侧滑出；
+        宽屏预览：报告/报表面板可扩展至整行宽度（智能问数区暂隐，对话内容保留），按钮在面板左缘切换 ===== */}
       <div
         className={`flex-shrink-0 h-full transition-[width] duration-300 overflow-hidden ${
           reportDrawer.open || fillDrawer.open || previewTable ? "w-[720px]" : "w-0"
         }`}
+        style={panelWide && (reportDrawer.open || fillDrawer.open) ? { width: wideWidth } : undefined}
       >
-        <div className="w-[720px] h-full border-l border-gray-100 bg-white">
+        <div className="relative w-full min-w-[720px] h-full border-l border-gray-100 bg-white">
+          {/* 宽屏预览切换（仅报告/报表面板；嵌入窄容器的 compact 模式不展示）：
+            左缘长条按钮（完全展示在面板内），默认「<」展开占满整行，宽屏态「>」返回左右分栏 */}
+          {(reportDrawer.open || fillDrawer.open) && !compact && (
+            <button
+              onClick={togglePanelWide}
+              title={panelWide ? "返回智能问数" : reportDrawer.open ? "展开报告面板" : "展开报表面板"}
+              aria-label={panelWide ? "返回智能问数" : reportDrawer.open ? "展开报告面板" : "展开报表面板"}
+              className="absolute left-0 top-1/2 z-20 flex h-12 w-6 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-gray-200 bg-white text-gray-400 shadow-md transition-colors hover:border-primary-300 hover:text-primary-600"
+            >
+              {panelWide ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            </button>
+          )}
           {/* 文档详情面板（报告） */}
           <ReportDrawer
             open={reportDrawer.open}
-            onClose={() => setReportDrawer({ open: false, msgId: null, autoExport: false })}
+            onClose={() => { setReportDrawer({ open: false, msgId: null }); setPanelWide(false); }}
             data={messages.find((m) => m.id === reportDrawer.msgId)?.reportCard ?? null}
             reportId={reportDrawer.msgId ?? "report"}
-            autoExport={reportDrawer.autoExport}
+            wide={panelWide && reportDrawer.open}
             onStop={stopReportGeneration}
             onRetry={() => reportDrawer.msgId && retryReportGeneration(reportDrawer.msgId)}
           />
           {/* 表格详情面板（智能填表，与文档面板互斥展示） */}
           <FillDrawer
             open={fillDrawer.open}
-            onClose={() => setFillDrawer({ open: false, msgId: null })}
+            onClose={() => { setFillDrawer({ open: false, msgId: null }); setPanelWide(false); }}
             data={messages.find((m) => m.id === fillDrawer.msgId)?.fillCard ?? null}
             fillId={fillDrawer.msgId ?? "fill"}
+            wide={panelWide && fillDrawer.open}
             onStop={stopFillGeneration}
             onRetry={() => fillDrawer.msgId && retryFillGeneration(fillDrawer.msgId)}
             onExport={(name) => fillDrawer.msgId && exportFill(fillDrawer.msgId, name)}

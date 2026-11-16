@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useMemo, useEffect, ReactNode } from "react";
-import { QaMessage, DISLIKE_REASONS, ExecutionNode, ReportOutline } from "@/types";
-import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { QaMessage, DISLIKE_REASONS, ExecutionNode, ReportOutline, FillTable } from "@/types";
+import { ThumbsUp, ThumbsDown, FileText, Table } from "lucide-react";
 import { ChartRenderer } from "./ChartRenderer";
 import { ResultTable } from "./ResultTable";
 import { CalculationProcess } from "./CalculationProcess";
 import { OutlineCard } from "./OutlineCard";
 import { ReportCard } from "./ReportCard";
 import { FillCard } from "./FillCard";
+import { MiniMarkdown } from "./ReportDrawer";
 import { QA_BUBBLE_ICONS } from "@/components/layout/NavIcon";
 import { useToast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -33,6 +34,12 @@ const CHART_LABELS: Record<string, string> = {
   table: "表格",
 };
 
+// 产品规则阈值：报告 ≤1500 字在对话中直接展示完整报告（>1500 字落报告卡片，点击右侧预览）；
+// 报表仅单 Sheet 且 ≤10 行 ≤8 列时在对话中直接展示完整表格（>10 行或多个 Sheet 落报表卡片）。
+const REPORT_INLINE_MAX_CHARS = 1500;
+const FILL_INLINE_MAX_ROWS = 10;
+const FILL_INLINE_MAX_COLS = 8;
+
 // 执行节点状态图标
 function nodeIcon(status: string): string {
   switch (status) {
@@ -44,8 +51,9 @@ function nodeIcon(status: string): string {
 }
 
 // 思考过程折叠面板（普通回答 / 大纲卡片 / 报告卡片共用）：Agent 执行流程时间线，
-// 生成中标题「思考中...」且自动展开（流式展示各步骤状态与耗时），执行结束自动折叠（支持手动展开查看）；
-// 其余「思考过程」并展示总用时（各步骤耗时求和）；节点状态图标 running⏳/completed✅/failed❌/pending○。
+// 生成中标题「正在思考...」且自动展开（流式展示各步骤状态与耗时），执行结束自动折叠（支持手动展开查看）；
+// 结束态标题按结果区分：成功「思考完成 · 用时Xs」/ 失败「执行失败 · 用时Xs」（总用时为各步骤耗时求和）；
+// 节点状态图标 running⏳/completed✅/failed❌/pending○。
 // avatar：AI 头像与标题同一行；streamLog：生成中的执行日志在面板内逐字逐行流式输出（替代独立日志区），
 // 结束后（可手动展开）仍显示节点时间线。
 function ThinkingPanel({ nodes, running, avatar, streamLog }: { nodes: ExecutionNode[]; running?: boolean; avatar?: ReactNode; streamLog?: string }) {
@@ -54,6 +62,8 @@ function ThinkingPanel({ nodes, running, avatar, streamLog }: { nodes: Execution
   useEffect(() => { if (!running) setShow(false); }, [running]);
   // 总用时：各步骤耗时求和（节点未带耗时不展示）
   const totalMs = nodes.reduce((n, node) => n + (node.duration ?? 0), 0);
+  // 状态文案统一：执行中「正在思考...」/ 执行成功「思考完成 · 用时Xs」/ 执行失败「执行失败 · 用时Xs」
+  const hasFailed = nodes.some((n) => n.status === "failed");
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
       <button
@@ -63,8 +73,8 @@ function ThinkingPanel({ nodes, running, avatar, streamLog }: { nodes: Execution
         <span className="text-gray-700 flex items-center gap-1.5 min-w-0">
           {avatar}
           <span className="flex items-center gap-1 truncate">
-            {QA_BUBBLE_ICONS.thinking} {running ? "思考中..." : "思考过程"}
-            {!running && totalMs > 0 && <span className="text-gray-400"> · 用时{(totalMs / 1000).toFixed(2)}秒</span>}
+            {QA_BUBBLE_ICONS.thinking} {running ? "正在思考..." : hasFailed ? "执行失败" : "思考完成"}
+            {!running && totalMs > 0 && <span className="text-gray-400"> · 用时{Math.round(totalMs / 1000)}s</span>}
           </span>
         </span>
         <span
@@ -297,6 +307,132 @@ function FeedbackActions({
   );
 }
 
+// ---------- 对话内直接展示的完整成果（短报告 / 小报表，替代任务卡片） ----------
+
+// 头部行共用：图标 + 标题.扩展名 + 完成标记 + hover 下载/分享（与任务卡片同款按钮样式）
+function InlineResultHeader({
+  icon,
+  title,
+  ext,
+  onDownload,
+  onShare,
+  downloadTitle,
+}: {
+  icon: ReactNode;
+  title: string;
+  ext: string;
+  onDownload: () => void;
+  onShare: () => void;
+  downloadTitle: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-gray-100">
+      <span className="flex-shrink-0 flex items-center">{icon}</span>
+      <span className="text-sm font-medium text-gray-800 truncate">
+        {title}
+        <span className="text-gray-400 font-normal">.{ext}</span>
+      </span>
+      <span className="text-xs text-gray-400 flex-shrink-0">生成已完成</span>
+      <div className="ml-auto flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={(e) => { e.stopPropagation(); onDownload(); }}
+          className="px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
+          title={downloadTitle}
+        >
+          ⬇ 下载
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onShare(); }}
+          className="px-2 py-1 text-xs text-gray-500 bg-white border border-gray-200 rounded-lg hover:text-primary-600 hover:border-primary-300 shadow-sm transition-colors"
+          title="复制分享链接"
+        >
+          🔗 分享
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// 短报告（≤1500 字）完成态：对话中直接展示完整报告正文（与右侧面板同款 MiniMarkdown 渲染）
+function InlineReportView({
+  title,
+  content,
+  onDownload,
+  onShare,
+}: {
+  title: string;
+  content: string;
+  onDownload: () => void;
+  onShare: () => void;
+}) {
+  return (
+    <div className="group border border-gray-200 bg-white rounded-xl overflow-hidden min-w-0" aria-label="报告正文">
+      <InlineResultHeader
+        icon={<FileText size={18} className="text-blue-600" />}
+        title={title}
+        ext="docx"
+        onDownload={onDownload}
+        onShare={onShare}
+        downloadTitle="下载报告文档"
+      />
+      <div className="px-5 py-4">
+        <MiniMarkdown md={content} withCharts />
+      </div>
+    </div>
+  );
+}
+
+// 小报表（单 Sheet 且 ≤10 行 ≤8 列）完成态：对话中直接展示完整表格
+function InlineFillView({
+  title,
+  sheet,
+  onDownload,
+  onShare,
+}: {
+  title: string;
+  sheet: FillTable;
+  onDownload: () => void;
+  onShare: () => void;
+}) {
+  return (
+    <div className="group border border-gray-200 bg-white rounded-xl overflow-hidden min-w-0" aria-label="报表内容">
+      <InlineResultHeader
+        icon={<Table size={18} className="text-green-600" />}
+        title={title}
+        ext="xlsx"
+        onDownload={onDownload}
+        onShare={onShare}
+        downloadTitle="下载报表(.xlsx)"
+      />
+      <div className="px-4 py-3 overflow-x-auto">
+        <p className="text-xs text-gray-500 mb-2">{sheet.title}</p>
+        <table className="text-sm border-collapse">
+          <thead>
+            <tr>
+              {sheet.headers.map((h, i) => (
+                <th key={i} className="bg-gray-50 border border-gray-200 px-3 py-1.5 text-left text-xs font-medium text-gray-600 whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sheet.rows.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className="border border-gray-200 px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 interface MessageBubbleProps {
   message: QaMessage;
   isFavorited: boolean;
@@ -384,6 +520,19 @@ export function MessageBubble({
   );
   const inlineAvatar = !isUser && !isWelcome && hasThinkingPanel;
 
+  // 完成态成果的直接展示判定（生成中/已停止/失败仍走任务卡片展示进度与状态）：
+  // 报告 ≤1500 字 → 对话内完整正文；报表单 Sheet 且 ≤10 行 ≤8 列 → 对话内完整表格
+  const reportTask = message.reportCard?.kind === "report" ? message.reportCard.task : undefined;
+  const showInlineReport =
+    reportTask?.status === "done" && !!reportTask.content && reportTask.content.length <= REPORT_INLINE_MAX_CHARS;
+  const fillSheets = message.fillCard?.tables;
+  const showInlineFill =
+    message.fillCard?.status === "done" &&
+    !!fillSheets &&
+    fillSheets.length === 1 &&
+    fillSheets[0].rows.length <= FILL_INLINE_MAX_ROWS &&
+    fillSheets[0].headers.length <= FILL_INLINE_MAX_COLS;
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       {/* 大纲确认卡片铺满中间内容区；报告/填表卡片固定 95% 宽（不随 hover 按钮出现变宽）；普通气泡仍 78% */}
@@ -404,7 +553,7 @@ export function MessageBubble({
         {/* ===== 报告卡片消息（大纲确认 / 报告任务）：不套普通气泡与操作栏 ===== */}
         {!isUser && message.reportCard && (
           <div className="space-y-1.5">
-            {/* Agent 执行流程：大纲/报告卡片上方同样展示思考过程（报告生成中标题为「思考中...」，
+            {/* Agent 执行流程：大纲/报告卡片上方同样展示思考过程（报告生成中标题为「正在思考...」，
                 执行日志在面板内逐字逐行流式输出，节点实时推进） */}
             {message.executionNodes?.length ? (
               <ThinkingPanel
@@ -423,16 +572,26 @@ export function MessageBubble({
               />
             ) : (
               <>
-                {/* 任务卡片：思考期隐藏，开始生成正文（文档）时才展示——位于执行过程步骤下方 */}
+                {/* 任务卡片/完整报告：思考期隐藏，开始生成正文（文档）时才展示——位于执行过程步骤下方。
+                    ≤1500 字的短报告完成态直接展示完整正文（InlineReportView），其余走报告卡片 */}
                 {!message.reportCard.task?.hidden && (
                   <>
-                    <ReportCard
-                      data={message.reportCard}
-                      onOpen={() => onOpenReport?.(message.id)}
-                      onDownload={() => onDownloadReport?.(message.id)}
-                      onShare={() => onShareReport?.(message.id)}
-                      onRetry={() => onRetryReport?.(message.id)}
-                    />
+                    {showInlineReport ? (
+                      <InlineReportView
+                        title={reportTask!.title}
+                        content={reportTask!.content!}
+                        onDownload={() => onDownloadReport?.(message.id)}
+                        onShare={() => onShareReport?.(message.id)}
+                      />
+                    ) : (
+                      <ReportCard
+                        data={message.reportCard}
+                        onOpen={() => onOpenReport?.(message.id)}
+                        onDownload={() => onDownloadReport?.(message.id)}
+                        onShare={() => onShareReport?.(message.id)}
+                        onRetry={() => onRetryReport?.(message.id)}
+                      />
+                    )}
                     {/* 卡片下方：收藏 / 点赞 / 点踩 */}
                     <FeedbackActions
                       msgId={message.id}
@@ -458,16 +617,26 @@ export function MessageBubble({
                 avatar={aiAvatar}
               />
             ) : null}
-            {/* 任务卡片：思考期隐藏，开始填充数据时才展示——位于执行过程步骤下方 */}
+            {/* 任务卡片/完整表格：思考期隐藏，开始填充数据时才展示——位于执行过程步骤下方。
+                单 Sheet 且 ≤10 行 ≤8 列的小报表完成态直接展示完整表格（InlineFillView），其余走报表卡片 */}
             {!message.fillCard.hidden && (
               <>
-                <FillCard
-                  data={message.fillCard}
-                  onOpen={() => onOpenFill?.(message.id)}
-                  onDownload={() => onDownloadFill?.(message.id)}
-                  onShare={() => onShareFill?.(message.id)}
-                  onRetry={() => onRetryFill?.(message.id)}
-                />
+                {showInlineFill ? (
+                  <InlineFillView
+                    title={message.fillCard.title}
+                    sheet={fillSheets![0]}
+                    onDownload={() => onDownloadFill?.(message.id)}
+                    onShare={() => onShareFill?.(message.id)}
+                  />
+                ) : (
+                  <FillCard
+                    data={message.fillCard}
+                    onOpen={() => onOpenFill?.(message.id)}
+                    onDownload={() => onDownloadFill?.(message.id)}
+                    onShare={() => onShareFill?.(message.id)}
+                    onRetry={() => onRetryFill?.(message.id)}
+                  />
+                )}
                 {/* 卡片下方：收藏 / 点赞 / 点踩 */}
                 <FeedbackActions
                   msgId={message.id}

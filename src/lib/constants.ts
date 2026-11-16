@@ -1,6 +1,7 @@
 import { NavItem } from "@/types";
 
 // 一级导航（左侧纵向菜单）
+// 「仪表盘问数 /energy/overview」已隐藏（页面代码保留，入口暂时移除，恢复时加回本列表即可）
 export const PRIMARY_NAV: NavItem[] = [
   { label: "智能问数", href: "/qa", icon: "💬" },
   { label: "告警中心", href: "/quality/alert", icon: "⚠️", children: [
@@ -8,7 +9,6 @@ export const PRIMARY_NAV: NavItem[] = [
     { label: "告警管理", href: "/quality/alert/management", icon: "🛠️" },
   ]},
   { label: "指标溯源", href: "/metric-trace", icon: "🔗" },
-  { label: "仪表盘问数", href: "/energy/overview", icon: "📊" },
 ];
 
 // 管理后台二级导航（配置中心）

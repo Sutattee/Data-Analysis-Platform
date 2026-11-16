@@ -37,6 +37,7 @@ export function FillCard({
           title={task.status === "done" ? "点击预览报表" : "点击查看生成进度"}
         >
           {task.title}
+          <span className="text-gray-400 font-normal">.xlsx</span>
         </button>
         {/* 行尾组：恒占位 + hover 显现（opacity 过渡），行高与卡片高度固定不变 */}
         {task.status === "done" && (

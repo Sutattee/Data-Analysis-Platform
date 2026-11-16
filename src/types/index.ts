@@ -145,7 +145,7 @@ export interface FillTable {
 
 // 对话内填表任务卡片（挂在 QaMessage.fillCard 上，作为会话记录的一部分）
 export interface FillCardData {
-  title: string;              // 报表名（模板名）
+  title: string;              // 报表名（统计周期 + 模板名，如「2026年10月能耗统计表」）
   status: "generating" | "done" | "stopped" | "failed";
   stage?: string;             // 正在解析模板 / 正在查询数据 / 正在填充工作表 / 正在校验填报结果
   failReason?: string;        // 失败或手动停止的原因
