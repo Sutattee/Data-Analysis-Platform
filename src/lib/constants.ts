@@ -23,6 +23,7 @@ export const SETTINGS_NAV: SettingsNavGroup[] = [
     items: [
       { label: "数据源",     href: "/settings/data-source" },
       { label: "元数据管理", href: "/settings/metadata" },
+      { label: "业务域管理", href: "/settings/domain-management" },
       { label: "指标管理",   href: "/settings/metric-management" },
       { label: "业务术语",   href: "/settings/biz-term" },
       { label: "业务逻辑",   href: "/settings/biz-logic" },
