@@ -14,7 +14,7 @@ import { useApp } from "@/lib/store/AppContext";
 import { useToast } from "@/components/ui/Toast";
 import { ALERT_RECORDS, orgPathOf, EMPTY_ORG_FILTER, type OrgFilter } from "@/lib/mock-data/alerts";
 import { EXPENSE_ALERT_METRIC_NAMES, EXPENSE_ALERT_METRIC_SUFFIX, expenseSubjectOfMetric } from "@/lib/mock-data/expense-alerts";
-import { TYPE_DISPLAY, QUALITY_MACHINES, qualityCycleUnitOf } from "@/lib/mock-data/quality-alerts";
+import { TYPE_DISPLAY, qualityCycleUnitOf } from "@/lib/mock-data/quality-alerts";
 import { DEPT_STATS } from "@/lib/mock-data/expense-indicators";
 import { EXPENSE_NODES } from "@/lib/mock-data/expense-overview";
 import { OrgCascaderFilter } from "@/components/alert/OrgCascaderFilter";
@@ -34,9 +34,8 @@ interface StratFilter {
   enabled: string;
   dept: string;      // 费用口径：部门筛选（"" = 全部部门）
   subjectId: string; // 费用口径：费用科目筛选（"all" = 全部费用）
-  machine: string;   // 质量口径：机台筛选（"" = 全部机台）
 }
-const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "", dept: "", subjectId: "all", machine: "" };
+const EMPTY_FILTER: StratFilter = { keyword: "", type: "", enabled: "", dept: "", subjectId: "all" };
 
 // 费用科目下拉选项：全角空格缩进表层级（同费用总览 ExpenseHeader）
 const SUBJECT_OPTIONS = EXPENSE_NODES.map((n) => ({
@@ -67,7 +66,7 @@ const selectCls =
 // 不传 → 展示全部并排除费用预算执行策略（能源告警中心维持原有口径，且排除质量 QAS 前缀）
 // basePath：新建/编辑路由前缀（费用预算执行传 /expense/alert/management；缺省按 metrics 二分保持兼容）
 // variant="expense"：费用口径列结构（含所属部门、无告警等级列）与 部门+费用科目 筛选区
-// variant="quality"：工艺质量口径（QAS 前缀策略；实测异常+预测风险均展示，告警类型单列；机台筛选）
+// variant="quality"：工艺质量口径（QAS 前缀策略；实测异常+预测风险均展示，告警类型单列）
 export function AlertStrategiesList({
   metrics,
   basePath,
@@ -178,17 +177,14 @@ export function AlertStrategiesList({
         return c.metric.toLowerCase().includes(k) || sp.toLowerCase().includes(k);
       });
     }
-    // 质量口径：机台命中（策略告警对象含选中机台即保留）
-    function matchQualityFilters(s: AlertStrategy): boolean {
-      return !applied.machine || s.objects.includes(applied.machine);
-    }
     const filtered = strategies.filter(
       (s) =>
         matchKeyword(s) &&
         (!applied.enabled || (applied.enabled === "启用" ? s.enabled : !s.enabled)) &&
         // 质量口径：告警类型表头筛选（实测异常/预测风险，存储枚举经展示文案映射比较）
         (!isQuality || !applied.type || TYPE_DISPLAY[s.type] === applied.type) &&
-        (isExpense ? matchExpenseFilters(s) : isQuality ? matchQualityFilters(s) : matchStrategyOrg(s))
+        // 质量口径无独立筛选（组织层级筛选对空值恒命中）；费用口径走部门+科目
+        (isExpense ? matchExpenseFilters(s) : matchStrategyOrg(s))
     );
     return [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [strategies, applied, orgFilter, isExpense, isQuality]);
@@ -207,7 +203,6 @@ export function AlertStrategiesList({
       keyword: filter.keyword,
       dept: filter.dept,
       subjectId: filter.subjectId,
-      machine: filter.machine,
     }));
     setPage(1);
     runLoad();
@@ -294,22 +289,6 @@ export function AlertStrategiesList({
             placeholder={isExpense ? "搜索告警名称、部门名称、费用名称、指标名称" : "搜索告警名称"}
             className="w-[480px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
           />
-          {/* 质量口径：机台筛选紧随搜索框（查询/重置之前），与搜索同排 */}
-          {isQuality && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">机台</span>
-              <select
-                className={selectCls}
-                value={filter.machine}
-                onChange={(e) => setFilter({ ...filter, machine: e.target.value })}
-              >
-                <option value="">全部机台</option>
-                {QUALITY_MACHINES.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <Button onClick={handleSearch}>查询</Button>
           <Button variant="secondary" onClick={handleReset}>重置</Button>
           {isAdmin && (
