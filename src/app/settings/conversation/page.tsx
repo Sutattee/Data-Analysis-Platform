@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   conversationRecords,
   formatDuration,
-  SAMPLE_ELIGIBLE_TYPES,
   STATUS_STYLE,
   ConversationItem,
   ConvStatus,
@@ -46,7 +45,6 @@ export default function ConversationPage() {
   const [fEnd, setFEnd] = useState("");
   const [fStatus, setFStatus] = useState("all");
   const [fFeedback, setFFeedback] = useState("all");
-  const [fSample, setFSample] = useState("all");
   const [showMore, setShowMore] = useState(false);
 
   // 行勾选
@@ -63,13 +61,11 @@ export default function ConversationPage() {
       if (fTitle && !r.title.toLowerCase().includes(fTitle.trim().toLowerCase())) return false;
       if (fStatus !== "all" && r.status !== fStatus) return false;
       if (fFeedback !== "all" && r.feedback !== fFeedback) return false;
-      if (fSample === "in" && !r.inSampleSet) return false;
-      if (fSample === "out" && r.inSampleSet) return false;
       if (fStart && r.startTime < normTime(fStart)) return false;
       if (fEnd && r.startTime > normTime(fEnd)) return false;
       return true;
     });
-  }, [records, fUser, fTitle, fStatus, fFeedback, fSample, fStart, fEnd]);
+  }, [records, fUser, fTitle, fStatus, fFeedback, fStart, fEnd]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -84,11 +80,6 @@ export default function ConversationPage() {
   function toggleAll() {
     if (allChecked) setSelectedIds([]);
     else setSelectedIds(filtered.map((r) => r.id));
-  }
-
-  function addToSample(id: string) {
-    setRecords((prev) => prev.map((r) => (r.id === id ? { ...r, inSampleSet: true } : r)));
-    toast("已加入问题样本集", "success");
   }
 
   function copyTitle(text: string) {
@@ -111,10 +102,10 @@ export default function ConversationPage() {
       toast("没有可导出的数据", "warning");
       return;
     }
-    const headers = ["用户", "对话名称", "耗时", "对话状态", "用户评价", "样本问题集", "数据模型", "问题类型", "开始时间"];
+    const headers = ["用户", "对话名称", "耗时", "对话状态", "用户评价", "数据模型", "问题类型", "开始时间"];
     const rows = targets.map((r) => [
       r.user, r.title, formatDuration(r.durationSec), r.status, r.feedback,
-      r.inSampleSet ? "已加入" : "未加入", r.dataModel, r.questionType, r.startTime,
+      r.dataModel, r.questionType, r.startTime,
     ]);
     const csv = "﻿" + [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -129,7 +120,7 @@ export default function ConversationPage() {
 
   function resetFilters() {
     setFUser(""); setFTitle(""); setFStart(""); setFEnd("");
-    setFStatus("all"); setFFeedback("all"); setFSample("all");
+    setFStatus("all"); setFFeedback("all");
     setPage(1);
   }
 
@@ -175,14 +166,6 @@ export default function ConversationPage() {
                 <option value="点赞">点赞</option>
                 <option value="点踩">点踩</option>
                 <option value="未反馈">未反馈</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">问题样本集</label>
-              <select value={fSample} onChange={(e) => setFSample(e.target.value)} className={selectCls}>
-                <option value="all">全部</option>
-                <option value="in">已加入</option>
-                <option value="out">未加入</option>
               </select>
             </div>
           </div>
@@ -232,16 +215,14 @@ export default function ConversationPage() {
                 <th className={th}>耗时</th>
                 <th className={th}>对话状态</th>
                 <th className={th}>用户评价</th>
-                <th className={th}>样本问题集</th>
                 <th className={th}>开始时间</th>
                 <th className={`${th} text-right`}>操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {paged.length === 0 ? (
-                <tr><td colSpan={9} className="py-16 text-center text-sm text-gray-400">暂无数据</td></tr>
+                <tr><td colSpan={8} className="py-16 text-center text-sm text-gray-400">暂无数据</td></tr>
               ) : paged.map((r) => {
-                const eligible = SAMPLE_ELIGIBLE_TYPES.includes(r.questionType);
                 return (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
@@ -275,11 +256,6 @@ export default function ConversationPage() {
                         : r.feedback === "点踩" ? <span className="text-red-500 text-xs">👎 点踩</span>
                         : <span className="text-gray-400 text-xs">未反馈</span>}
                     </td>
-                    <td className={td}>
-                      {r.inSampleSet
-                        ? <span className="text-xs text-primary-600">已加入</span>
-                        : <span className="text-xs text-gray-400">未加入</span>}
-                    </td>
                     <td className={td + " text-gray-500 font-mono text-xs whitespace-nowrap"}>{r.startTime}</td>
                     <td className={td + " text-right whitespace-nowrap"}>
                       <div className="inline-flex items-center gap-1">
@@ -290,17 +266,6 @@ export default function ConversationPage() {
                         >
                           📋
                         </button>
-                        {eligible ? (
-                          <button
-                            onClick={() => addToSample(r.id)}
-                            title="加入问题样本集"
-                            className="p-1.5 text-base text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition-colors leading-none"
-                          >
-                            ➕
-                          </button>
-                        ) : (
-                          <span title="该问题类型不支持加入样本集" className="p-1.5 text-base text-gray-300 leading-none">➕</span>
-                        )}
                       </div>
                     </td>
                   </tr>
