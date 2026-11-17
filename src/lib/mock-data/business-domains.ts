@@ -10,7 +10,7 @@ export interface BusinessDomain {
   name: string; // 业务域名称
 }
 
-// 初始业务域：平台各模块在用口径 + 「综合管理」未被引用（演示可删除）
+// 初始业务域：覆盖平台各模块在用口径（指标管理 / 报告模板 / 标准问答）
 export const BUSINESS_DOMAINS_SEED: BusinessDomain[] = [
   { id: "bd-001", name: "生产管理" },
   { id: "bd-002", name: "工艺质量" },
@@ -21,6 +21,7 @@ export const BUSINESS_DOMAINS_SEED: BusinessDomain[] = [
   { id: "bd-007", name: "质量管理" },
   { id: "bd-008", name: "安全生产" },
   { id: "bd-009", name: "综合管理" },
+  { id: "bd-010", name: "费用管理" },
 ];
 
 // 引用检测：返回仍在引用该业务域的业务模块及数量（结果为空 = 无引用，可删除）

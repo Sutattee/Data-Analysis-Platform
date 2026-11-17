@@ -420,3 +420,19 @@ export const metricList: MetricManage[] = [
     updatedAt: "2026-09-10 15:00",
   },
 ];
+
+// 关联数据表选择层级：数据源 → 该数据源下的数据表（供新增/编辑指标选择，支持多选）
+export interface SourceTableGroup {
+  source: string;   // 数据源名称
+  tables: string[]; // 该数据源下的数据表
+}
+
+export const METRIC_SOURCE_TABLES: SourceTableGroup[] = [
+  { source: "MES生产数据库", tables: ["ads_plan_achieve", "ads_equip_efficiency", "ads_hourly_output"] },
+  { source: "能源管理库",    tables: ["ads_energy_per_box", "ads_carbon_output"] },
+  { source: "ERP核心库",     tables: ["ads_expense_controllable", "ads_fin_manual_value"] },
+  { source: "物料管理库",    tables: ["ads_material_consume"] },
+  { source: "质量检验系统",  tables: ["ads_quality_rate", "ads_moisture_dev"] },
+  { source: "设备监控API",   tables: ["ads_stop_rate"] },
+  { source: "人力资源库",    tables: ["ads_hr_manual_value"] },
+];

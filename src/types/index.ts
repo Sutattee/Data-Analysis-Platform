@@ -575,7 +575,9 @@ export interface MetricManage {
   defaultAgg?: string;     // 默认聚合
   derivedFormula?: string; // 派生公式
   sourceId?: string;       // 数据源ID
-  mainTable?: string;      // 主表
+  mainTable?: string;      // 主表（兼容字段，取关联数据表首个）
+  relatedSources?: string[]; // 关联数据源（多选）
+  relatedTables?: string[]; // 关联数据表（多选）
   measureExpr?: string;    // 度量表达式
   target?: { value: number; direction: "不高于" | "不低于" }; // 目标值（目标值管理）
   reverseItems?: string[]; // 达标反推内容（由 AI 生成 / 手动维护，仅配置目标值的指标开放）
